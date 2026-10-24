@@ -101,6 +101,9 @@
     box-shadow: 0 .4vw 1.4vw rgba(0,0,0,.35); outline: .18vw solid transparent; outline-offset: .25vw; transition: outline-color .2s ease; }
   .app .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .app .tile.square img { object-fit: contain; padding: .6vw; }
+  .app.r { width: 6.2vw; }
+  .app .tile.round { width: 6.2vw; height: 6.2vw; border-radius: 50%; background: none; outline: none; }
+  .app.on .tile.round { box-shadow: 0 0 0 .2vw rgba(255,255,255,.9), 0 .4vw 1.4vw rgba(0,0,0,.35); }
   .app .name { font-size: .85vw; margin-top: .6vw; color: var(--muted); opacity: 0; transition: opacity .2s ease; }
   .app.on { transform: scale(1.12); }
   .app.on .tile { outline-color: rgba(255,255,255,.9); }
@@ -428,13 +431,21 @@
     for (var i = 0; i < els.length; i++) els[i].classList.toggle("on", row === 1 && i === col[1]);
   }
   function rowLen(r) { return r === 0 ? tops.length : apps.length; }
+  // Custom round icons in web/icons/ (by package); other apps fall back to the TV's own banner or icon.
+  var ICONS = {
+    "com.amazon.tv.launcher": "firetv", "com.netflix.ninja": "netflix", "com.amazon.firetv.youtube": "youtube",
+    "com.amazon.firebat": "prime", "com.hbo.hbonow": "hbomax", "com.disney.disneyplus": "disney",
+    "com.spotify.tv.android": "spotify"
+  };
   function loadApps() {
     if (!window.TV || !TV.apps) return;
     show("topbar", true);
     try { apps = JSON.parse(TV.apps()) || []; } catch (e) { apps = []; }
     if (apps.length) {
       $("apps").innerHTML = apps.map(function (a) {
-        return '<div class="app"><div class="tile' + (a.banner ? "" : " square") + '"><img alt="" src="' + a.icon + '"></div><div class="name">' + esc(a.label) + "</div></div>";
+        var own = ICONS[a.pkg];
+        var cls = own ? " round" : (a.banner ? "" : " square");
+        return '<div class="app' + (own ? " r" : "") + '"><div class="tile' + cls + '"><img alt="" src="' + (own ? "icons/" + own + ".webp" : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
       }).join("");
       show("apps", true);
     } else row = 0;

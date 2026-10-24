@@ -57,7 +57,7 @@ app asks for on first launch.
 ## Repository
 
 ```
-web/                      the dashboard page (index.html) and background player (bg.js)
+web/                      the dashboard page (index.html), background player (bg.js), app icons (icons/)
 videos/                   background clips; compressed for the TV on publish
 supabase/functions/       tv-dashboard (data for the page), work-calendar-ingest (work calendar)
 android/                  the TV app: full screen WebView, app row bridge, Home redirect, screensaver
@@ -71,6 +71,7 @@ docs/                     architecture, TV setup, data and config, Power Automat
 * **Location, time zone, trips, subway stop:** edit the `tv_config` row in Supabase ([docs/data.md](docs/data.md)). No code change or publish needed.
 * **Look and layout:** edit `web/index.html`. The TV picks it up on its daily reload, or press ☰ Menu.
 * **App row:** edit the list in `android/app/src/main/java/app/tvdashboard/TvBridge.java` and reinstall the app ([docs/tv-setup.md](docs/tv-setup.md)).
+* **App icons:** round 192×192 WebP files in `web/icons/`, mapped by package in `ICONS` in `web/index.html`. Apps without one use the TV's own banner.
 
 ## Docs
 
