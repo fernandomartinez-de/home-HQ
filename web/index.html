@@ -110,6 +110,19 @@
   .app.on { transform: scale(1.12); }
   .app.on .tile { outline-color: rgba(255,255,255,.9); }
   .app.on .name { opacity: 1; color: var(--text); }
+  /* Spotify now playing, under the app row; only while Spotify is playing or paused */
+  .np { position: fixed; left: 50%; top: 70.5%; transform: translateX(-50%); display: flex; align-items: center; gap: 1.1vw;
+    padding: .55vw 1.3vw .55vw .55vw; border-radius: .9vw; background: rgba(10,12,16,.38); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 .4vw 1.6vw rgba(0,0,0,.3); width: 28vw; transition: opacity .6s ease; }
+  .np img { width: 3.8vw; height: 3.8vw; border-radius: .5vw; object-fit: cover; flex: none; background: rgba(255,255,255,.08); }
+  .np .meta { min-width: 0; flex: 1; }
+  .np .src { font-size: .7vw; letter-spacing: .12vw; text-transform: uppercase; color: #1ed760; font-weight: 600; }
+  .np .src.paused { color: var(--muted); }
+  .np .ttl { font-size: 1.15vw; font-weight: 500; margin-top: .15vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .art { font-size: .9vw; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .bar { height: .18vw; background: rgba(255,255,255,.15); border-radius: .1vw; margin-top: .5vw; overflow: hidden; }
+  .np .bar i { display: block; height: 100%; width: 0; background: #1ed760; transition: width 1s linear; }
+  .np .tm { display: flex; justify-content: space-between; font-size: .7vw; color: var(--muted); margin-top: .25vw; font-variant-numeric: tabular-nums; }
   /* Top buttons: settings, inputs, Wi-Fi */
   .topbar { position: fixed; top: 2.4vw; left: 50%; transform: translateX(-50%); display: flex; gap: 1vw; align-items: center;
     transition: opacity .8s ease; }
@@ -207,6 +220,16 @@
     </div>
   </div>
   <div class="apps hidden" id="apps"></div>
+  <div class="np hidden" id="np">
+    <img id="npArt" alt="">
+    <div class="meta">
+      <div class="src" id="npSrc">Spotify · Playing</div>
+      <div class="ttl" id="npTitle"></div>
+      <div class="art" id="npArtist"></div>
+      <div class="bar"><i id="npBar"></i></div>
+      <div class="tm"><span id="npPos"></span><span id="npDur"></span></div>
+    </div>
+  </div>
   <div class="foot" id="foot"></div>
 
 <script src="bg.js"></script>
@@ -435,6 +458,27 @@
     var els = $("apps").children;
     for (var i = 0; i < els.length; i++) els[i].classList.toggle("on", row === 1 && i === col[1]);
   }
+  // Spotify now playing (needs notification access for the app; see docs/tv-setup.md)
+  var np = { active: false }, npArtKey = "";
+  function mmss(ms) { var t = Math.floor((ms || 0) / 1000); return Math.floor(t / 60) + ":" + ("0" + t % 60).slice(-2); }
+  function updateNowPlaying() {
+    if (!window.TV || !TV.nowPlaying) return;
+    try { np = JSON.parse(TV.nowPlaying()) || { active: false }; } catch (e) { np = { active: false }; }
+    show("np", !!np.active);
+    if (!np.active) return;
+    $("npSrc").textContent = "Spotify · " + (np.playing ? "Playing" : "Paused");
+    $("npSrc").className = "src" + (np.playing ? "" : " paused");
+    $("npTitle").textContent = np.title || "";
+    $("npArtist").textContent = np.artist || "";
+    var key = (np.title || "") + "|" + (np.artist || "");
+    if (key !== npArtKey) { npArtKey = key; if (np.art) $("npArt").src = np.art; else $("npArt").removeAttribute("src"); }
+    var pct = np.duration > 0 ? Math.min(100, np.position / np.duration * 100) : 0;
+    $("npBar").style.width = pct + "%";
+    $("npPos").textContent = mmss(np.position);
+    $("npDur").textContent = np.duration > 0 ? mmss(np.duration) : "";
+  }
+  setInterval(updateNowPlaying, 1000);
+
   function rowLen(r) { return r === 0 ? tops.length : apps.length; }
   // Custom round icons in web/icons/ (by package); other apps fall back to the TV's own banner or icon.
   var ICONS = {
@@ -468,7 +512,11 @@
 
   window.tvKey = function (k) {
     wake();
-    if (k === "ff" || k === "rw") { if (window.bgVideo) window.bgVideo(k === "ff" ? "next" : "prev"); return; }
+    if (k === "ff" || k === "rw") {            // skip tracks while Spotify is on, otherwise switch background videos
+      if (np.active && window.TV && TV.media) { TV.media(k === "ff" ? "next" : "prev"); setTimeout(updateNowPlaying, 400); }
+      else if (window.bgVideo) window.bgVideo(k === "ff" ? "next" : "prev");
+      return;
+    }
     if (k === "up" && row === 1) row = 0;
     else if (k === "down" && row === 0 && apps.length) row = 1;
     else if (k === "left" && rowLen(row)) col[row] = (col[row] - 1 + rowLen(row)) % rowLen(row);

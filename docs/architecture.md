@@ -10,8 +10,10 @@ flowchart TB
     subgraph TV["Fire TV"]
         direction TB
         MA["MainActivity<br/>full screen WebView"]
-        BR["TvBridge<br/>window.TV: apps, launch,<br/>system screens, network"]
+        BR["TvBridge<br/>window.TV: apps, launch,<br/>system screens, network, now playing"]
         HS["HomeService<br/>accessibility: Home and wake redirect"]
+        ML["MediaListener<br/>notification access for Spotify now playing"]
+        ML -. media sessions .-> BR
         DR["DashboardDream<br/>screensaver"]
         BT["BootReceiver<br/>open on boot"]
         MA --- BR

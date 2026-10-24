@@ -38,6 +38,13 @@ Home shows the stock home for a moment before the dashboard replaces it; Fire OS
 anything faster. The **Fire TV** tile on the app row opens the stock home on purpose (for
 settings and other apps); press Home there to come back.
 
+Optional, show what Spotify is playing on the dashboard (album art, song, progress; ⏪/⏩ skip
+tracks while it shows). Reading media sessions needs notification access for the app:
+
+```powershell
+adb -s $tv shell cmd notification allow_listener "$app/.MediaListener"
+```
+
 Optional, use the dashboard as the screensaver too:
 
 ```powershell
@@ -59,6 +66,7 @@ adb -s $tv shell settings put secure screensaver_components "$app/.DashboardDrea
 
 ```powershell
 adb -s $tv shell settings put secure enabled_accessibility_services '""'
+adb -s $tv shell cmd notification disallow_listener "$app/.MediaListener"
 adb -s $tv shell settings put secure screensaver_components com.amazon.ftv.screensaver/.app.services.ScreensaverService
 adb -s $tv uninstall $app
 ```

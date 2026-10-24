@@ -61,6 +61,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Spotify now playing: holds the notification access that reading media sessions requires -->
+        <service
+            android:name=".MediaListener"
+            android:exported="true"
+            android:label="Dashboard now playing"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- The same dashboard as a screensaver -->
         <service
             android:name=".DashboardDream"

@@ -36,7 +36,7 @@ flowchart LR
 | Top left | Time, date, portfolio total with today's change, 30 day line, holdings, home equity | `stocks_crypto_history`, `real_estate_history`, live quotes |
 | Top right | Weather and 3 day forecast, trip countdown, next meetings (personal and work) | Open-Meteo, `tv_config.trips`, Google Calendar iCal, `work_calendar_events` |
 | Top center | Settings, Inputs and Wi‑Fi buttons; Wi‑Fi shows network name and signal | Fire OS |
-| Middle | Favorite apps; dims when idle | Installed apps on the TV |
+| Middle | Favorite apps; dims when idle. Below them, what Spotify is playing | Installed apps on the TV, Spotify's media session |
 | Bottom | Recovery, sleep, strain, today's workout, body composition trend, subway departures | `whoop_*`, `training_plan`, `body_composition`, MTA realtime |
 | Background | Looping videos, switched with the remote | `videos/` |
 
@@ -47,7 +47,7 @@ flowchart LR
 | Up / Down | Move between the top buttons (Settings, Inputs, Wi‑Fi) and the app row |
 | Left / Right | Move along the row |
 | OK | Open the app or screen |
-| ⏪ / ⏩ | Previous / next background video |
+| ⏪ / ⏩ | Previous / next background video (previous / next track while Spotify is playing) |
 | ☰ Menu | Refresh the dashboard |
 | Home | Comes back to the dashboard (after a brief flash of the stock home) |
 

@@ -2,7 +2,13 @@ package app.tvdashboard;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.ComponentName;
 import android.content.Intent;
+import android.media.MediaMetadata;
+import android.media.session.MediaController;
+import android.media.session.MediaSessionManager;
+import android.media.session.PlaybackState;
+import android.os.SystemClock;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.wifi.WifiInfo;
@@ -127,6 +133,82 @@ final class TvBridge {
         } catch (Exception ignored) {
         }
         return o.toString();
+    }
+
+    static final String SPOTIFY = "com.spotify.tv.android";
+    private String artKey, artUrl;
+
+    /** Spotify's media session, or null when Spotify is not playing or paused (or access is not granted). */
+    private MediaController spotify() {
+        try {
+            MediaSessionManager msm = (MediaSessionManager) activity.getSystemService(Context.MEDIA_SESSION_SERVICE);
+            for (MediaController c : msm.getActiveSessions(new ComponentName(activity, MediaListener.class))) {
+                if (!SPOTIFY.equals(c.getPackageName())) continue;
+                PlaybackState st = c.getPlaybackState();
+                if (st == null || c.getMetadata() == null) continue;
+                int s = st.getState();
+                if (s == PlaybackState.STATE_PLAYING || s == PlaybackState.STATE_PAUSED || s == PlaybackState.STATE_BUFFERING) return c;
+            }
+        } catch (SecurityException e) {
+            return null; // notification access not granted yet
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /** {active:false} or {active, playing, title, artist, album, art (data URL), position, duration} in ms. */
+    @JavascriptInterface
+    public String nowPlaying() {
+        JSONObject o = new JSONObject();
+        try {
+            MediaController c = spotify();
+            o.put("active", c != null);
+            if (c == null) return o.toString();
+            MediaMetadata m = c.getMetadata();
+            PlaybackState st = c.getPlaybackState();
+            boolean playing = st.getState() == PlaybackState.STATE_PLAYING;
+            long pos = st.getPosition();
+            if (playing && st.getLastPositionUpdateTime() > 0) {
+                pos += (long) ((SystemClock.elapsedRealtime() - st.getLastPositionUpdateTime()) * st.getPlaybackSpeed());
+            }
+            String title = m.getString(MediaMetadata.METADATA_KEY_TITLE);
+            String artist = m.getString(MediaMetadata.METADATA_KEY_ARTIST);
+            o.put("playing", playing);
+            o.put("title", title == null ? "" : title);
+            o.put("artist", artist == null ? "" : artist);
+            o.put("album", m.getString(MediaMetadata.METADATA_KEY_ALBUM));
+            o.put("duration", m.getLong(MediaMetadata.METADATA_KEY_DURATION));
+            o.put("position", Math.max(0, pos));
+            String key = title + "|" + artist;
+            if (!key.equals(artKey)) { // encode the cover once per track
+                artKey = key;
+                artUrl = null;
+                Bitmap art = m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+                if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_ART);
+                if (art != null) {
+                    Bitmap small = Bitmap.createScaledBitmap(art, 240, 240, true);
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    small.compress(Bitmap.CompressFormat.JPEG, 85, bytes);
+                    artUrl = "data:image/jpeg;base64," + Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP);
+                }
+            }
+            if (artUrl != null) o.put("art", artUrl);
+        } catch (Exception ignored) {
+        }
+        return o.toString();
+    }
+
+    /** Spotify transport: "toggle", "next" or "prev". */
+    @JavascriptInterface
+    public void media(String cmd) {
+        MediaController c = spotify();
+        if (c == null) return;
+        MediaController.TransportControls t = c.getTransportControls();
+        if ("next".equals(cmd)) t.skipToNext();
+        else if ("prev".equals(cmd)) t.skipToPrevious();
+        else if ("toggle".equals(cmd)) {
+            if (c.getPlaybackState().getState() == PlaybackState.STATE_PLAYING) t.pause(); else t.play();
+        }
     }
 
     private static String dataUrl(Drawable d, int w, int h) {
