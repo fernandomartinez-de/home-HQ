@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_service_label">Dashboard as home</string>
+    <string name="home_service_description">Opens the dashboard when you press Home or when the TV wakes up. It only watches for the Home button and for Amazon\'s home screen; it does not read anything on screen.</string>
+</resources>

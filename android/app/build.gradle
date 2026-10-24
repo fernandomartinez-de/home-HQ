@@ -1,0 +1,45 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "app.tvdashboard"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "app.tvdashboard"
+        minSdk 25
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
+        versionName "1." + (System.getenv("VERSION_CODE") ?: "1")
+        // The dashboard page. CI sets PAGE_URL from the repo (https://<owner>.github.io/<repo>/).
+        buildConfigField "String", "PAGE_URL", "\"" + (System.getenv("PAGE_URL") ?: "http://localhost:8000/") + "\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // A sideloaded app: the signing key lives in the repo so every CI build can update
+    // the installed app in place. Generate your own keystore if you fork this.
+    signingConfigs {
+        release {
+            storeFile file("../tv-dashboard.keystore")
+            storePassword "tvdashboard"
+            keyAlias "tvdash"
+            keyPassword "tvdashboard"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

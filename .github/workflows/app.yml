@@ -1,0 +1,51 @@
+name: TV app
+
+on:
+  push:
+    branches: [main]
+    paths: ["android/**", ".github/workflows/app.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"; repo="${GITHUB_REPOSITORY#*/}"
+          export PAGE_URL="https://${owner,,}.github.io/${repo}/"
+          echo "Page: $PAGE_URL"
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          gradle -p android assembleRelease --no-daemon -q
+          cp android/app/build/outputs/apk/release/app-release.apk tv-dashboard.apk
+          ls -la tv-dashboard.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest tv-dashboard.apk --title "TV app build ${{ github.run_number }}" \
+            --notes "Fire TV dashboard app, build ${{ github.run_number }}." --latest
+
+      - name: Refresh the page (it hosts app.apk for the Downloader app)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main

@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TV Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Minimal layer over the background video: text in the corners, apps in the middle. */
+  :root {
+    --text: #ffffff;
+    --muted: rgba(255,255,255,.66);
+    --faint: rgba(255,255,255,.22);
+    --up: #5ef09a;
+    --down: #ff7a8a;
+    --work: #c7a6ff;
+    --personal: #8cc8ff;
+    --green: #16ec06;
+    --yellow: #ffde00;
+    --red: #ff3b52;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 2px 18px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0c10; color: var(--text);
+    font-family: Inter, Roboto, system-ui, sans-serif; cursor: none; }
+  body { text-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
+
+  #bgRoot { position: fixed; inset: 0; background: radial-gradient(circle at 25% 20%, #24324f 0%, #0b0c10 65%); }
+  .bgvid { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .7s ease; }
+  /* Light scrims only where text sits */
+  .scrim { position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 42% 55% at 0% 0%, rgba(0,0,0,.42), transparent 70%),
+      radial-gradient(ellipse 36% 60% at 100% 0%, rgba(0,0,0,.38), transparent 70%),
+      linear-gradient(0deg, rgba(0,0,0,.62) 0%, rgba(0,0,0,.25) 22%, transparent 38%); }
+
+  .label { font-size: .78vw; letter-spacing: .16vw; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); }
+  .hidden { display: none !important; }
+
+  /* Top left: clock and portfolio */
+  .tl { position: fixed; left: 3.4vw; top: 2.8vw; width: 26vw; }
+  .time { font-size: 6.6vw; font-weight: 200; letter-spacing: -.2vw; line-height: .95; }
+  .time .ampm { font-size: 1.8vw; font-weight: 300; letter-spacing: 0; margin-left: .5vw; color: var(--muted); }
+  .date { font-size: 1.5vw; font-weight: 300; color: var(--muted); margin-top: .5vw; }
+
+  .pf { margin-top: 2.4vw; }
+  .pf-total { font-size: 2.2vw; font-weight: 300; margin-top: .35vw; letter-spacing: -.03vw; }
+  .pf-chg { font-size: .95vw; font-weight: 500; margin-top: .15vw; }
+  .spark { display: block; width: 15vw; height: 2.4vw; margin: .6vw 0 .5vw; overflow: visible; }
+  .pf-list { display: flex; flex-wrap: wrap; gap: .25vw 1.1vw; font-size: .85vw; color: var(--muted); }
+  .pf-list b { color: var(--text); font-weight: 500; margin-right: .3vw; }
+  .pf-list i { font-style: normal; }
+  .pf-foot { font-size: .8vw; color: var(--muted); margin-top: .5vw; }
+
+  /* Top right: weather, trip, calendar */
+  .tr { position: fixed; right: 3.4vw; top: 2.8vw; width: 26vw; text-align: right; }
+  .now { display: flex; align-items: center; justify-content: flex-end; gap: .8vw; }
+  .now .icon { font-size: 2.6vw; line-height: 1; text-shadow: none; }
+  .now .temp { font-size: 4vw; font-weight: 200; }
+  .wdesc { font-size: .95vw; color: var(--muted); margin-top: .2vw; }
+  .days { display: flex; gap: 1.2vw; justify-content: flex-end; margin-top: .6vw; font-size: .85vw; color: var(--muted); }
+  .days b { color: var(--text); font-weight: 500; margin-right: .3vw; }
+  .trip { margin-top: 1.3vw; font-size: 1.05vw; font-weight: 400; }
+  .trip span { color: var(--muted); }
+
+  .cal { margin-top: 1.6vw; }
+  .cal h3 { font-size: .78vw; letter-spacing: .14vw; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: .9vw 0 .3vw; }
+  .ev { display: flex; justify-content: flex-end; align-items: baseline; gap: .7vw; font-size: .98vw; padding: .18vw 0; }
+  .ev .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 17vw; font-weight: 400; }
+  .ev .t { color: var(--muted); width: 4.6vw; flex: none; }
+  .ev .dot { width: .45vw; height: .45vw; border-radius: 50%; flex: none; align-self: center; background: var(--personal); }
+  .ev .dot.work { background: var(--work); }
+  .ev.live .t { color: var(--text); font-weight: 600; }
+
+  /* Bottom: one row of stats separated by hairlines */
+  .bottom { position: fixed; left: 3.4vw; right: 3.4vw; bottom: 2.4vw; display: flex; align-items: flex-end; }
+  .stat { padding: 0 1.6vw; border-left: 1px solid var(--faint); min-width: 0; }
+  .stat:first-child { padding-left: 0; border-left: 0; }
+  .stat .big { font-size: 1.9vw; font-weight: 300; margin-top: .3vw; white-space: nowrap; }
+  .stat .big small { font-size: .95vw; color: var(--muted); font-weight: 400; margin-left: .2vw; }
+  .stat .sub { font-size: .85vw; color: var(--muted); margin-top: .2vw; white-space: nowrap; }
+  .rec { display: flex; align-items: center; gap: 1vw; }
+  .ring { position: relative; width: 4.2vw; height: 4.2vw; flex: none; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.15vw; font-weight: 500; }
+  .mini { display: block; width: 7vw; height: 1.6vw; margin-top: .35vw; overflow: visible; }
+  .train-row { display: flex; align-items: center; gap: .5vw; font-size: .95vw; margin-top: .3vw; white-space: nowrap; }
+  .train-row .dir { color: var(--muted); width: 5.6vw; }
+  .bullet { display: inline-flex; align-items: center; justify-content: center; width: 1.2vw; height: 1.2vw; border-radius: 50%;
+    font-size: .72vw; font-weight: 700; color: #fff; text-shadow: none; }
+  .bullet.J, .bullet.Z { background: #996633; } .bullet.M { background: #ff6319; }
+  .spacer { flex: 1; }
+  /* App row, centered. Dims when idle so the background stays the focus. */
+  .apps { position: fixed; left: 0; right: 0; top: 60%; transform: translateY(-50%); display: flex; justify-content: center;
+    gap: 1.6vw; transition: opacity .8s ease; }
+  .apps.idle { opacity: .4; }
+  .app { width: 9.6vw; text-align: center; transition: transform .2s ease; }
+  .app .tile { width: 9.6vw; height: 5.4vw; border-radius: .7vw; overflow: hidden; background: rgba(255,255,255,.08);
+    box-shadow: 0 .4vw 1.4vw rgba(0,0,0,.35); outline: .18vw solid transparent; outline-offset: .25vw; transition: outline-color .2s ease; }
+  .app .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .app .tile.square img { object-fit: contain; padding: .6vw; }
+  .app .name { font-size: .85vw; margin-top: .6vw; color: var(--muted); opacity: 0; transition: opacity .2s ease; }
+  .app.on { transform: scale(1.12); }
+  .app.on .tile { outline-color: rgba(255,255,255,.9); }
+  .app.on .name { opacity: 1; color: var(--text); }
+  .foot { position: fixed; right: 3.4vw; bottom: .7vw; font-size: .6vw; color: rgba(255,255,255,.3); text-shadow: none; }
+</style>
+</head>
+<body>
+  <div id="bgRoot"></div>
+  <div class="scrim"></div>
+
+  <section class="tl">
+    <div class="time" id="time">--:--</div>
+    <div class="date" id="date"></div>
+
+    <div class="pf hidden" id="pf">
+      <div class="label">Portfolio</div>
+      <div class="pf-total" id="pfTotal">--</div>
+      <div class="pf-chg" id="pfChg"></div>
+      <svg class="spark" id="pfSpark" viewBox="0 0 300 48" preserveAspectRatio="none"></svg>
+      <div class="pf-list" id="pfList"></div>
+      <div class="pf-foot" id="pfFoot"></div>
+    </div>
+  </section>
+
+  <section class="tr">
+    <div class="now"><span class="icon" id="wIcon"></span><span class="temp" id="wTemp">--°</span></div>
+    <div class="wdesc" id="wDesc"></div>
+    <div class="days" id="wDays"></div>
+    <div class="trip hidden" id="trip"></div>
+    <div class="cal" id="cal"></div>
+  </section>
+
+  <section class="bottom">
+    <div class="stat hidden" id="sRec">
+      <div class="rec">
+        <div class="ring">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="8"/>
+            <circle id="ringArc" cx="50" cy="50" r="42" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 264"/>
+          </svg>
+          <b id="recVal">--</b>
+        </div>
+        <div>
+          <div class="label">Recovery</div>
+          <div class="sub" id="recSub"></div>
+          <div class="sub" id="recSub2"></div>
+        </div>
+      </div>
+    </div>
+    <div class="stat hidden" id="sSleep">
+      <div class="label">Sleep</div>
+      <div class="big" id="sleepH">--</div>
+      <div class="sub" id="sleepSub"></div>
+    </div>
+    <div class="stat hidden" id="sStrain">
+      <div class="label">Strain</div>
+      <div class="big" id="strain">--</div>
+      <div class="sub" id="strainSub"></div>
+    </div>
+    <div class="stat hidden" id="sWork">
+      <div class="label">Today's workout</div>
+      <div class="big" id="workout">--</div>
+      <div class="sub" id="workoutSub"></div>
+    </div>
+    <div class="stat hidden" id="sBody">
+      <div class="label">Body</div>
+      <div class="big" id="weight">--</div>
+      <div class="sub" id="bodySub"></div>
+      <svg class="mini" id="bodySpark" viewBox="0 0 140 32" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="spacer"></div>
+    <div class="stat hidden" id="sTrain">
+      <div class="label" id="trainLabel">Subway</div>
+      <div id="trainRows"></div>
+    </div>
+  </section>
+  <div class="apps hidden" id="apps"></div>
+  <div class="foot" id="foot"></div>
+
+<script src="bg.js"></script>
+<script>
+(function () {
+  // The data function (supabase/functions/tv-dashboard). Location, time zone and trips come
+  // back from it in "settings", so nothing personal is stored in this page.
+  var FN_URL = "https://uuvsvtpfcexhqojlrsxy.supabase.co/functions/v1/tv-dashboard";
+  var DATA_MINUTES = 5, WEATHER_MINUTES = 20;
+  var TZ = Intl.DateTimeFormat().resolvedOptions().timeZone, LOC = null, TRIPS = [];
+
+  // The TV app passes its key in the URL fragment (never sent to any server).
+  var key = "";
+  var m = /[#&]k=([A-Za-z0-9]+)/.exec(location.hash);
+  try {
+    if (m) { key = m[1]; localStorage.setItem("tvkey", key); }
+    else key = localStorage.getItem("tvkey") || "";
+  } catch (e) { if (m) key = m[1]; }
+  if (m) history.replaceState(null, "", location.pathname + location.search);
+
+  function $(id) { return document.getElementById(id); }
+  function show(id, on) { $(id).classList.toggle("hidden", !on); }
+  function fmt(d, opts) { return new Intl.DateTimeFormat("en-US", Object.assign({ timeZone: TZ }, opts)).format(d); }
+  function dayKey(d) { return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(d); }
+  function esc(s) { return String(s || "").replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function usd(n) { return "$" + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 }); }
+  function short(n) { return Math.abs(n) >= 1e6 ? "$" + (n / 1e6).toFixed(2) + "M" : Math.abs(n) >= 1e4 ? "$" + Math.round(n / 1e3) + "K" : usd(n); }
+  function cls(n) { return n > 0.005 ? "up" : n < -0.005 ? "down" : "flat"; }
+  function arrow(n) { return n > 0.005 ? "▲" : n < -0.005 ? "▼" : "•"; }
+
+  // A thin line chart: soft fill, line, emphasized last point
+  function spark(svg, vals, w, h, color) {
+    if (!vals || vals.length < 2) { svg.innerHTML = ""; return; }
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), span = hi - lo || 1;
+    var pts = vals.map(function (v, i) { return [(i / (vals.length - 1)) * (w - 4) + 2, h - 3 - ((v - lo) / span) * (h - 8)]; });
+    var d = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+    var e = pts[pts.length - 1], id = "g" + Math.random().toString(36).slice(2, 7);
+    svg.innerHTML = '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + color + '" stop-opacity=".28"/><stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+      '<path d="' + d + " L" + (w - 2) + " " + h + " L2 " + h + ' Z" fill="url(#' + id + ')"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>' +
+      '<circle cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '" r="2.6" fill="' + color + '"/>';
+  }
+
+  // Clock and trip countdown (trips come from the data function's settings)
+  function tick() {
+    var now = new Date();
+    var t = fmt(now, { hour: "numeric", minute: "2-digit", hour12: true }).split(" ");
+    $("time").innerHTML = t[0] + '<span class="ampm">' + (t[1] || "") + "</span>";
+    $("date").textContent = fmt(now, { weekday: "long", month: "long", day: "numeric" });
+    renderTrip(now);
+  }
+  function renderTrip(now) {
+    var today = dayKey(now), next = null;
+    TRIPS.forEach(function (tr) { if (tr.end >= today && (!next || tr.start < next.start)) next = tr; });
+    if (!next) { show("trip", false); return; }
+    var dayMs = 86400000, t0 = Date.parse(today + "T12:00:00Z"), s0 = Date.parse(next.start + "T12:00:00Z");
+    var html;
+    if (today < next.start) {
+      var n = Math.round((s0 - t0) / dayMs);
+      html = "✈︎ " + esc(next.name) + " <span>in " + n + (n === 1 ? " day" : " days") + "</span>";
+    } else {
+      var d = Math.round((t0 - s0) / dayMs) + 1;
+      var total = Math.round((Date.parse(next.end + "T12:00:00Z") - s0) / dayMs) + 1;
+      html = "✈︎ " + esc(next.name) + " <span>day " + d + " of " + total + "</span>";
+    }
+    $("trip").innerHTML = html; show("trip", true);
+  }
+  tick(); setInterval(tick, 5000);
+
+  // Weather (Open-Meteo, no key)
+  var WX = { 0: ["☀️", "Clear"], 1: ["🌤️", "Mostly clear"], 2: ["⛅", "Partly cloudy"], 3: ["☁️", "Cloudy"], 45: ["🌫️", "Fog"], 48: ["🌫️", "Fog"],
+    51: ["🌦️", "Light drizzle"], 53: ["🌦️", "Drizzle"], 55: ["🌧️", "Drizzle"], 61: ["🌦️", "Light rain"], 63: ["🌧️", "Rain"], 65: ["🌧️", "Heavy rain"],
+    66: ["🌧️", "Freezing rain"], 67: ["🌧️", "Freezing rain"], 71: ["🌨️", "Light snow"], 73: ["🌨️", "Snow"], 75: ["❄️", "Heavy snow"], 77: ["🌨️", "Snow"],
+    80: ["🌦️", "Showers"], 81: ["🌧️", "Showers"], 82: ["⛈️", "Heavy showers"], 85: ["🌨️", "Snow showers"], 86: ["❄️", "Snow showers"],
+    95: ["⛈️", "Thunderstorm"], 96: ["⛈️", "Thunderstorm"], 99: ["⛈️", "Thunderstorm"] };
+  function wx(c) { return WX[c] || ["🌡️", ""]; }
+  function loadWeather() {
+    if (!LOC) return;
+    fetch("https://api.open-meteo.com/v1/forecast?latitude=" + LOC.lat + "&longitude=" + LOC.lon +
+      "&current=temperature_2m,apparent_temperature,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+      "&temperature_unit=fahrenheit&timezone=" + encodeURIComponent(TZ) + "&forecast_days=4")
+      .then(function (r) { return r.json(); }).then(function (d) {
+        var c = d.current, dl = d.daily;
+        $("wIcon").textContent = wx(c.weather_code)[0];
+        $("wTemp").textContent = Math.round(c.temperature_2m) + "°";
+        $("wDesc").textContent = wx(c.weather_code)[1] + " · H " + Math.round(dl.temperature_2m_max[0]) + "° L " + Math.round(dl.temperature_2m_min[0]) + "°" +
+          (dl.precipitation_probability_max[0] >= 20 ? " · " + dl.precipitation_probability_max[0] + "% rain" : "");
+        var html = "";
+        for (var i = 1; i < dl.time.length; i++) {
+          html += "<span><b>" + new Date(dl.time[i] + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" }) + "</b>" +
+            Math.round(dl.temperature_2m_max[i]) + "° " + wx(dl.weather_code[i])[0] + "</span>";
+        }
+        $("wDays").innerHTML = html;
+      }).catch(function () {});
+  }
+  setInterval(loadWeather, WEATHER_MINUTES * 60000);
+
+  function ringColor(s) { return s >= 67 ? "var(--green)" : s >= 34 ? "var(--yellow)" : "var(--red)"; }
+  function hm(min) { var h = Math.floor(min / 60), mm = Math.round(min % 60); return h + "h " + (mm < 10 ? "0" : "") + mm + "m"; }
+
+  function renderWhoop(w) {
+    var ok = !!(w && !w.error && w.recovery);
+    show("sRec", ok); show("sSleep", ok && !!w.sleep); show("sStrain", ok && !!w.today);
+    if (!ok) return;
+    var r = w.recovery, score = Math.round(r.recovery_score);
+    $("recVal").textContent = score + "%";
+    $("ringArc").setAttribute("stroke-dasharray", (264 * score / 100).toFixed(1) + " 264");
+    $("ringArc").setAttribute("stroke", ringColor(score));
+    $("recSub").textContent = "HRV " + Math.round(r.hrv_rmssd_milli) + " ms";
+    $("recSub2").textContent = "RHR " + Math.round(r.resting_heart_rate) + " bpm";
+    if (w.sleep) {
+      $("sleepH").textContent = hm(w.sleep.duration_minutes);
+      $("sleepSub").textContent = Math.round(w.sleep.performance_percentage) + "% performance";
+    }
+    if (w.today) {
+      $("strain").textContent = Number(w.today.strain).toFixed(1);
+      $("strainSub").textContent = w.yesterday ? "yesterday " + Number(w.yesterday.strain).toFixed(1) : Math.round(w.today.calories_kcal) + " kcal";
+    }
+  }
+
+  function renderFitness(f) {
+    var ok = !!(f && !f.error);
+    show("sWork", ok && !!f.today); show("sBody", ok && !!f.body);
+    if (!ok) return;
+    if (f.today) {
+      $("workout").textContent = f.today.training_type;
+      $("workoutSub").textContent = f.today.load ? f.today.load.charAt(0).toUpperCase() + f.today.load.slice(1) + " load" : "";
+    }
+    if (f.body) {
+      var b = f.body.latest, first = f.body.first;
+      $("weight").innerHTML = b.weight.toFixed(1) + "<small>kg</small>";
+      var dw = b.weight - first.weight;
+      $("bodySub").textContent = b.fat.toFixed(1) + "% fat · " + (dw >= 0 ? "+" : "−") + Math.abs(dw).toFixed(1) + " kg since " +
+        new Date(first.date + "T12:00:00").toLocaleDateString("en-US", { month: "short" });
+      spark($("bodySpark"), f.body.series.map(function (x) { return x.weight; }), 140, 32, "#ffffff");
+    }
+  }
+
+  function renderPortfolio(p) {
+    var ok = !!(p && !p.error && p.holdings && p.holdings.length);
+    show("pf", ok); if (!ok) return;
+    $("pfTotal").textContent = usd(p.total);
+    $("pfChg").className = "pf-chg " + cls(p.change);
+    $("pfChg").textContent = arrow(p.change) + " " + usd(p.change) + "  " + (p.changePct >= 0 ? "+" : "") + p.changePct.toFixed(2) + "% today";
+    var vals = (p.series || []).map(function (x) { return x.total; });
+    spark($("pfSpark"), vals, 300, 48, vals.length > 1 && vals[vals.length - 1] < vals[0] ? "#ff7a8a" : "#5ef09a");
+    $("pfList").innerHTML = p.holdings.map(function (h) {
+      return "<span><b>" + esc(h.name) + '</b><i class="' + cls(h.change) + '">' + arrow(h.change) + Math.abs(h.changePct).toFixed(1) + "%</i></span>";
+    }).join("");
+    var month = vals.length ? p.total - vals[0] : null;
+    $("pfFoot").innerHTML = (month != null ? '30 days <span class="' + cls(month) + '">' + (month >= 0 ? "+" : "−") + short(Math.abs(month)) + "</span>" : "") +
+      (p.homeEquity ? (month != null ? " · " : "") + "Home equity " + short(p.homeEquity) : "");
+  }
+
+  function renderTrains(t) {
+    var ok = !!(t && !t.error);
+    show("sTrain", ok); if (!ok) return;
+    $("trainLabel").textContent = (t.label ? t.label + " · " : "") + t.station;
+    function row(dir, list) {
+      if (!list.length) return "";
+      return '<div class="train-row"><span class="dir">' + dir + "</span>" + list.map(function (x) {
+        return '<span class="bullet ' + x.route + '">' + x.route + "</span>" + (x.mins === 0 ? "now" : x.mins + "m");
+      }).join(" &nbsp;") + "</div>";
+    }
+    var html = row("Manhattan", t.manhattan || []) + row("Brooklyn", t.brooklyn || []);
+    $("trainRows").innerHTML = html || '<div class="sub">No service here right now</div>';
+  }
+
+  function renderCalendar(c) {
+    var box = $("cal");
+    if (!key || !c || c.error || !c.length) { box.innerHTML = ""; return; }
+    var now = new Date(), today = dayKey(now), tomorrow = dayKey(new Date(now.getTime() + 86400000));
+    var groups = {}, order = [], count = 0;
+    c.forEach(function (e) {
+      if (!e.allDay && new Date(e.end) < now) return;
+      var k = e.allDay ? (e.start < today ? today : e.start) : dayKey(new Date(e.start));
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(e);
+    });
+    order.sort();
+    var html = "";
+    order.forEach(function (k) {
+      if (count >= 5) return;
+      var label = k === today ? "Today" : k === tomorrow ? "Tomorrow" : new Date(k + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
+      html += "<h3>" + label + "</h3>";
+      groups[k].forEach(function (e) {
+        if (count >= 5) return; count++;
+        var live = !e.allDay && new Date(e.start) <= now && new Date(e.end) > now;
+        var t = e.allDay ? "All day" : live ? "Now" : fmt(new Date(e.start), { hour: "numeric", minute: "2-digit" });
+        html += '<div class="ev' + (live ? " live" : "") + '"><span class="n">' + esc(e.title || "Busy") + '</span><span class="t">' + t +
+          '</span><span class="dot' + (e.source === "work" ? " work" : "") + '"></span></div>';
+      });
+    });
+    box.innerHTML = html;
+  }
+
+  function loadData() {
+    if (!key) return;
+    fetch(FN_URL, { headers: { "x-tv-key": key } }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.settings) {
+        var first = !LOC;
+        TZ = d.settings.timezone || TZ; LOC = d.settings.location || LOC; TRIPS = d.settings.trips || [];
+        if (first) { tick(); loadWeather(); }
+      }
+      renderWhoop(d.whoop); renderFitness(d.fitness); renderPortfolio(d.portfolio); renderTrains(d.trains); renderCalendar(d.calendar);
+      $("foot").textContent = "Updated " + fmt(new Date(), { hour: "numeric", minute: "2-digit" });
+    }).catch(function () { $("foot").textContent = "Offline, retrying"; });
+  }
+  loadData(); setInterval(loadData, DATA_MINUTES * 60000);
+
+  // ---------- App row and remote buttons ----------
+  // The TV app exposes window.TV (apps list + launch) and forwards remote presses to tvKey().
+  var apps = [], focus = 0, idleTimer = null;
+  function wake() {
+    $("apps").classList.remove("idle");
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () { $("apps").classList.add("idle"); }, 8000);
+  }
+  function drawFocus() {
+    var els = $("apps").children;
+    for (var i = 0; i < els.length; i++) els[i].classList.toggle("on", i === focus);
+  }
+  function loadApps() {
+    if (!window.TV || !TV.apps) return;
+    try { apps = JSON.parse(TV.apps()) || []; } catch (e) { apps = []; }
+    if (!apps.length) return;
+    $("apps").innerHTML = apps.map(function (a) {
+      return '<div class="app"><div class="tile' + (a.banner ? "" : " square") + '"><img alt="" src="' + a.icon + '"></div><div class="name">' + esc(a.label) + "</div></div>";
+    }).join("");
+    show("apps", true); drawFocus(); wake();
+  }
+  window.tvKey = function (k) {
+    wake();
+    if (k === "left" && apps.length) { focus = (focus - 1 + apps.length) % apps.length; drawFocus(); }
+    else if (k === "right" && apps.length) { focus = (focus + 1) % apps.length; drawFocus(); }
+    else if (k === "ok" && apps.length && window.TV) TV.launch(apps[focus].pkg);
+    else if (k === "up" && window.bgVideo) window.bgVideo("prev");
+    else if (k === "down" && window.bgVideo) window.bgVideo("next");
+  };
+  // Keyboard does the same in a desktop browser (arrows, Enter)
+  document.addEventListener("keydown", function (e) {
+    var map = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", Enter: "ok" };
+    if (map[e.key]) window.tvKey(map[e.key]);
+  });
+  loadApps();
+
+  // Reload once a day to pick up page updates
+  setTimeout(function () { location.reload(); }, 24 * 3600 * 1000);
+})();
+</script>
+</body>
+</html>

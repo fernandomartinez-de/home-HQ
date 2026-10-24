@@ -1,0 +1,68 @@
+name: Dashboard page
+
+# Publishes web/ and the background videos to GitHub Pages.
+# Also serves the latest TV app build at /app.apk.
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "videos/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Copy the page
+        run: |
+          mkdir -p _site
+          cp -r web/. _site/
+          # Version stamp so the TV never runs a cached copy of the background script
+          sed -i "s#src=\"bg.js\"#src=\"bg.js?v=${GITHUB_SHA::7}\"#" _site/index.html
+
+      - name: Build background videos
+        run: |
+          set -e
+          mkdir -p _site/videos
+          shopt -s nullglob nocaseglob
+          # TV friendly: max 1080p, 30 fps, 40 s, no audio, H.264, fast start so it plays while loading
+          for f in videos/*.mp4 videos/*.mov; do
+            out="_site/videos/$(basename "${f%.*}").mp4"
+            ffmpeg -nostdin -loglevel error -y -i "$f" -t 40 -an -vf "scale='min(1920,iw)':-2,fps=30" \
+              -c:v libx264 -preset veryfast -crf 25 -pix_fmt yuv420p -movflags +faststart "$out" || rm -f "$out"
+          done
+          (cd _site/videos && ls -1 *.mp4 2>/dev/null || true) \
+            | python3 -c "import sys,json;print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))" > _site/videos/manifest.json
+          ls -la _site/videos
+
+      - name: Include the TV app (app.apk) if a build exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download latest -p tv-dashboard.apk -O _site/app.apk -R ${{ github.repository }} || echo "No app build yet"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
