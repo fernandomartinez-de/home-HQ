@@ -49,9 +49,9 @@
   .pf-total { font-size: 2.2vw; font-weight: 300; margin-top: .35vw; letter-spacing: -.03vw; }
   .pf-chg { font-size: .95vw; font-weight: 500; margin-top: .15vw; }
   .spark { display: block; width: 15vw; height: 2.4vw; margin: .6vw 0 .5vw; overflow: visible; }
-  .pf-list { display: flex; flex-wrap: wrap; gap: .25vw 1.1vw; font-size: .85vw; color: var(--muted); }
-  .pf-list b { color: var(--text); font-weight: 500; margin-right: .3vw; }
-  .pf-list i { font-style: normal; }
+  .pf-list { display: grid; grid-template-columns: auto auto auto; justify-content: start; gap: .2vw 1.1vw; font-size: .85vw; color: var(--muted); white-space: nowrap; }
+  .pf-list b { color: var(--text); font-weight: 500; }
+  .pf-list i { font-style: normal; text-align: right; }
   .pf-foot { font-size: .8vw; color: var(--muted); margin-top: .5vw; }
 
   /* Top right: weather, trip, calendar */
@@ -354,10 +354,13 @@
     var vals = (p.series || []).map(function (x) { return x.total; });
     spark($("pfSpark"), vals, 300, 48, vals.length > 1 && vals[vals.length - 1] < vals[0] ? "#ff7a8a" : "#5ef09a");
     $("pfList").innerHTML = p.holdings.map(function (h) {
-      return "<span><b>" + esc(h.name) + '</b><i class="' + cls(h.change) + '">' + arrow(h.change) + Math.abs(h.changePct).toFixed(1) + "%</i></span>";
+      var c = cls(h.change), sign = h.change >= 0 ? "+" : "−";
+      return "<b>" + esc(h.name) + '</b><i class="' + c + '">' + arrow(h.change) + " " + Math.abs(h.changePct || 0).toFixed(1) + '%</i><i class="' + c + '">' + sign + short(Math.abs(h.change || 0)) + "</i>";
     }).join("");
     var month = vals.length ? p.total - vals[0] : null;
-    $("pfFoot").innerHTML = (month != null ? '30 days <span class="' + cls(month) + '">' + (month >= 0 ? "+" : "−") + short(Math.abs(month)) + "</span>" : "") +
+    var monthPct = month != null && vals[0] ? month / vals[0] * 100 : null;
+    $("pfFoot").innerHTML = (month != null ? '30 days <span class="' + cls(month) + '">' + (month >= 0 ? "+" : "−") + short(Math.abs(month)) +
+      (monthPct != null ? " (" + (monthPct >= 0 ? "+" : "−") + Math.abs(monthPct).toFixed(1) + "%)" : "") + "</span>" : "") +
       (p.homeEquity ? (month != null ? " · " : "") + "Home equity " + short(p.homeEquity) : "");
   }
 
