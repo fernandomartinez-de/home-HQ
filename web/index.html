@@ -111,18 +111,16 @@
   .app.on .tile { outline-color: rgba(255,255,255,.9); }
   .app.on .name { opacity: 1; color: var(--text); }
   /* Spotify now playing, under the app row; only while Spotify is playing or paused */
-  .np { position: fixed; left: 50%; top: 70.5%; transform: translateX(-50%); display: flex; align-items: center; gap: 1.1vw;
-    padding: .55vw 1.3vw .55vw .55vw; border-radius: .9vw; background: rgba(10,12,16,.38); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 .4vw 1.6vw rgba(0,0,0,.3); width: 28vw; transition: opacity .6s ease; }
-  .np img { width: 3.8vw; height: 3.8vw; border-radius: .5vw; object-fit: cover; flex: none; background: rgba(255,255,255,.08); }
+  .np { position: fixed; left: 50%; top: 71%; transform: translateX(-50%); display: flex; align-items: center; gap: .9vw;
+    width: 22vw; opacity: .7; transition: opacity .6s ease; }
+  .np img { width: 3vw; height: 3vw; border-radius: .4vw; object-fit: cover; flex: none; background: rgba(255,255,255,.06); }
   .np .meta { min-width: 0; flex: 1; }
-  .np .src { font-size: .7vw; letter-spacing: .12vw; text-transform: uppercase; color: #1ed760; font-weight: 600; }
-  .np .src.paused { color: var(--muted); }
-  .np .ttl { font-size: 1.15vw; font-weight: 500; margin-top: .15vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .np .art { font-size: .9vw; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .np .bar { height: .18vw; background: rgba(255,255,255,.15); border-radius: .1vw; margin-top: .5vw; overflow: hidden; }
-  .np .bar i { display: block; height: 100%; width: 0; background: #1ed760; transition: width 1s linear; }
-  .np .tm { display: flex; justify-content: space-between; font-size: .7vw; color: var(--muted); margin-top: .25vw; font-variant-numeric: tabular-nums; }
+  .np .ttl { font-size: 1vw; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .ttl::before { content: ""; display: inline-block; width: .4vw; height: .4vw; border-radius: 50%; background: #1ed760; margin-right: .5vw; vertical-align: middle; }
+  .np.paused .ttl::before { background: var(--muted); }
+  .np .art { font-size: .8vw; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .1vw; }
+  .np .bar { height: 1px; background: rgba(255,255,255,.18); margin-top: .45vw; }
+  .np .bar i { display: block; height: 100%; width: 0; background: rgba(255,255,255,.8); transition: width 1s linear; }
   /* Top buttons: settings, inputs, Wi-Fi */
   .topbar { position: fixed; top: 2.4vw; left: 50%; transform: translateX(-50%); display: flex; gap: 1vw; align-items: center;
     transition: opacity .8s ease; }
@@ -223,11 +221,9 @@
   <div class="np hidden" id="np">
     <img id="npArt" alt="">
     <div class="meta">
-      <div class="src" id="npSrc">Spotify · Playing</div>
       <div class="ttl" id="npTitle"></div>
       <div class="art" id="npArtist"></div>
       <div class="bar"><i id="npBar"></i></div>
-      <div class="tm"><span id="npPos"></span><span id="npDur"></span></div>
     </div>
   </div>
   <div class="foot" id="foot"></div>
@@ -460,22 +456,18 @@
   }
   // Spotify now playing (needs notification access for the app; see docs/tv-setup.md)
   var np = { active: false }, npArtKey = "";
-  function mmss(ms) { var t = Math.floor((ms || 0) / 1000); return Math.floor(t / 60) + ":" + ("0" + t % 60).slice(-2); }
   function updateNowPlaying() {
     if (!window.TV || !TV.nowPlaying) return;
     try { np = JSON.parse(TV.nowPlaying()) || { active: false }; } catch (e) { np = { active: false }; }
     show("np", !!np.active);
     if (!np.active) return;
-    $("npSrc").textContent = "Spotify · " + (np.playing ? "Playing" : "Paused");
-    $("npSrc").className = "src" + (np.playing ? "" : " paused");
+    $("np").classList.toggle("paused", !np.playing);
     $("npTitle").textContent = np.title || "";
     $("npArtist").textContent = np.artist || "";
     var key = (np.title || "") + "|" + (np.artist || "");
     if (key !== npArtKey) { npArtKey = key; if (np.art) $("npArt").src = np.art; else $("npArt").removeAttribute("src"); }
     var pct = np.duration > 0 ? Math.min(100, np.position / np.duration * 100) : 0;
     $("npBar").style.width = pct + "%";
-    $("npPos").textContent = mmss(np.position);
-    $("npDur").textContent = np.duration > 0 ? mmss(np.duration) : "";
   }
   setInterval(updateNowPlaying, 1000);
 
