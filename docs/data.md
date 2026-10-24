@@ -47,6 +47,7 @@ erDiagram
     whoop_workouts { timestamptz start_time  text sport_name  numeric strain }
     training_plan { text dow PK "Mon..Sun"  text training_type  text load }
     body_composition { timestamptz measured_at  numeric weight_kg  numeric body_fat_pct }
+    nutrition_log { date logged_date  numeric calories_kcal }
     stocks_crypto_history { date snapshot_date  text asset_type  text asset_name  numeric quantity  numeric total_value }
     real_estate_history { date snapshot_date  text asset_name  text data_source  numeric home_value  numeric mortgage_balance }
     work_calendar_events { timestamptz start_time  timestamptz end_time  text title  boolean all_day }
@@ -57,6 +58,7 @@ erDiagram
 | `whoop_*` | WHOOP data pipeline | Recovery ring, HRV, resting HR, sleep, strain |
 | `training_plan` | Manual (one row per weekday) | Today's workout |
 | `body_composition` | Smart scale sync | Weight, body fat, trend line |
+| `nutrition_log` | Meals logged in Luna | Calories eaten today, against today's WHOOP calories burned |
 | `stocks_crypto_history` | Portfolio pipeline | Holdings; Stock and Crypto priced live, Retirement/Brokerage daily rows |
 | `real_estate_history` | Portfolio pipeline | Home equity (average of the latest Zillow and Redfin values, minus mortgage) |
 | `work_calendar_events` | `work-calendar-ingest` | Work meetings (replaced on every flow run) |

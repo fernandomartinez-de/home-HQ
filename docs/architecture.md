@@ -32,7 +32,7 @@ flowchart TB
         TVF["tv-dashboard<br/>edge function"]
         INF["work-calendar-ingest<br/>edge function"]
         CFG[("tv_config")]
-        HEALTH[("whoop_recovery · whoop_sleep<br/>whoop_cycles · whoop_workouts<br/>training_plan · body_composition")]
+        HEALTH[("whoop_recovery · whoop_sleep<br/>whoop_cycles · whoop_workouts<br/>training_plan · body_composition<br/>nutrition_log")]
         FIN[("stocks_crypto_history<br/>real_estate_history")]
         WCAL[("work_calendar_events")]
     end

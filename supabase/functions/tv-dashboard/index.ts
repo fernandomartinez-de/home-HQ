@@ -3,6 +3,7 @@
 //   calendar   personal Google Calendar (iCal link) merged with work events (work_calendar_events)
 //   portfolio  holdings from stocks_crypto_history and real_estate_history, priced live
 //   fitness    today's planned workout (training_plan) and body composition trend
+//   nutrition  today's calories burned (whoop_cycles) vs eaten (nutrition_log)
 //   trains     next subway departures at the configured stop (MTA realtime)
 //   settings   location, time zone, trips and station label for the page
 // Personal settings live in the private table tv_config, not in this file.
@@ -224,6 +225,24 @@ async function fitness() {
   };
 }
 
+// ---------- Calorie balance today: burned (WHOOP) vs eaten (nutrition_log), like Luna's nutrition page ----------
+async function nutrition() {
+  const sb = db();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+  const start = startOfToday();
+  const [meals, cyc] = await Promise.all([
+    sb.from("nutrition_log").select("calories_kcal").eq("logged_date", today),
+    sb.from("whoop_cycles").select("start_time,end_time,calories_kcal").order("start_time", { ascending: false }).limit(1),
+  ]);
+  if (meals.error) throw meals.error;
+  const rows = meals.data ?? [];
+  const eaten = Math.round(rows.reduce((a, r) => a + Number(r.calories_kcal || 0), 0));
+  // A WHOOP cycle runs sleep to sleep, so today's starts with last night's sleep (after 6 pm yesterday)
+  const c = cyc.data?.[0];
+  const current = c && c.calories_kcal != null && new Date(c.start_time).getTime() >= start.getTime() - 6 * 3600000;
+  return { date: today, burned: current ? Math.round(Number(c.calories_kcal)) : null, eaten, meals: rows.length };
+}
+
 // ---------- Subway: next departures at the configured stop (MTA realtime, no key needed) ----------
 async function trains(cfg: NonNullable<Config["subway"]>) {
   const now = Date.now() / 1000;
@@ -350,9 +369,9 @@ Deno.serve(async (req) => {
   TZ = cfg.timezone ?? TZ;
   SYMBOLS = cfg.quote_symbols ?? {};
 
-  const [w, c, p, wk, f, t] = await Promise.allSettled([
+  const [w, c, p, wk, f, t, n] = await Promise.allSettled([
     whoop(), calendar(), portfolio(), workCalendar(), fitness(),
-    cfg.subway ? trains(cfg.subway) : Promise.resolve(null),
+    cfg.subway ? trains(cfg.subway) : Promise.resolve(null), nutrition(),
   ]);
   // One calendar list: personal and work, sorted by start.
   let cal: any = c.status === "fulfilled" ? c.value : { error: String(c.reason) };
@@ -368,5 +387,6 @@ Deno.serve(async (req) => {
     portfolio: p.status === "fulfilled" ? p.value : { error: String(p.reason) },
     fitness: f.status === "fulfilled" ? f.value : { error: String(f.reason) },
     trains: t.status === "fulfilled" ? t.value : { error: String(t.reason) },
+    nutrition: n.status === "fulfilled" ? n.value : { error: String(n.reason) },
   });
 });

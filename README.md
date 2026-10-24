@@ -37,7 +37,7 @@ flowchart LR
 | Top right | Weather and 3 day forecast, trip countdown, next meetings (personal and work) | Open-Meteo, `tv_config.trips`, Google Calendar iCal, `work_calendar_events` |
 | Top center | Settings, Inputs and Wi‑Fi buttons; Wi‑Fi shows network name and signal | Fire OS |
 | Middle | Favorite apps; dims when idle. Below them, what Spotify is playing | Installed apps on the TV, Spotify's media session |
-| Bottom | Recovery, sleep, strain, today's workout, body composition trend, subway departures | `whoop_*`, `training_plan`, `body_composition`, MTA realtime |
+| Bottom | Recovery, sleep, strain, today's workout, body composition trend, calorie balance (burned vs eaten), subway departures | `whoop_*`, `training_plan`, `body_composition`, `nutrition_log`, MTA realtime |
 | Background | Looping videos, switched with the remote | `videos/` |
 
 ## Remote
