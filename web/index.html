@@ -68,8 +68,8 @@
   .cal { margin-top: 1.6vw; }
   .cal h3 { font-size: .78vw; letter-spacing: .14vw; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: .9vw 0 .3vw; }
   .ev { display: flex; justify-content: flex-end; align-items: baseline; gap: .7vw; font-size: .98vw; padding: .18vw 0; }
-  .ev .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 17vw; font-weight: 400; }
-  .ev .t { color: var(--muted); width: 4.6vw; flex: none; }
+  .ev .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 17vw; font-weight: 400; }
+  .ev .t { color: var(--muted); width: 5.6vw; flex: none; white-space: nowrap; text-align: right; }
   .ev .dot { width: .45vw; height: .45vw; border-radius: 50%; flex: none; align-self: center; background: var(--personal); }
   .ev .dot.work { background: var(--work); }
   .ev.live .t { color: var(--text); font-weight: 600; }
@@ -103,6 +103,8 @@
   .app .tile.square img { object-fit: contain; padding: .6vw; }
   .app.r { width: 6.2vw; }
   .app .tile.round { width: 6.2vw; height: 6.2vw; border-radius: 50%; background: none; outline: none; }
+  .app .tile.round img { opacity: .62; transition: opacity .2s ease; }
+  .app.on .tile.round img { opacity: .9; }
   .app.on .tile.round { box-shadow: 0 0 0 .2vw rgba(255,255,255,.9), 0 .4vw 1.4vw rgba(0,0,0,.35); }
   .app .name { font-size: .85vw; margin-top: .6vw; color: var(--muted); opacity: 0; transition: opacity .2s ease; }
   .app.on { transform: scale(1.12); }
@@ -285,7 +287,7 @@
     if (!LOC) return;
     fetch("https://api.open-meteo.com/v1/forecast?latitude=" + LOC.lat + "&longitude=" + LOC.lon +
       "&current=temperature_2m,apparent_temperature,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-      "&temperature_unit=fahrenheit&timezone=" + encodeURIComponent(TZ) + "&forecast_days=4")
+      "&temperature_unit=celsius&timezone=" + encodeURIComponent(TZ) + "&forecast_days=4")
       .then(function (r) { return r.json(); }).then(function (d) {
         var c = d.current, dl = d.daily;
         $("wIcon").textContent = wx(c.weather_code)[0];
