@@ -1,7 +1,12 @@
 package app.tvdashboard;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -78,6 +83,50 @@ final class TvBridge {
             } catch (Exception ignored) {
             }
         });
+    }
+
+    /** Opens a system screen: "settings", "inputs" or "wifi". */
+    @JavascriptInterface
+    public void openSystem(String kind) {
+        final String action;
+        if ("settings".equals(kind)) action = "android.settings.SETTINGS";
+        else if ("inputs".equals(kind)) action = "com.amazon.tv.inputpreference.action.LAUNCH_INPUTS"; // Fire TV Edition
+        else if ("wifi".equals(kind)) action = "android.settings.WIFI_SETTINGS";
+        else return;
+        activity.runOnUiThread(() -> {
+            try {
+                activity.startActivity(new Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception e) {
+                try { // fall back to the main settings screen
+                    activity.startActivity(new Intent("android.settings.SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
+    /** {connected, type: "wifi"|"ethernet"|"none", ssid, bars 0..4}. SSID needs the location permission. */
+    @JavascriptInterface
+    public String network() {
+        JSONObject o = new JSONObject();
+        try {
+            ConnectivityManager cm = (ConnectivityManager) activity.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
+            boolean connected = nc != null && nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            String type = nc == null ? "none" : nc.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ? "ethernet"
+                    : nc.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ? "wifi" : "other";
+            o.put("connected", connected);
+            o.put("type", type);
+            if ("wifi".equals(type)) {
+                WifiManager wm = (WifiManager) activity.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                WifiInfo info = wm.getConnectionInfo();
+                String ssid = info.getSSID();
+                if (ssid != null && ssid.startsWith("\"") && ssid.endsWith("\"")) ssid = ssid.substring(1, ssid.length() - 1);
+                o.put("ssid", ssid == null || ssid.contains("unknown ssid") ? "" : ssid);
+                o.put("bars", WifiManager.calculateSignalLevel(info.getRssi(), 5));
+            }
+        } catch (Exception ignored) {
+        }
+        return o.toString();
     }
 
     private static String dataUrl(Drawable d, int w, int h) {

@@ -63,9 +63,11 @@ public class HomeService extends AccessibilityService {
         CharSequence pkg = ev.getPackageName();
         if (pkg == null) return;
         String p = pkg.toString();
-        if (AMAZON_HOME.equals(p)) {
+        CharSequence cls = ev.getClassName();
+        boolean isHomeScreen = cls != null && cls.toString().contains("HomeActivity");
+        if (AMAZON_HOME.equals(p) && isHomeScreen) {
             if (!amazonHomeAllowed) openDashboard();
-        } else if (!p.equals(getPackageName()) && !p.startsWith("com.android.systemui")) {
+        } else if (!AMAZON_HOME.equals(p) && !p.equals(getPackageName()) && !p.startsWith("com.android.systemui")) {
             amazonHomeAllowed = false; // they left Amazon's home for another app
         }
     }

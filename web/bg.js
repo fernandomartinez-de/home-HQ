@@ -1,7 +1,7 @@
 /* Background videos for the TV dashboard.
  * Plays the clips listed in videos/manifest.json, one at a time on a loop.
  * The remote switches clips: the page calls window.bgVideo("next" | "prev")
- * (Down / Up on the remote). The last clip chosen is remembered across restarts.
+ * (fast forward / rewind on the remote). The last clip chosen is remembered across restarts.
  */
 (function () {
   var root = document.getElementById("bgRoot");

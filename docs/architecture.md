@@ -10,7 +10,7 @@ flowchart TB
     subgraph TV["Fire TV"]
         direction TB
         MA["MainActivity<br/>full screen WebView"]
-        BR["TvBridge<br/>window.TV: app list, launch"]
+        BR["TvBridge<br/>window.TV: apps, launch,<br/>system screens, network"]
         HS["HomeService<br/>accessibility: Home and wake redirect"]
         DR["DashboardDream<br/>screensaver"]
         BT["BootReceiver<br/>open on boot"]
@@ -56,9 +56,9 @@ flowchart TB
 
 | Piece | Where | Role |
 |---|---|---|
-| TV app | `android/` | Wraps the page in a full screen WebView, passes remote buttons to it, exposes the app row (`window.TV`), redirects Home and wake to the dashboard, doubles as screensaver |
+| TV app | `android/` | Wraps the page in a full screen WebView, passes remote buttons to it, exposes the app row, system screens and network status (`window.TV`), redirects Home and wake to the dashboard, doubles as screensaver |
 | Page | `web/index.html` | Draws everything; calls the data function every 5 minutes and Open-Meteo every 20 |
-| Background | `web/bg.js` + `videos/` | Plays one clip on a loop; Up/Down switch clips; remembers the last one |
+| Background | `web/bg.js` + `videos/` | Plays one clip on a loop; ⏪/⏩ switch clips; remembers the last one |
 | Data function | `supabase/functions/tv-dashboard` | One authenticated endpoint that returns all personal data plus settings |
 | Calendar receiver | `supabase/functions/work-calendar-ingest` | Accepts the work calendar from Power Automate and replaces the stored copy |
 
@@ -131,4 +131,4 @@ flowchart LR
 * **Two separate keys, stored only as SHA-256 hashes.** The TV key is held by the TV app (set once over ADB) and sent as `x-tv-key`. The ingest key lives in the Power Automate flow and is sent as `x-ingest-key`. Either can be rotated by updating its hash in `tv_config`.
 * **Tables have row level security on with no policies**, so only the edge functions (service role) can read them.
 * **Work calendar minimization:** the flow sends titles and times only; attendees, locations and bodies never leave Outlook.
-* **The app row can only launch apps on its allowlist** (`TvBridge.APPS`).
+* **The app row can only launch apps on its allowlist** (`TvBridge.APPS`), and the top buttons only open Settings, Inputs and Network.

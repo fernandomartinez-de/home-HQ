@@ -3,6 +3,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Wi-Fi status on the top bar (the network name also needs location access) -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <!-- The apps on the dashboard's app row (needed to read their icons and open them) -->
     <queries>
@@ -13,6 +17,9 @@
         <package android:name="com.disney.disneyplus" />
         <package android:name="com.spotify.tv.android" />
         <package android:name="com.amazon.tv.launcher" />
+        <package android:name="com.amazon.tv.inputpreference.service" />
+        <intent><action android:name="android.settings.SETTINGS" /></intent>
+        <intent><action android:name="android.settings.WIFI_SETTINGS" /></intent>
     </queries>
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

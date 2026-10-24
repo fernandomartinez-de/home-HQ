@@ -17,6 +17,10 @@ public class MainActivity extends Activity {
         web = Dash.create(this, new TvBridge(this));
         setContentView(web);
         hideBars();
+        // Android only reveals the Wi-Fi network name to apps with location access; ask once.
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        }
     }
 
     @Override
@@ -38,16 +42,17 @@ public class MainActivity extends Activity {
     @Override
     public boolean onKeyDown(int code, KeyEvent e) {
         switch (code) {
-            // The page handles navigation: Left/Right move along the app row, OK opens the app,
-            // Up/Down change the background video.
+            // The page handles navigation: Up/Down move between the top buttons and the app row,
+            // Left/Right move along a row, OK opens.
             case KeyEvent.KEYCODE_DPAD_LEFT: send("left"); return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT: send("right"); return true;
             case KeyEvent.KEYCODE_DPAD_UP: send("up"); return true;
             case KeyEvent.KEYCODE_DPAD_DOWN: send("down"); return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER: send("ok"); return true;
-            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD: send("down"); return true;
-            case KeyEvent.KEYCODE_MEDIA_REWIND: send("up"); return true;
+            // Fast forward / rewind: next / previous background video.
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD: send("ff"); return true;
+            case KeyEvent.KEYCODE_MEDIA_REWIND: send("rw"); return true;
             // Menu (three lines button): reload the dashboard.
             case KeyEvent.KEYCODE_MENU:
                 web.loadUrl(Dash.url(this));
