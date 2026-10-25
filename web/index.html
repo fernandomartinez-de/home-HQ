@@ -539,6 +539,7 @@
 
   function rowLen(r) { return r === 0 ? tops.length : apps.length; }
   // Custom round icons in web/icons/ (by package); other apps fall back to the TV's own banner or icon.
+  var ASSET_V = "dev"; // replaced with the commit on publish, so the TV fetches new icons
   var ICONS = {
     "com.amazon.tv.launcher": "firetv", "com.netflix.ninja": "netflix", "com.amazon.firetv.youtube": "youtube",
     "com.amazon.firebat": "prime", "com.hbo.hbonow": "hbomax", "com.disney.disneyplus": "disney",
@@ -552,7 +553,7 @@
       $("apps").innerHTML = apps.map(function (a) {
         var own = ICONS[a.pkg];
         var cls = own ? " round" : " round fallback";   // apps without a custom icon: their own logo in a matching circle
-        return '<div class="app r"><div class="tile' + cls + '"><img alt="" src="' + (own ? "icons/" + own + ".webp" : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
+        return '<div class="app r"><div class="tile' + cls + '"><img alt="" src="' + (own ? "icons/" + own + ".webp?v=" + ASSET_V : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
       }).join("");
       show("apps", true);
     } else row = 0;
@@ -573,7 +574,7 @@
   function tileHtml(a) {
     var own = ICONS[a.pkg];
     return '<div class="app r"><div class="tile round' + (own ? "" : " fallback") + '"><img alt="" src="' +
-      (own ? "icons/" + own + ".webp" : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
+      (own ? "icons/" + own + ".webp?v=" + ASSET_V : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
   }
   function openFolder(f) {
     folder = f; fcol = 0;

@@ -32,6 +32,7 @@ jobs:
           cp -r web/. _site/
           # Version stamp so the TV never runs a cached copy of the background script
           sed -i "s#src=\"bg.js\"#src=\"bg.js?v=${GITHUB_SHA::7}\"#" _site/index.html
+          sed -i "s#var ASSET_V = \"dev\"#var ASSET_V = \"${GITHUB_SHA::7}\"#" _site/index.html
 
       - name: Build background videos
         run: |
