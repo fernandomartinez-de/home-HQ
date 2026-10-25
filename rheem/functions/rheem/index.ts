@@ -99,7 +99,9 @@ function modeKey(text: string) {
 
 function normalize(e: any) {
   const modeTexts: string[] = e["@MODE"]?.constraints?.enumText ?? [];
-  const modes = modeTexts.map(modeKey);
+  const isGas = /gas|tankless/i.test(String(e["@TYPE"] ?? ""));
+  // "ELECTRIC/GAS" is one shared label in EcoNet; name it for what this unit actually is.
+  const modes = modeTexts.map(modeKey).map((m) => (m === "electric_gas" ? (isGas ? "gas" : "electric") : m));
   const hasEnabled = e["@ENABLED"] !== undefined;
   const enabled = hasEnabled ? e["@ENABLED"]?.value === 1 : undefined;
   const modeIdx = e["@MODE"]?.value;

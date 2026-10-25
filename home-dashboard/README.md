@@ -41,8 +41,8 @@ docs/                 architecture diagram
 ## Roadmap
 
 - [x] Shared Supabase schema
-- [x] Govee function (waiting on API key)
-- [x] Rheem function (waiting on login secrets)
+- [x] Govee function, connected (7 lights)
+- [x] Rheem function, connected
 - [x] Polling every 5 minutes (pg_cron)
 - [ ] Schedules runner
 - [ ] Next.js app with live state and controls

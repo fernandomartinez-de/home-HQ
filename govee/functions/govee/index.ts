@@ -52,8 +52,10 @@ async function govee(path: string, body?: unknown) {
 type Cap = { type: string; instance: string; parameters?: any };
 type Device = { sku: string; device: string; deviceName?: string; type?: string; capabilities: Cap[] };
 
+// Lights only. Govee groups (sku like "SameModeGroup") have no state of their own, so skip them.
 const devices = async (): Promise<Device[]> =>
-  ((await govee("/user/devices")).data ?? []).filter((d: Device) => !d.type || d.type === "devices.types.light");
+  ((await govee("/user/devices")).data ?? []).filter((d: Device) =>
+    (!d.type || d.type === "devices.types.light") && !/group/i.test(d.sku));
 
 const deviceId = (d: Device) => `govee_${d.device.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`;
 const cap = (d: Device, instance: string) => d.capabilities.find((c) => c.instance.toLowerCase() === instance.toLowerCase());
@@ -69,6 +71,15 @@ function capabilities(d: Device) {
 }
 
 async function state(d: Device) {
+  try {
+    return await readState(d);
+  } catch (err) {
+    // Some devices (e.g. Bluetooth only models) list fine but have no cloud state.
+    return { online: null, power: null, brightness: null, color: null, color_temp_k: null, error: String((err as Error).message ?? err) };
+  }
+}
+
+async function readState(d: Device) {
   const j = await govee("/device/state", { requestId: crypto.randomUUID(), payload: { sku: d.sku, device: d.device } });
   const caps: { instance: string; state?: { value: unknown } }[] = j.payload?.capabilities ?? [];
   const v = (inst: string) => caps.find((c) => c.instance.toLowerCase() === inst.toLowerCase())?.state?.value;
