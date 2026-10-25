@@ -4,6 +4,7 @@
 //   portfolio  holdings from stocks_crypto_history and real_estate_history, priced live
 //   fitness    today's planned workout (training_plan) and body composition trend
 //   nutrition  today's calories burned (whoop_cycles) vs eaten (nutrition_log)
+//   gmail      unread count in the Gmail inbox (tv_metrics, pushed by an Apps Script)
 //   trains     next subway departures at the configured stop (MTA realtime)
 //   settings   location, time zone, trips and station label for the page
 // Personal settings live in the private table tv_config, not in this file.
@@ -243,6 +244,13 @@ async function nutrition() {
   return { date: today, burned: current ? Math.round(Number(c.calories_kcal)) : null, eaten, meals: rows.length };
 }
 
+// ---------- Gmail: unread inbox count, pushed every few minutes by an Apps Script (docs/gmail.md) ----------
+async function gmail() {
+  const { data, error } = await db().from("tv_metrics").select("value,updated_at").eq("name", "gmail_unread").maybeSingle();
+  if (error) throw error;
+  return data ? { unread: Number(data.value), updatedAt: data.updated_at } : null;
+}
+
 // ---------- Subway: next departures at the configured stop (MTA realtime, no key needed) ----------
 async function trains(cfg: NonNullable<Config["subway"]>) {
   const now = Date.now() / 1000;
@@ -369,9 +377,9 @@ Deno.serve(async (req) => {
   TZ = cfg.timezone ?? TZ;
   SYMBOLS = cfg.quote_symbols ?? {};
 
-  const [w, c, p, wk, f, t, n] = await Promise.allSettled([
+  const [w, c, p, wk, f, t, n, g] = await Promise.allSettled([
     whoop(), calendar(), portfolio(), workCalendar(), fitness(),
-    cfg.subway ? trains(cfg.subway) : Promise.resolve(null), nutrition(),
+    cfg.subway ? trains(cfg.subway) : Promise.resolve(null), nutrition(), gmail(),
   ]);
   // One calendar list: personal and work, sorted by start.
   let cal: any = c.status === "fulfilled" ? c.value : { error: String(c.reason) };
@@ -388,5 +396,6 @@ Deno.serve(async (req) => {
     fitness: f.status === "fulfilled" ? f.value : { error: String(f.reason) },
     trains: t.status === "fulfilled" ? t.value : { error: String(t.reason) },
     nutrition: n.status === "fulfilled" ? n.value : { error: String(n.reason) },
+    gmail: g.status === "fulfilled" ? g.value : { error: String(g.reason) },
   });
 });

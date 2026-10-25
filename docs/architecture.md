@@ -35,6 +35,8 @@ flowchart TB
         HEALTH[("whoop_recovery · whoop_sleep<br/>whoop_cycles · whoop_workouts<br/>training_plan · body_composition<br/>nutrition_log")]
         FIN[("stocks_crypto_history<br/>real_estate_history")]
         WCAL[("work_calendar_events")]
+        MET[("tv_metrics")]
+        MI["tv-metrics-ingest<br/>edge function"]
     end
 
     subgraph OUT["Public services"]
@@ -45,15 +47,17 @@ flowchart TB
     end
 
     PAF["Power Automate flow<br/>work Outlook calendar"]
+    GAS["Apps Script in Gmail<br/>unread count"]
 
     MA --> IDX
     IDX --> BG --> VID
     IDX --> OM
     IDX -- "x-tv-key" --> TVF
-    TVF --> CFG & HEALTH & FIN & WCAL
+    TVF --> CFG & HEALTH & FIN & WCAL & MET
     TVF --> YF & MTA & GCAL
     PAF -- "x-ingest-key" --> INF --> WCAL
     INF --> CFG
+    GAS -- "x-metrics-key" --> MI --> MET
 ```
 
 | Piece | Where | Role |
@@ -130,7 +134,8 @@ flowchart LR
 ## Security model
 
 * **No personal data in this repo.** Location, time zone, trips, subway stop and key hashes live in the private `tv_config` table. The Google Calendar link is the `GCAL_ICS_URL` function secret.
-* **Two separate keys, stored only as SHA-256 hashes.** The TV key is held by the TV app (set once over ADB) and sent as `x-tv-key`. The ingest key lives in the Power Automate flow and is sent as `x-ingest-key`. Either can be rotated by updating its hash in `tv_config`.
+* **Separate keys, stored only as SHA-256 hashes.** The TV key is held by the TV app (set once over ADB) and sent as `x-tv-key`. The ingest key lives in the Power Automate flow and is sent as `x-ingest-key`. The metrics key lives in the Gmail Apps Script and is sent as `x-metrics-key`. Either can be rotated by updating its hash in `tv_config`.
 * **Tables have row level security on with no policies**, so only the edge functions (service role) can read them.
 * **Work calendar minimization:** the flow sends titles and times only; attendees, locations and bodies never leave Outlook.
+* **Gmail minimization:** the script sends one number, the inbox unread count. No mail content and no Gmail password leave Google.
 * **The app row can only launch apps on its allowlist** (`TvBridge.APPS`), and the top buttons only open Settings, Inputs and Network.

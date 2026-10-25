@@ -34,7 +34,7 @@ flowchart LR
 | Area | Shows | Source |
 |---|---|---|
 | Top left | Time, date, portfolio total with today's change, 30 day line, holdings, home equity | `stocks_crypto_history`, `real_estate_history`, live quotes |
-| Top right | Weather and 3 day forecast, trip countdown, next meetings (personal and work) | Open-Meteo, `tv_config.trips`, Google Calendar iCal, `work_calendar_events` |
+| Top right | Weather and 3 day forecast, trip countdown, Gmail unread count, next meetings (personal and work) | Open-Meteo, `tv_config.trips`, `tv_metrics` (Apps Script), Google Calendar iCal, `work_calendar_events` |
 | Top center | Settings, Inputs and Wi‑Fi buttons; Wi‑Fi shows network name and signal | Fire OS |
 | Middle | Favorite apps; dims when idle. Below them, what Spotify is playing | Installed apps on the TV, Spotify's media session |
 | Bottom | Recovery, sleep, strain, today's workout, body composition trend, calorie balance (burned vs eaten), subway departures | `whoop_*`, `training_plan`, `body_composition`, `nutrition_log`, MTA realtime |
@@ -59,7 +59,7 @@ app asks for on first launch.
 ```
 web/                      the dashboard page (index.html), background player (bg.js), app icons (icons/)
 videos/                   background clips; compressed for the TV on publish
-supabase/functions/       tv-dashboard (data for the page), work-calendar-ingest (work calendar)
+supabase/functions/       tv-dashboard (data for the page), work-calendar-ingest (work calendar), tv-metrics-ingest (Gmail count)
 android/                  the TV app: full screen WebView, app row bridge, Home redirect, screensaver
 .github/workflows/        pages.yml (publish site), app.yml (build and release the APK)
 docs/                     architecture, TV setup, data and config, Power Automate flow, debloat list
@@ -79,6 +79,7 @@ docs/                     architecture, TV setup, data and config, Power Automat
 * [TV setup and recovery](docs/tv-setup.md): install, Home button redirect, troubleshooting
 * [Data and config](docs/data.md): tables, `tv_config`, secrets, API response
 * [Work calendar flow](docs/power-automate.md): the Power Automate flow, step by step
+* [Gmail unread count](docs/gmail.md): the Apps Script that sends the count
 * [Debloat](docs/debloat.md): what was disabled on the TV and how to undo it
 
 ## Privacy
