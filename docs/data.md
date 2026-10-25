@@ -59,7 +59,7 @@ erDiagram
 | `whoop_*` | WHOOP data pipeline | Recovery ring, HRV, resting HR, sleep, strain |
 | `training_plan` | Manual (one row per weekday) | Today's workout |
 | `body_composition` | Smart scale sync | Weight, body fat, trend line |
-| `tv_metrics` | Gmail Apps Script via tv-metrics-ingest | Unread inbox count (`gmail_unread`) |
+| `tv_metrics` | Gmail Apps Script via tv-metrics-ingest | Unread inbox count (`gmail_unread`, Primary tab only) |
 | `nutrition_log` | Meals logged in Luna | Calories eaten today, against today's WHOOP calories burned |
 | `stocks_crypto_history` | Portfolio pipeline | Holdings; Stock and Crypto priced live, Retirement/Brokerage daily rows |
 | `real_estate_history` | Portfolio pipeline | Home equity (average of the latest Zillow and Redfin values, minus mortgage) |

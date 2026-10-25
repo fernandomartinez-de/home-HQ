@@ -1,6 +1,6 @@
 # Gmail unread count
 
-A Google Apps Script in the Gmail account counts unread conversations in the inbox every
+A Google Apps Script in the Gmail account counts unread conversations in the inbox's Primary tab every
 5 minutes and posts only that number to the `tv-metrics-ingest` function. No mail, subjects or
 senders leave Gmail, and no Gmail password is stored anywhere.
 
@@ -12,7 +12,7 @@ sequenceDiagram
     participant F as tv-dashboard
     participant TV as TV page
     loop every 5 minutes
-        G->>G: GmailApp.getInboxUnreadCount()
+        G->>G: count unread in Primary
         G->>I: POST {"gmail_unread": n} with x-metrics-key
         I->>D: upsert gmail_unread
     end
@@ -34,7 +34,8 @@ const URL = "https://<project-ref>.supabase.co/functions/v1/tv-metrics-ingest";
 const KEY = "<metrics key>";
 
 function push() {
-  const unread = GmailApp.getInboxUnreadCount();   // unread conversations in the inbox, like Gmail shows
+  // unread conversations in the Primary tab only (not Promotions, Social, Updates, Forums)
+  const unread = GmailApp.search("in:inbox is:unread category:primary", 0, 500).length;
   const res = UrlFetchApp.fetch(URL, {
     method: "post",
     contentType: "application/json",
