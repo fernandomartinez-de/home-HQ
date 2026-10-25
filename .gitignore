@@ -6,8 +6,7 @@ tv-dashboard/android/local.properties
 .idea/
 _site/
 .env.local
-home-control/services/logger/.env
-home-control/homeassistant/secrets.yaml
-home-control/esphome/secrets.yaml
+ac/esphome/secrets.yaml
+**/.env
 node_modules/
 .next/

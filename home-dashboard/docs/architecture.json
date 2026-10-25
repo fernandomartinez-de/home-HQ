@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Home HQ: control center architecture",
+    "output": "home-dashboard/docs/architecture.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "components": [
+    { "id": "you", "type": "external", "label": "You", "sublabel": "iPad, phone, TV", "pos": [40, 190], "size": [110, 60] },
+    { "id": "ui", "type": "frontend", "label": "Home Dashboard", "sublabel": "Next.js on Vercel", "pos": [240, 180], "size": [160, 80], "tag": "home-dashboard/" },
+    { "id": "fn", "type": "backend", "label": "Appliance functions", "sublabel": "Supabase Edge Functions", "pos": [510, 160], "size": [180, 120], "tag": "rheem/ ac/ govee/" },
+    { "id": "db", "type": "database", "label": "Supabase Postgres", "sublabel": "home_* tables + pg_cron", "pos": [510, 400], "size": [180, 64] },
+    { "id": "econet", "type": "cloud", "label": "Rheem EcoNet API", "sublabel": "unofficial, login", "pos": [800, 40], "size": [150, 60] },
+    { "id": "esp32", "type": "backend", "label": "ESP32 + ESPHome", "sublabel": "on your WiFi", "pos": [800, 190], "size": [150, 60] },
+    { "id": "goveeapi", "type": "cloud", "label": "Govee Cloud API", "sublabel": "official, API key", "pos": [800, 340], "size": [150, 60] },
+    { "id": "rheem", "type": "external", "label": "Rheem Water Heater", "sublabel": "EcoNet WiFi", "pos": [1060, 40], "size": [150, 60] },
+    { "id": "ac", "type": "external", "label": "LG Ducted AC", "sublabel": "wired wall controller", "pos": [1060, 190], "size": [150, 60] },
+    { "id": "govee", "type": "external", "label": "Govee Lights", "sublabel": "WiFi", "pos": [1060, 340], "size": [150, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Supabase", "wraps": ["fn", "db"] }
+  ],
+  "connections": [
+    { "id": "you-ui", "from": "you", "to": "ui", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "ui-fn", "from": "ui", "to": "fn", "label": "control, state", "variant": "emphasis" },
+    { "id": "fn-econet", "from": "fn", "to": "econet", "label": "EcoNet API" },
+    { "id": "esp-fn", "from": "esp32", "to": "fn", "label": "poll + push", "variant": "dashed" },
+    { "id": "fn-govee", "from": "fn", "to": "goveeapi", "label": "Govee API" },
+    { "id": "fn-db", "from": "fn", "to": "db", "label": "readings, commands" },
+    { "id": "econet-rheem", "from": "econet", "to": "rheem", "label": "WiFi" },
+    { "id": "esp-ac", "from": "esp32", "to": "ac", "label": "wired bus" },
+    { "id": "govee-dev", "from": "goveeapi", "to": "govee", "label": "WiFi" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Appliances", "items": ["rheem/: EcoNet login, read temps, set mode", "ac/: ESP32 firmware plus its function", "govee/: official API key, color and power"] },
+    { "dot": "emerald", "title": "Always on, no home server", "items": ["pg_cron polls each appliance every few minutes", "Schedules run in Supabase, not on a screen", "Only the ESP32 lives at home"] },
+    { "dot": "violet", "title": "Data", "items": ["home_readings: state history", "home_commands: queue and audit log", "home_schedules: recurring actions"] }
+  ]
+}
