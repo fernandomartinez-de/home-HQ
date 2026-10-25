@@ -34,11 +34,6 @@ function ago(iso: string | null, now: number) {
   return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
 }
 
-const MODE_LABEL: Record<string, string> = {
-  off: "Off", energy_saver: "Energy saver", heat_pump: "Heat pump", high_demand: "High demand",
-  electric: "Electric", gas: "Gas", vacation: "Vacation", performance: "Performance",
-};
-const modeLabel = (m: string) => MODE_LABEL[m] ?? m.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 // Rooms in the order they appear on screen; any other room follows alphabetically.
 const ROOM_ORDER = ["Kitchen", "Living room", "Bedroom"];
@@ -221,7 +216,8 @@ function HeaterPanel({ heater, history, send, notify }: { heater: Heater; histor
   const lo = caps.setpoint_min_f ?? 110, hi = caps.setpoint_max_f ?? 140;
   const tank = Math.max(0, Math.min(100, s.tank_pct ?? 0));
   const off = s.power === false || s.mode === "off";
-  const modes = caps.modes.filter((m) => m !== "off");
+  // One mode keeps it simple: Energy saver (heat pump, with electric help when demand is high).
+  const onMode = caps.modes.includes("energy_saver") ? "energy_saver" : caps.modes.find((m) => m !== "off") ?? "energy_saver";
 
   const nudge = (delta: number) => {
     const next = Math.max(lo, Math.min(hi, setpoint + delta));
@@ -257,19 +253,11 @@ function HeaterPanel({ heater, history, send, notify }: { heater: Heater; histor
           </div>
           <p className="muted small">Set point, {lo} to {hi}°F</p>
 
-          <div className="modes" role="radiogroup" aria-label="Mode">
-            {modes.map((m) => (
-              <button key={m} role="radio" aria-checked={!off && s.mode === m}
-                className={`chip ${!off && s.mode === m ? "chip-on" : ""}`}
-                onClick={() => send(heater, { action: "set_mode", mode: m }, { mode: m, power: true })}>
-                {modeLabel(m)}
-              </button>
-            ))}
-          </div>
-
           {caps.supports_power && (
             <button className={`btn ${off ? "btn-brass" : "btn-quiet"}`}
-              onClick={() => send(heater, { action: "power", on: off }, { power: off, mode: off ? (modes[0] ?? "energy_saver") : "off" })}>
+              onClick={() => off
+                ? send(heater, { action: "set_mode", mode: onMode }, { power: true, mode: onMode })
+                : send(heater, { action: "power", on: false }, { power: false, mode: "off" })}>
               {off ? "Turn on water heater" : "Turn off water heater"}
             </button>
           )}

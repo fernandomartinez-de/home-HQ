@@ -15,11 +15,6 @@ const WEEKEND = [6, 0];
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 const MAX_BLOCKS = 4;
 
-const MODE_LABEL: Record<string, string> = {
-  energy_saver: "Energy saver", heat_pump: "Heat pump", high_demand: "High demand",
-  electric: "Electric", gas: "Gas", vacation: "Vacation", performance: "Performance",
-};
-const modeLabel = (m: string) => MODE_LABEL[m] ?? m.replace(/_/g, " ");
 const dayName = (d: number) => DAYS.find((x) => x.d === d)?.long ?? "";
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
@@ -31,7 +26,7 @@ function to12h(t: string) {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-const describe = (b: ScheduleBlock) => `${modeLabel(b.command.mode)} at ${b.command.setpoint}°`;
+const describe = (b: ScheduleBlock) => `${b.command.setpoint}°`;
 
 // Week math, in minutes from Sunday 00:00; a stop earlier than the start runs past midnight.
 const WEEK = 10080;
@@ -132,7 +127,8 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
     schedule.blocks.map((b) => ({ day: b.day, start: b.start, stop: b.stop, command: { ...b.command } })));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const modes = heater.capabilities.modes.filter((m) => m !== "off");
+  // Blocks always heat in Energy saver; only the times and temperature are editable.
+  const onMode = heater.capabilities.modes.includes("energy_saver") ? "energy_saver" : heater.capabilities.modes.find((m) => m !== "off") ?? "energy_saver";
   const lo = heater.capabilities.setpoint_min_f ?? 110, hi = heater.capabilities.setpoint_max_f ?? 140;
 
   useEffect(() => { dialog.current?.showModal(); }, []);
@@ -166,7 +162,7 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
     const stop = fromMin(startMin + 120);
     setBlocks((all) => [...all, {
       day, start, stop,
-      command: { action: "set_state", mode: last?.command.mode ?? modes[0], setpoint: last?.command.setpoint ?? Math.min(hi, Math.max(lo, 125)) },
+      command: { action: "set_state", mode: onMode, setpoint: last?.command.setpoint ?? Math.min(hi, Math.max(lo, 125)) },
     }]);
     setDirty(true);
   };
@@ -185,11 +181,12 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
 
   const save = async () => {
     setSaving(true);
+    const toSave = blocks.map((b) => ({ ...b, command: { ...b.command, action: "set_state", mode: onMode } }));
     try {
       const r = await fetch("/api/schedule", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: heater.id, blocks }),
+        body: JSON.stringify({ device_id: heater.id, blocks: toSave }),
       });
       const body = await r.json();
       if (!r.ok) throw new Error(body.error);
@@ -248,12 +245,7 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
                 </label>
               </div>
               <div className="block-settings">
-                <label className="slot-field">
-                  <span className="sr-only">Mode</span>
-                  <select value={b.command.mode} className="slot-mode" onChange={(e) => change(i, {}, { mode: e.target.value })}>
-                    {modes.map((m) => <option key={m} value={m}>{modeLabel(m)}</option>)}
-                  </select>
-                </label>
+                <span className="block-temp-label">Temperature</span>
                 <div className="slot-temp" aria-label="Temperature">
                   <button className="step step-small" disabled={(b.command.setpoint ?? lo) <= lo}
                     onClick={() => change(i, {}, { setpoint: (b.command.setpoint ?? lo) - 1 })} aria-label="Lower">−</button>

@@ -431,3 +431,5 @@ button { font: inherit; color: inherit; }
 .block-settings { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
 .block-warn { margin: 0; color: var(--bad); font-size: 0.875rem; }
 .block-add { justify-self: start; }
+
+.block-temp-label { color: var(--stone); font-size: 0.875rem; }
