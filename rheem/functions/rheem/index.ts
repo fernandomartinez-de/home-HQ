@@ -144,6 +144,9 @@ function normalize(e: any) {
   const modeIdx = e["@MODE"]?.value;
   let mode = typeof modeIdx === "number" ? modes[modeIdx] ?? null : null;
   if (enabled === false) mode = "off";
+  // Some units (e.g. Gen 5 heat pumps) have both an Enabled flag and an "Off" mode. The heater
+  // only heats when it is enabled AND in a heating mode, so "on" needs both.
+  const on = enabled === false ? false : mode ? mode !== "off" : enabled ?? null;
   const sp = e["@SETPOINT"] ?? {};
   return {
     id: `rheem_${e.serial_number}`,
@@ -157,7 +160,7 @@ function normalize(e: any) {
     },
     state: {
       connected: e["@CONNECTED"] ?? true,
-      power: enabled ?? (mode ? mode !== "off" : null),
+      power: on,
       mode,
       setpoint_f: sp.value ?? null,
       running: typeof e["@RUNNING"] === "string" ? e["@RUNNING"].trim() || null : null,
@@ -203,6 +206,15 @@ async function publish(s: Session, deviceName: string, serial: string, payload: 
 }
 
 // ---------- actions ----------
+
+async function lastHeatingMode(deviceId: string, modes: string[]) {
+  const { data } = await db.from("home_readings").select("state").eq("device_id", deviceId)
+    .neq("state->>mode", "off").not("state->>mode", "is", null)
+    .order("recorded_at", { ascending: false }).limit(1);
+  const m = data?.[0]?.state?.mode;
+  if (m && modes.includes(m)) return m;
+  return modes.find((x) => x === "energy_saver") ?? modes.find((x) => x !== "off") ?? "off";
+}
 
 async function liveState() {
   let s = await session();
@@ -253,17 +265,19 @@ async function command(deviceId: string, cmd: any, source = "ui") {
       if (!(v >= lo && v <= hi)) throw new Error(`setpoint must be between ${lo} and ${hi} F`);
       payload["@SETPOINT"] = v;
     } else if (cmd?.action === "set_mode" || cmd?.action === "power") {
-      const want = cmd.action === "power" ? (cmd.on ? null : "off") : String(cmd.mode);
-      if (e["@ENABLED"] !== undefined) payload["@ENABLED"] = want === "off" ? 0 : 1;
-      if (want && want !== "off") {
-        const idx = n.capabilities.modes.indexOf(want);
-        if (idx < 0) throw new Error(`mode must be one of: ${n.capabilities.modes.join(", ")}`);
-        payload["@MODE"] = idx;
-      } else if (want === "off" && e["@ENABLED"] === undefined) {
-        const idx = n.capabilities.modes.indexOf("off");
-        if (idx < 0) throw new Error("this heater cannot be turned off remotely");
-        payload["@MODE"] = idx;
+      const modes = n.capabilities.modes;
+      let want: string;
+      if (cmd.action === "set_mode") want = String(cmd.mode);
+      else if (!cmd.on) want = "off";
+      else {
+        // Turning on: keep the current heating mode, else the last one used, else energy saver.
+        want = n.state.mode && n.state.mode !== "off" ? n.state.mode : await lastHeatingMode(deviceId, modes);
       }
+      const hasEnabled = e["@ENABLED"] !== undefined;
+      if (hasEnabled) payload["@ENABLED"] = want === "off" ? 0 : 1;
+      const idx = modes.indexOf(want);
+      if (idx >= 0) payload["@MODE"] = idx;
+      else if (want !== "off" || !hasEnabled) throw new Error(`mode must be one of: ${modes.join(", ")}`);
     } else {
       throw new Error("unknown command; use set_setpoint, set_mode or power");
     }
@@ -282,7 +296,12 @@ Deno.serve(async (req) => {
     if (!(await authorized(req))) return json({ error: "unauthorized" }, 401);
     if (req.method === "GET") {
       const { heaters } = await liveState();
-      return json({ heaters: heaters.map(({ n }) => ({ id: n.id, name: n.name, capabilities: n.capabilities, state: n.state })) });
+      const debug = new URL(req.url).searchParams.has("raw");
+      const pick = (e: any) => Object.fromEntries(
+        ["@ENABLED", "@MODE", "@STATUS", "@RUNNING", "@SETPOINT", "@TANK", "@AWAY", "@VACATION", "@CONNECTED", "@TYPE"]
+          .map((k) => [k, k === "@MODE" || k === "@SETPOINT" ? { value: e[k]?.value, status: e[k]?.status, enumText: e[k]?.constraints?.enumText } : e[k]]),
+      );
+      return json({ heaters: heaters.map(({ e, n }) => ({ id: n.id, name: n.name, capabilities: n.capabilities, state: n.state, ...(debug ? { raw: pick(e) } : {}) })) });
     }
     const body = await req.json().catch(() => ({}));
     if (body.action === "poll") return json({ polled: await poll() });
