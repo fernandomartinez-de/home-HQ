@@ -33,7 +33,7 @@ flowchart TB
         INF["work-calendar-ingest<br/>edge function"]
         CFG[("tv_config")]
         HEALTH[("whoop_recovery · whoop_sleep<br/>whoop_cycles · whoop_workouts<br/>training_plan · body_composition<br/>nutrition_log")]
-        FIN[("stocks_crypto_history<br/>real_estate_history")]
+        FIN[("stocks_crypto_history")]
         WCAL[("work_calendar_events")]
         MET[("tv_metrics")]
         MI["tv-metrics-ingest<br/>edge function"]

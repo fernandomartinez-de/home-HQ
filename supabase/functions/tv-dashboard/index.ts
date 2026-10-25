@@ -1,7 +1,7 @@
 // tv-dashboard: everything the TV dashboard shows, in one response.
 //   whoop      recovery, sleep, strain (whoop_* tables)
 //   calendar   personal Google Calendar (iCal link) merged with work events (work_calendar_events)
-//   portfolio  holdings from stocks_crypto_history and real_estate_history, priced live
+//   portfolio  stock and crypto holdings from stocks_crypto_history, priced live
 //   fitness    today's planned workout (training_plan) and body composition trend
 //   nutrition  today's calories burned (whoop_cycles) vs eaten (nutrition_log)
 //   gmail      unread count in the Gmail inbox (tv_metrics, pushed by an Apps Script)
@@ -115,18 +115,12 @@ async function quote(symbol: string) {
 }
 
 async function portfolio() {
+  // Stocks and crypto only (retirement accounts and home equity are left out on purpose).
   const sb = db();
-  const since = new Date(Date.now() - 40 * 86400000).toISOString().slice(0, 10);
-  const [sc, ret, re] = await Promise.all([
-    sb.from("stocks_crypto_history").select("snapshot_date,asset_type,asset_name,quantity,total_value,cost_basis")
-      .in("asset_type", ["Stock", "Crypto"]).order("snapshot_date", { ascending: false }).limit(200),
-    sb.from("stocks_crypto_history").select("snapshot_date,asset_name,total_value,cost_basis")
-      .in("asset_type", ["Retirement", "Brokerage"]).gte("snapshot_date", since).order("snapshot_date", { ascending: true }),
-    sb.from("real_estate_history").select("snapshot_date,asset_name,home_value,mortgage_balance,data_source")
-      .order("snapshot_date", { ascending: false }).limit(60),
-  ]);
+  const sc = await sb.from("stocks_crypto_history").select("snapshot_date,asset_type,asset_name,quantity,total_value,cost_basis")
+    .in("asset_type", ["Stock", "Crypto"]).order("snapshot_date", { ascending: false }).limit(200);
 
-  // Latest snapshot of each stock / crypto holding
+  // Latest snapshot of each holding
   const latest = new Map<string, any>();
   for (const r of sc.data ?? []) if (!latest.has(r.asset_name)) latest.set(r.asset_name, r);
 
@@ -148,57 +142,22 @@ async function portfolio() {
     holdings.push({ name: r.asset_name, type: r.asset_type, value, change, changePct: value - change > 0 ? (change / (value - change)) * 100 : 0, costBasis: Number(r.cost_basis) || 0, live });
   }));
 
-  // Retirement: one row per day; change = latest minus the previous day
-  const retRows = ret.data ?? [];
-  const retByDate: Record<string, number> = {};
-  for (const r of retRows) retByDate[r.snapshot_date] = (retByDate[r.snapshot_date] ?? 0) + (Number(r.total_value) || 0);
-  const retDates = Object.keys(retByDate).sort();
-  if (retDates.length) {
-    const last = retByDate[retDates[retDates.length - 1]];
-    const prev = retDates.length > 1 ? retByDate[retDates[retDates.length - 2]] : last;
-    const lastRows = retRows.filter((r) => r.snapshot_date === retDates[retDates.length - 1]);
-    holdings.push({ name: "Retirement", type: "Retirement", value: last, change: last - prev, changePct: prev > 0 ? ((last - prev) / prev) * 100 : 0,
-      costBasis: lastRows.reduce((s, r) => s + (Number(r.cost_basis) || 0), 0), live: false, asOf: retDates[retDates.length - 1] });
-  }
-  // Daily portfolio total: every holding carries its last known value forward
-  // over days it has no price (weekends for stocks, gaps in retirement rows).
+  // Daily total: each holding carries its last close forward over days it has no price (weekends for stocks).
   const allDates = new Set<string>();
   for (const a of perAsset) Object.keys(a.closes).forEach((d) => allDates.add(d));
   const dailyTotals: Record<string, number> = {};
   const lastClose = perAsset.map(() => null as number | null);
-  let carry: number | null = null;
   for (const d of [...allDates].sort()) {
     perAsset.forEach((a, i) => { if (a.closes[d] != null) lastClose[i] = a.closes[d]; });
     if (lastClose.some((c) => c == null)) continue; // wait until every holding has a price
-    const known = retDates.filter((x) => x <= d);
-    if (known.length) carry = retByDate[known[known.length - 1]];
-    if (retDates.length && carry == null) continue; // no retirement value yet
-    dailyTotals[d] = perAsset.reduce((s, a, i) => s + a.qty * (lastClose[i] as number), 0) + (carry ?? 0);
-  }
-
-  // Real estate: home value is the average of the latest Zillow and Redfin estimates
-  const reRows = re.data ?? [];
-  const z = reRows.find((r) => r.asset_name === "Condo" && r.data_source === "Zillow");
-  const rf = reRows.find((r) => r.asset_name === "Condo" && r.data_source === "Redfin");
-  const anyCondo = reRows.find((r) => r.asset_name === "Condo");
-  let homeValue = 0, mortgage = 0;
-  if (z && rf) {
-    homeValue = (Number(z.home_value) + Number(rf.home_value)) / 2;
-    mortgage = Number((z.snapshot_date >= rf.snapshot_date ? z : rf).mortgage_balance) || 0;
-  } else if (anyCondo) {
-    homeValue = Number(anyCondo.home_value) || 0;
-    mortgage = Number(anyCondo.mortgage_balance) || 0;
+    dailyTotals[d] = perAsset.reduce((s, a, i) => s + a.qty * (lastClose[i] as number), 0);
   }
 
   holdings.sort((a, b) => b.value - a.value);
   const total = holdings.reduce((s, h) => s + h.value, 0);
   const change = holdings.reduce((s, h) => s + h.change, 0);
   const series = Object.keys(dailyTotals).sort().map((d) => ({ date: d, total: Math.round(dailyTotals[d]) }));
-  return {
-    total, change, changePct: total - change > 0 ? (change / (total - change)) * 100 : 0,
-    holdings, series,
-    homeEquity: homeValue ? homeValue - mortgage : null,
-  };
+  return { total, change, changePct: total - change > 0 ? (change / (total - change)) * 100 : 0, holdings, series };
 }
 
 // ---------- Fitness: today's planned workout and body composition ----------

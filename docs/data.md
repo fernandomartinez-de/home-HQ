@@ -50,7 +50,6 @@ erDiagram
     body_composition { timestamptz measured_at  numeric weight_kg  numeric body_fat_pct }
     nutrition_log { date logged_date  numeric calories_kcal }
     stocks_crypto_history { date snapshot_date  text asset_type  text asset_name  numeric quantity  numeric total_value }
-    real_estate_history { date snapshot_date  text asset_name  text data_source  numeric home_value  numeric mortgage_balance }
     work_calendar_events { timestamptz start_time  timestamptz end_time  text title  boolean all_day }
 ```
 
@@ -61,8 +60,7 @@ erDiagram
 | `body_composition` | Smart scale sync | Weight, body fat, trend line |
 | `tv_metrics` | Gmail Apps Script via tv-metrics-ingest | Unread inbox count (`gmail_unread`, Primary tab only) |
 | `nutrition_log` | Meals logged in Luna | Calories eaten today, against today's WHOOP calories burned |
-| `stocks_crypto_history` | Portfolio pipeline | Holdings; Stock and Crypto priced live, Retirement/Brokerage daily rows |
-| `real_estate_history` | Portfolio pipeline | Home equity (average of the latest Zillow and Redfin values, minus mortgage) |
+| `stocks_crypto_history` | Portfolio pipeline | Stock and Crypto holdings, priced live |
 | `work_calendar_events` | `work-calendar-ingest` | Work meetings (replaced on every flow run) |
 
 ## Function secrets
@@ -82,7 +80,7 @@ erDiagram
   "settings":  { "timezone": "...", "location": { "lat": 0, "lon": 0 }, "trips": [] },
   "whoop":     { "recovery": {}, "recoveryTrend": [], "today": {}, "yesterday": {}, "sleep": {}, "lastWorkout": {} },
   "calendar":  [ { "title": "...", "start": "...", "end": "...", "allDay": false, "source": "personal | work" } ],
-  "portfolio": { "total": 0, "change": 0, "changePct": 0, "holdings": [], "series": [], "homeEquity": 0 },
+  "portfolio": { "total": 0, "change": 0, "changePct": 0, "holdings": [], "series": [] },
   "fitness":   { "today": { "training_type": "...", "load": "..." }, "body": { "latest": {}, "first": {}, "series": [] } },
   "trains":    { "station": "...", "label": "...", "manhattan": [ { "route": "J", "mins": 4 } ], "brooklyn": [] }
 }

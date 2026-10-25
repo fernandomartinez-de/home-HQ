@@ -33,7 +33,7 @@ flowchart LR
 
 | Area | Shows | Source |
 |---|---|---|
-| Top left | Time, date, portfolio total with today's change, 30 day line, holdings, home equity | `stocks_crypto_history`, `real_estate_history`, live quotes |
+| Top left | Time, date, stock and crypto portfolio with today's change, 30 day line, holdings | `stocks_crypto_history`, live quotes |
 | Top right | Weather and 3 day forecast, trip countdown, Gmail unread count, next meetings (personal and work) | Open-Meteo, `tv_config.trips`, `tv_metrics` (Apps Script), Google Calendar iCal, `work_calendar_events` |
 | Top center | Settings, Inputs and Wi‑Fi buttons; Wi‑Fi shows network name and signal | Fire OS |
 | Middle | Favorite apps and a News folder; dims when idle. Below them, what Spotify is playing | Installed apps on the TV, Spotify's media session |
