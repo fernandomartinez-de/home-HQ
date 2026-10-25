@@ -1,5 +1,5 @@
 import "server-only";
-import type { Command, HomeData, Schedule, ScheduleSlot } from "./types";
+import type { Command, HomeData, Schedule, ScheduleBlock } from "./types";
 import { mockData, mockCommand, mockSchedule, mockSaveSchedule, mockEnableSchedule } from "./mock";
 
 const useMock = () => process.env.HOME_MOCK === "1" || !process.env.SUPABASE_URL || !process.env.HOME_API_KEY;
@@ -55,9 +55,9 @@ export async function getSchedule(deviceId: string): Promise<Schedule> {
   return call(`schedules?device_id=${encodeURIComponent(deviceId)}`);
 }
 
-export async function saveSchedule(deviceId: string, slots: ScheduleSlot[]): Promise<Schedule> {
-  if (useMock()) return mockSaveSchedule(deviceId, slots);
-  return call("schedules", { method: "PUT", body: JSON.stringify({ device_id: deviceId, slots }) });
+export async function saveSchedule(deviceId: string, blocks: ScheduleBlock[]): Promise<Schedule> {
+  if (useMock()) return mockSaveSchedule(deviceId, blocks);
+  return call("schedules", { method: "PUT", body: JSON.stringify({ device_id: deviceId, blocks }) });
 }
 
 export async function enableSchedule(deviceId: string, enabled: boolean): Promise<Schedule> {

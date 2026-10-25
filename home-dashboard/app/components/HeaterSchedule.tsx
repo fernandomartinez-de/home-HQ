@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Heater, Schedule, ScheduleSlot } from "@/lib/types";
+import type { Heater, Schedule, ScheduleBlock } from "@/lib/types";
 
 // Monday first, like the Rheem app. Values are JS weekdays (0 = Sunday).
 const DAYS = [
@@ -12,34 +12,33 @@ const DAYS = [
 ];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKEND = [6, 0];
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+const MAX_BLOCKS = 4;
 
 const MODE_LABEL: Record<string, string> = {
-  off: "Off", energy_saver: "Energy saver", heat_pump: "Heat pump", high_demand: "High demand",
+  energy_saver: "Energy saver", heat_pump: "Heat pump", high_demand: "High demand",
   electric: "Electric", gas: "Gas", vacation: "Vacation", performance: "Performance",
 };
 const modeLabel = (m: string) => MODE_LABEL[m] ?? m.replace(/_/g, " ");
+const dayName = (d: number) => DAYS.find((x) => x.d === d)?.long ?? "";
+
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const fromMin = (m: number) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`; };
+const label = (start: string) => { const m = toMin(start); return m < 720 ? "Morning" : m < 1020 ? "Afternoon" : m < 1260 ? "Evening" : "Night"; };
 
 function to12h(t: string) {
   const [h, m] = t.split(":").map(Number);
-  const suffix = h >= 12 ? "PM" : "AM";
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${suffix}`;
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-const byTime = (a: ScheduleSlot, b: ScheduleSlot) => a.at_time.localeCompare(b.at_time);
-const describe = (s: ScheduleSlot) =>
-  s.command.mode === "off" ? "Off" : `${modeLabel(s.command.mode)} at ${s.command.setpoint ?? ""}°`;
+const describe = (b: ScheduleBlock) => `${modeLabel(b.command.mode)} at ${b.command.setpoint}°`;
 
-// The slot after the current one, wrapping around the week.
-function nextSlot(slots: ScheduleSlot[], current: ScheduleSlot | null) {
-  if (!slots.length) return null;
-  const order = (s: ScheduleSlot) => ((s.day + 6) % 7) * 1440 + Number(s.at_time.slice(0, 2)) * 60 + Number(s.at_time.slice(3));
-  const sorted = [...slots].sort((a, b) => order(a) - order(b));
-  if (!current) return sorted[0];
-  const i = sorted.findIndex((s) => s.day === current.day && s.at_time === current.at_time);
-  return sorted[(i + 1) % sorted.length];
-}
-
-const dayName = (d: number) => DAYS.find((x) => x.d === d)?.long ?? "";
+// Week math, in minutes from Sunday 00:00; a stop earlier than the start runs past midnight.
+const WEEK = 10080;
+const since = (a: number, b: number) => ((a - b) % WEEK + WEEK) % WEEK;
+const startW = (b: ScheduleBlock) => b.day * 1440 + toMin(b.start);
+const dur = (b: ScheduleBlock) => (toMin(b.stop) > toMin(b.start) ? toMin(b.stop) - toMin(b.start) : toMin(b.stop) + 1440 - toMin(b.start));
+const overlaps = (a: ScheduleBlock, b: ScheduleBlock) => since(startW(b), startW(a)) < dur(a) || since(startW(a), startW(b)) < dur(b);
 
 export default function HeaterSchedule({ heater, notify }: { heater: Heater; notify: (msg: string) => void }) {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -57,7 +56,11 @@ export default function HeaterSchedule({ heater, notify }: { heater: Heater; not
     }
   }, [heater.id, notify]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 60_000); // keep "now" and "next" current
+    return () => clearInterval(t);
+  }, [load]);
 
   const toggle = async () => {
     if (!schedule) return;
@@ -79,26 +82,29 @@ export default function HeaterSchedule({ heater, notify }: { heater: Heater; not
   };
 
   if (!schedule) return <div className="sched"><p className="muted small">Loading schedule</p></div>;
-
-  const next = nextSlot(schedule.slots, schedule.current);
+  const { active, next } = schedule;
 
   return (
     <div className="sched">
       <div className="sched-head">
         <h3 className="sched-title">Schedule</h3>
         <button role="switch" aria-checked={schedule.enabled} className={`switch ${schedule.enabled ? "is-on" : ""}`}
-          onClick={toggle} disabled={busy || !schedule.slots.length} aria-label="Follow schedule">
+          onClick={toggle} disabled={busy || !schedule.blocks.length} aria-label="Follow schedule">
           <span className="switch-knob" />
         </button>
       </div>
 
       {schedule.enabled ? (
         <>
-          {schedule.current && (
-            <p className="sched-line">Now: <b>{schedule.current.slot}</b>, {describe(schedule.current)}</p>
+          {active
+            ? <p className="sched-line">On now: <b>{active.slot}</b>, {describe(active)} until {to12h(active.stop)}</p>
+            : <p className="sched-line">Off now.</p>}
+          {next && (
+            <p className="sched-line muted">
+              Next: {next.slot}, {next.day !== new Date().getDay() ? `${dayName(next.day)} ` : ""}{to12h(next.start)} to {to12h(next.stop)}, {describe(next)}
+            </p>
           )}
-          {next && <p className="sched-line muted">Next: {next.slot} {dayName(next.day) !== dayName(schedule.current?.day ?? -1) ? `${dayName(next.day)} ` : ""}at {to12h(next.at_time)}, {describe(next)}</p>}
-          <p className="muted small">Keep Follow Schedule off in the Rheem app so the two don't conflict.</p>
+          <p className="muted small">Keep Follow Schedule off in the Rheem app so the two don&apos;t conflict.</p>
         </>
       ) : (
         <p className="sched-line muted">Off. The heater only changes when you change it.</p>
@@ -122,40 +128,59 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
   const dialog = useRef<HTMLDialogElement>(null);
   const today = new Date().getDay();
   const [day, setDay] = useState(today);
-  const [slots, setSlots] = useState<ScheduleSlot[]>(() =>
-    schedule.slots.map((s) => ({ day: s.day, slot: s.slot, at_time: s.at_time, command: { ...s.command } })));
+  const [blocks, setBlocks] = useState<ScheduleBlock[]>(() =>
+    schedule.blocks.map((b) => ({ day: b.day, start: b.start, stop: b.stop, command: { ...b.command } })));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const modes = heater.capabilities.modes;
+  const modes = heater.capabilities.modes.filter((m) => m !== "off");
   const lo = heater.capabilities.setpoint_min_f ?? 110, hi = heater.capabilities.setpoint_max_f ?? 140;
 
   useEffect(() => { dialog.current?.showModal(); }, []);
 
-  const daySlots = useMemo(() => slots.map((s, i) => ({ s, i })).filter(({ s }) => s.day === day).sort((a, b) => byTime(a.s, b.s)), [slots, day]);
+  const dayBlocks = useMemo(
+    () => blocks.map((b, i) => ({ b, i })).filter(({ b }) => b.day === day).sort((x, y) => x.b.start.localeCompare(y.b.start)),
+    [blocks, day],
+  );
 
-  const update = (i: number, patch: Partial<ScheduleSlot> & { mode?: string; setpoint?: number }) => {
-    setSlots((all) => all.map((s, j) => {
-      if (j !== i) return s;
-      const { mode, setpoint, ...rest } = patch;
-      const command = { ...s.command, action: "set_state" };
-      if (mode !== undefined) {
-        command.mode = mode;
-        if (mode !== "off" && command.setpoint == null) command.setpoint = Math.min(hi, Math.max(lo, 120));
-      }
-      if (setpoint !== undefined) command.setpoint = Math.min(hi, Math.max(lo, setpoint));
-      return { ...s, ...rest, command };
-    }));
+  // Which blocks clash with another one, so the editor can flag them before saving.
+  const clashes = useMemo(() => {
+    const bad = new Set<number>();
+    blocks.forEach((a, i) => blocks.forEach((b, j) => { if (i < j && overlaps(a, b)) { bad.add(i); bad.add(j); } }));
+    return bad;
+  }, [blocks]);
+  const sameTimes = blocks.some((b) => b.start === b.stop);
+
+  const change = (i: number, patch: Partial<ScheduleBlock>, cmd?: Partial<ScheduleBlock["command"]>) => {
+    setBlocks((all) => all.map((b, j) => (j === i ? { ...b, ...patch, command: { ...b.command, ...(cmd ?? {}) } } : b)));
     setDirty(true);
   };
 
-  const copyTo = (targets: number[]) => {
-    const source = slots.filter((s) => s.day === day);
-    setSlots((all) => [
-      ...all.filter((s) => s.day === day || !targets.includes(s.day)),
-      ...targets.filter((t) => t !== day).flatMap((t) => source.map((s) => ({ ...s, day: t, command: { ...s.command } }))),
+  const add = () => {
+    const last = dayBlocks.at(-1)?.b;
+    // First free two hour window between 6 AM and 10 PM, in half hour steps.
+    const probe = (s: number): ScheduleBlock => ({ day, start: fromMin(s), stop: fromMin(s + 120), command: { action: "set_state" } });
+    let startMin = 360;
+    while (startMin <= 1200 && blocks.some((b) => overlaps(probe(startMin), b))) startMin += 30;
+    if (startMin > 1200) startMin = last ? toMin(last.stop) : 420;
+    const start = fromMin(startMin);
+    const stop = fromMin(startMin + 120);
+    setBlocks((all) => [...all, {
+      day, start, stop,
+      command: { action: "set_state", mode: last?.command.mode ?? modes[0], setpoint: last?.command.setpoint ?? Math.min(hi, Math.max(lo, 125)) },
+    }]);
+    setDirty(true);
+  };
+
+  const remove = (i: number) => { setBlocks((all) => all.filter((_, j) => j !== i)); setDirty(true); };
+
+  const copyTo = (targets: number[], name: string) => {
+    const source = blocks.filter((b) => b.day === day);
+    setBlocks((all) => [
+      ...all.filter((b) => b.day === day || !targets.includes(b.day)),
+      ...targets.filter((t) => t !== day).flatMap((t) => source.map((b) => ({ ...b, day: t, command: { ...b.command } }))),
     ]);
     setDirty(true);
-    notify(`Copied ${dayName(day)} to ${targets.length === 7 ? "every day" : targets === WEEKDAYS ? "weekdays" : "the weekend"}. Save to keep it.`);
+    notify(`Copied ${dayName(day)} to ${name}. Save to keep it.`);
   };
 
   const save = async () => {
@@ -164,7 +189,7 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
       const r = await fetch("/api/schedule", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: heater.id, slots }),
+        body: JSON.stringify({ device_id: heater.id, blocks }),
       });
       const body = await r.json();
       if (!r.ok) throw new Error(body.error);
@@ -182,6 +207,9 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
     dialog.current?.close();
   };
 
+  const dayHasClash = (d: number) => blocks.some((b, i) => b.day === d && clashes.has(i));
+  const blocked = clashes.size > 0 || sameTimes;
+
   return (
     <dialog ref={dialog} className="sheet sheet-wide" onClose={onClose} onCancel={(e) => { e.preventDefault(); close(); }}>
       <div className="sheet-inner">
@@ -193,51 +221,68 @@ function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
         <div className="day-tabs" role="tablist" aria-label="Day">
           {DAYS.map(({ d, short, long }) => (
             <button key={d} role="tab" aria-selected={day === d} aria-label={long}
-              className={`day-tab ${day === d ? "is-active" : ""} ${d === today ? "is-today" : ""}`} onClick={() => setDay(d)}>
+              className={`day-tab ${day === d ? "is-active" : ""} ${d === today ? "is-today" : ""} ${dayHasClash(d) ? "has-clash" : ""}`}
+              onClick={() => setDay(d)}>
               {short}
             </button>
           ))}
         </div>
 
-        <ol className="slot-list">
-          {daySlots.map(({ s, i }) => {
-            const off = s.command.mode === "off";
-            return (
-              <li key={i} className={`slot-row ${off ? "is-off" : ""}`}>
-                <span className="slot-name">{s.slot}</span>
-                <label className="slot-field">
-                  <span className="sr-only">{s.slot} start time</span>
-                  <input type="time" value={s.at_time} step={900} className="slot-time"
-                    onChange={(e) => e.target.value && update(i, { at_time: e.target.value })} />
+        <p className="muted small">The heater runs during these blocks and is off the rest of {dayName(day)}.</p>
+
+        <ol className="block-list">
+          {dayBlocks.map(({ b, i }) => (
+            <li key={i} className={`block-row ${clashes.has(i) || b.start === b.stop ? "has-clash" : ""}`}>
+              <div className="block-top">
+                <span className="block-name">{label(b.start)}</span>
+                <button className="block-remove" onClick={() => remove(i)} aria-label={`Remove ${label(b.start)} block`}>Remove</button>
+              </div>
+              <div className="block-times">
+                <label className="time-field">
+                  <span>Start</span>
+                  <input type="time" value={b.start} step={900} onChange={(e) => e.target.value && change(i, { start: e.target.value })} />
                 </label>
+                <label className="time-field">
+                  <span>Stop</span>
+                  <input type="time" value={b.stop} step={900} onChange={(e) => e.target.value && change(i, { stop: e.target.value })} />
+                </label>
+              </div>
+              <div className="block-settings">
                 <label className="slot-field">
-                  <span className="sr-only">{s.slot} mode</span>
-                  <select value={s.command.mode} className="slot-mode" onChange={(e) => update(i, { mode: e.target.value })}>
+                  <span className="sr-only">Mode</span>
+                  <select value={b.command.mode} className="slot-mode" onChange={(e) => change(i, {}, { mode: e.target.value })}>
                     {modes.map((m) => <option key={m} value={m}>{modeLabel(m)}</option>)}
                   </select>
                 </label>
-                <div className="slot-temp" aria-label={`${s.slot} temperature`}>
-                  <button className="step step-small" disabled={off || (s.command.setpoint ?? lo) <= lo}
-                    onClick={() => update(i, { setpoint: (s.command.setpoint ?? lo) - 1 })} aria-label="Lower">−</button>
-                  <span className="slot-temp-value">{off ? "–" : `${s.command.setpoint}°`}</span>
-                  <button className="step step-small" disabled={off || (s.command.setpoint ?? lo) >= hi}
-                    onClick={() => update(i, { setpoint: (s.command.setpoint ?? lo) + 1 })} aria-label="Raise">+</button>
+                <div className="slot-temp" aria-label="Temperature">
+                  <button className="step step-small" disabled={(b.command.setpoint ?? lo) <= lo}
+                    onClick={() => change(i, {}, { setpoint: (b.command.setpoint ?? lo) - 1 })} aria-label="Lower">−</button>
+                  <span className="slot-temp-value">{b.command.setpoint}°</span>
+                  <button className="step step-small" disabled={(b.command.setpoint ?? lo) >= hi}
+                    onClick={() => change(i, {}, { setpoint: (b.command.setpoint ?? lo) + 1 })} aria-label="Raise">+</button>
                 </div>
-              </li>
-            );
-          })}
-          {daySlots.length === 0 && <li className="muted">No slots on {dayName(day)}.</li>}
+              </div>
+              {toMin(b.stop) < toMin(b.start) && <p className="muted small">Runs past midnight into {dayName((b.day + 1) % 7)}.</p>}
+              {b.start === b.stop && <p className="block-warn">Start and stop are the same time.</p>}
+              {clashes.has(i) && <p className="block-warn">Overlaps another block. Adjust the times.</p>}
+            </li>
+          ))}
+          {dayBlocks.length === 0 && <li className="muted">No blocks. The heater stays off all of {dayName(day)}.</li>}
         </ol>
+
+        {dayBlocks.length < MAX_BLOCKS && (
+          <button className="btn btn-quiet btn-small block-add" onClick={add}>Add a time block</button>
+        )}
 
         <div className="copy-row">
           <span className="muted small">Copy {dayName(day)} to</span>
-          <button className="chip" onClick={() => copyTo(WEEKDAYS)}>Weekdays</button>
-          <button className="chip" onClick={() => copyTo(WEEKEND)}>Weekend</button>
-          <button className="chip" onClick={() => copyTo([0, 1, 2, 3, 4, 5, 6])}>Every day</button>
+          <button className="chip" onClick={() => copyTo(WEEKDAYS, "weekdays")}>Weekdays</button>
+          <button className="chip" onClick={() => copyTo(WEEKEND, "the weekend")}>Weekend</button>
+          <button className="chip" onClick={() => copyTo(EVERY_DAY, "every day")}>Every day</button>
         </div>
 
-        <button className="btn btn-brass" onClick={save} disabled={!dirty || saving}>
-          {saving ? "Saving" : dirty ? "Save schedule" : "No changes"}
+        <button className="btn btn-brass" onClick={save} disabled={!dirty || saving || blocked}>
+          {saving ? "Saving" : blocked ? "Fix the highlighted blocks to save" : dirty ? "Save schedule" : "No changes"}
         </button>
       </div>
     </dialog>

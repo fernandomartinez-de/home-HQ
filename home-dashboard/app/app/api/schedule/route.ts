@@ -18,10 +18,10 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   if (!(await signedIn())) return unauthorized();
   const body = await req.json().catch(() => null);
-  if (!body?.device_id || !Array.isArray(body?.slots)) {
-    return NextResponse.json({ error: "Missing device_id or slots." }, { status: 400 });
+  if (!body?.device_id || !Array.isArray(body?.blocks)) {
+    return NextResponse.json({ error: "Missing device_id or blocks." }, { status: 400 });
   }
-  try { return NextResponse.json(await saveSchedule(body.device_id, body.slots)); } catch (err) { return fail(err); }
+  try { return NextResponse.json(await saveSchedule(body.device_id, body.blocks)); } catch (err) { return fail(err); }
 }
 
 // Turn the schedule on or off. Turning it on applies the current slot right away.

@@ -49,14 +49,13 @@ export type Command =
   | { action: "set_setpoint"; value: number }
   | { action: "set_mode"; mode: string };
 
-export type ScheduleSlot = {
+export type ScheduleBlock = {
   id?: number;
   day: number; // 0 = Sunday
-  slot: string;
-  at_time: string; // "HH:MM", 24 hour
+  slot?: string; // Morning, Afternoon, Evening or Night, named by the start time
+  start: string; // "HH:MM", 24 hour
+  stop: string; // "HH:MM"; earlier than start means it runs past midnight
   command: { action: string; mode?: any; setpoint?: number; [key: string]: any };
-  enabled?: boolean;
-  last_run_at?: string | null;
 };
 
 export type Schedule = {
@@ -64,7 +63,8 @@ export type Schedule = {
   name: string;
   enabled: boolean;
   time_zone: string;
-  slots: ScheduleSlot[];
-  current: ScheduleSlot | null;
+  blocks: ScheduleBlock[];
+  active: ScheduleBlock | null;
+  next: ScheduleBlock | null;
   mock?: boolean;
 };

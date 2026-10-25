@@ -48,6 +48,7 @@ All calls need the header `x-home-key`.
 
 ## Schedule
 
-Home HQ runs the water heater's weekly schedule (Morning, Day, Evening, Night for each day),
-copied from the Rheem app on setup. Edit it in the dashboard under Hot water, Edit schedule.
+Home HQ runs the water heater's weekly schedule as time blocks, each with a start, a stop, a
+mode and a temperature (up to four a day); the heater is off outside them. It was copied from
+the Rheem app on setup. Edit it in the dashboard under Hot water, Edit schedule.
 Keep **Follow Schedule** turned off in the Rheem app so the two schedules don't fight.

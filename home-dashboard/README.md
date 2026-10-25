@@ -27,7 +27,7 @@ public policies; only the edge functions (service role) read and write them.
 | `home_devices` | Each appliance: kind, provider, name, provider device ids, capabilities |
 | `home_readings` | State history: one JSON snapshot per poll or ESP32 push |
 | `home_commands` | Command queue and audit log (pending, sent, done, failed) |
-| `home_schedules` | Weekly schedule slots: day, slot name, local start time, command (mode and temperature for the heater) |
+| `home_schedules` | Weekly time blocks: day, start, stop, command (mode and temperature for the heater); off outside blocks |
 | `home_device_latest` (view) | Each device with its latest reading |
 
 ## Folders
@@ -45,7 +45,7 @@ docs/                 architecture diagram
 - [x] Govee function, connected (7 lights)
 - [x] Rheem function, connected
 - [x] Polling every 5 minutes (pg_cron)
-- [x] Schedules: Rheem style weekly grid, edited in the app, run every minute by Supabase
+- [x] Schedules: weekly time blocks with start and stop, edited in the app, run every minute by Supabase
 - [x] Next.js app with live state and controls
 - [x] Deploy to Vercel
 - [ ] ESP32 bridge for the AC, then its function
