@@ -1,4 +1,4 @@
-   [
-     { "label": "Site Name", "url": "https://moviepire.sc/" }
-     { "label": "Second Site", "url": "https://isportsurge.ws/index9" }
+[
+  { "label": "Movies", "url": "https://moviepire.sc/", "icon": "movies" },
+  { "label": "Sports", "url": "https://isportsurge.ws/index9", "icon": "sports" }
 ]
