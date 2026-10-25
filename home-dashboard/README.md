@@ -33,7 +33,8 @@ public policies; only the edge functions (service role) read and write them.
 ## Folders
 
 ```
-app/                  Next.js app (to come)
+app/                  Next.js app (see app/README.md to deploy)
+supabase/functions/   home: one read endpoint for the app
 supabase/migrations/  shared home_* schema
 docs/                 architecture diagram
 ```
@@ -45,7 +46,8 @@ docs/                 architecture diagram
 - [x] Rheem function, connected
 - [x] Polling every 5 minutes (pg_cron)
 - [ ] Schedules runner
-- [ ] Next.js app with live state and controls
+- [x] Next.js app with live state and controls
+- [ ] Deploy to Vercel
 - [ ] ESP32 bridge for the AC, then its function
 - [ ] History and analytics views
 - [ ] Home status tile on the TV dashboard

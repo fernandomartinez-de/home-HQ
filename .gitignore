@@ -10,3 +10,4 @@ ac/esphome/secrets.yaml
 **/.env
 node_modules/
 .next/
+tsconfig.tsbuildinfo
