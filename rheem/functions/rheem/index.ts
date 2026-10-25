@@ -49,6 +49,24 @@ async function authorized(req: Request) {
 
 type Session = { token: string; accountId: string; email: string };
 
+// EcoNet rate limits sign ins, so the session is saved in home_provider_sessions and reused
+// until EcoNet rejects it. A 429 on sign in starts a cool down so we stop asking for a while.
+const SESSION_MAX_AGE_MS = 7 * 24 * 3600_000;
+const COOLDOWN_MS = 15 * 60_000;
+
+class AuthExpired extends Error {}
+
+async function savedSession(): Promise<{ s?: Session; blockedUntil?: number; age: number }> {
+  const { data } = await db.from("home_provider_sessions").select("session, created_at").eq("provider", "rheem").maybeSingle();
+  if (!data) return { age: Infinity };
+  const j = data.session ?? {};
+  return {
+    s: j.token ? { token: j.token, accountId: j.accountId, email: j.email } : undefined,
+    blockedUntil: j.blocked_until ? Date.parse(j.blocked_until) : undefined,
+    age: Date.now() - Date.parse(data.created_at),
+  };
+}
+
 async function login(): Promise<Session> {
   const email = Deno.env.get("RHEEM_EMAIL");
   const password = Deno.env.get("RHEEM_PASSWORD");
@@ -58,10 +76,27 @@ async function login(): Promise<Session> {
     headers: BASE_HEADERS,
     body: JSON.stringify({ email, password }),
   });
+  if (r.status === 429) {
+    const until = new Date(Date.now() + COOLDOWN_MS).toISOString();
+    await db.from("home_provider_sessions").upsert({ provider: "rheem", session: { blocked_until: until }, created_at: new Date().toISOString() });
+    throw new Error("Rheem is limiting sign ins right now. Try again in about 15 minutes.");
+  }
   if (!r.ok) throw new Error(`EcoNet login failed: HTTP ${r.status}`);
   const j = await r.json();
   if (!j?.options?.success) throw new Error(`EcoNet login rejected: ${j?.options?.message ?? "unknown"}`);
-  return { token: j.user_token, accountId: j.options.account_id, email };
+  const s = { token: j.user_token, accountId: j.options.account_id, email };
+  await db.from("home_provider_sessions").upsert({ provider: "rheem", session: s, created_at: new Date().toISOString() });
+  return s;
+}
+
+async function session(forceNew = false): Promise<Session> {
+  const saved = await savedSession();
+  if (saved.blockedUntil && saved.blockedUntil > Date.now()) {
+    const mins = Math.ceil((saved.blockedUntil - Date.now()) / 60_000);
+    throw new Error(`Rheem is limiting sign ins right now. Try again in about ${mins} min.`);
+  }
+  if (!forceNew && saved.s && saved.age < SESSION_MAX_AGE_MS) return saved.s;
+  return login();
 }
 
 async function equipment(s: Session): Promise<any[]> {
@@ -70,6 +105,8 @@ async function equipment(s: Session): Promise<any[]> {
     headers: { ...BASE_HEADERS, "ClearBlade-UserToken": s.token },
     body: JSON.stringify({ resource: "friedrich" }),
   });
+  if (r.status === 400 || r.status === 401 || r.status === 403) throw new AuthExpired("EcoNet session expired");
+  if (r.status === 429) throw new Error("Rheem is busy right now. Try again in a minute.");
   if (!r.ok) throw new Error(`EcoNet equipment failed: HTTP ${r.status}`);
   const j = await r.json();
   if (!j?.success) throw new Error("EcoNet equipment: unexpected response");
@@ -168,8 +205,16 @@ async function publish(s: Session, deviceName: string, serial: string, payload: 
 // ---------- actions ----------
 
 async function liveState() {
-  const s = await login();
-  return { session: s, heaters: (await equipment(s)).map((e) => ({ e, n: normalize(e) })) };
+  let s = await session();
+  let list: any[];
+  try {
+    list = await equipment(s);
+  } catch (err) {
+    if (!(err instanceof AuthExpired)) throw err;
+    s = await session(true); // saved session expired: sign in once and retry
+    list = await equipment(s);
+  }
+  return { session: s, heaters: list.map((e) => ({ e, n: normalize(e) })) };
 }
 
 async function poll() {
