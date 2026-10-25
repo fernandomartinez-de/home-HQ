@@ -544,13 +544,30 @@
     "com.amazon.firebat": "prime", "com.hbo.hbonow": "hbomax", "com.disney.disneyplus": "disney",
     "com.spotify.tv.android": "spotify", "folder:news": "news"
   };
+  // Website tiles: listed in sites.json (label, https url, optional icon name in icons/). Changing the
+  // list only needs a publish, not a reinstall. They open in Silk, the TV's browser.
+  var tvApps = [], sites = [];
+  function loadSites() {
+    fetch("sites.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+      .catch(function () { return []; })
+      .then(function (list) {
+        sites = (list || []).filter(function (s) { return s && s.label && /^https:\/\//.test(s.url || ""); })
+          .map(function (s, i) { return { pkg: "site:" + i, label: s.label, url: s.url, site: true, iconName: s.icon || "web" }; });
+        if (sites.length) renderApps();
+      });
+  }
   function loadApps() {
     if (!window.TV || !TV.apps) return;
     show("topbar", true);
-    try { apps = JSON.parse(TV.apps()) || []; } catch (e) { apps = []; }
+    try { tvApps = JSON.parse(TV.apps()) || []; } catch (e) { tvApps = []; }
+    renderApps();
+    loadSites();
+  }
+  function renderApps() {
+    apps = tvApps.concat(sites);
     if (apps.length) {
       $("apps").innerHTML = apps.map(function (a) {
-        var own = ICONS[a.pkg];
+        var own = a.site ? a.iconName : ICONS[a.pkg];
         var cls = own ? " round" : " round fallback";   // apps without a custom icon: their own logo in a matching circle
         return '<div class="app r"><div class="tile' + cls + '"><img alt="" src="' + (own ? "icons/" + own + ".webp?v=" + ASSET_V : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
       }).join("");
@@ -610,6 +627,7 @@
     else if (k === "ok" && window.TV) {
       if (row === 0) TV.openSystem(tops[col[0]].getAttribute("data-act"));
       else if (apps.length && apps[col[1]].folder) { openFolder(apps[col[1]]); return; }
+      else if (apps.length && apps[col[1]].site) { if (TV.openUrl) TV.openUrl(apps[col[1]].url); }
       else if (apps.length) TV.launch(apps[col[1]].pkg);
     }
     drawFocus();

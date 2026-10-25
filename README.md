@@ -73,6 +73,7 @@ docs/                     architecture, TV setup, data and config, Power Automat
 * **Look and layout:** edit `web/index.html`. The TV picks it up on its daily reload, or press ☰ Menu.
 * **App row:** edit the list in `android/app/src/main/java/app/tvdashboard/TvBridge.java` and reinstall the app ([docs/tv-setup.md](docs/tv-setup.md)).
 * **Folders:** `NEWS` in `TvBridge.java` lists the apps by the name they show on the TV (e.g. "cbs news"); installed matches appear inside the News tile.
+* **Website tiles:** add `{"label": "Name", "url": "https://...", "icon": "name"}` to `web/sites.json` and publish; no reinstall. They open in Silk (the TV's browser, with a remote cursor). `icon` is a file in `web/icons/` without `.webp`; leave it out for the globe icon.
 * **App icons:** round 192×192 WebP files in `web/icons/`, mapped by package in `ICONS` in `web/index.html`. Apps without one use the TV's own banner.
 
 ## Docs

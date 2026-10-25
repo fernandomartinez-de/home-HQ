@@ -18,6 +18,12 @@
         <package android:name="com.univision.prendetv" />
         <package android:name="com.spotify.tv.android" />
         <package android:name="com.amazon.tv.launcher" />
+        <package android:name="com.amazon.cloud9" />
+        <!-- website tiles open in a browser -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
         <package android:name="com.amazon.tv.inputpreference.service" />
         <intent><action android:name="android.settings.SETTINGS" /></intent>
         <!-- folders (e.g. News) find their apps by name among installed TV apps -->

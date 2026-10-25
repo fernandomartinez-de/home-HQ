@@ -146,6 +146,22 @@ final class TvBridge {
         });
     }
 
+    static final String SILK = "com.amazon.cloud9"; // Fire TV's built-in browser
+
+    /** Opens a website (https only) in Silk, which has a remote-controlled cursor; any browser if Silk is missing. */
+    @JavascriptInterface
+    public void openUrl(String url) {
+        if (url == null || !url.startsWith("https://")) return;
+        activity.runOnUiThread(() -> {
+            Intent i = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                activity.startActivity(new Intent(i).setPackage(SILK));
+            } catch (Exception e) {
+                try { activity.startActivity(i); } catch (Exception ignored) { }
+            }
+        });
+    }
+
     /** Opens a system screen: "settings", "inputs" or "wifi". */
     @JavascriptInterface
     public void openSystem(String kind) {
