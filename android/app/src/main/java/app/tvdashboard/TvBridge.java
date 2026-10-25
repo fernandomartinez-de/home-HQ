@@ -35,6 +35,7 @@ final class TvBridge {
             {"com.amazon.firebat", "Prime Video"},
             {"com.hbo.hbonow", "HBO Max"},
             {"com.disney.disneyplus", "Disney+"},
+            {"com.univision.prendetv", "ViX"},
             {"com.spotify.tv.android", "Spotify"},
             {HomeService.AMAZON_HOME, "Fire TV"},
     };

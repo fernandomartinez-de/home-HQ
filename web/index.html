@@ -110,6 +110,8 @@
   .app .tile.round { width: 6.2vw; height: 6.2vw; border-radius: 50%; background: none; outline: none; }
   .app .tile.round img { opacity: .62; transition: opacity .2s ease; }
   .app.on .tile.round img { opacity: .9; }
+  .app .tile.round.fallback { background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 .15vw rgba(255,255,255,.12), 0 .4vw 1.4vw rgba(0,0,0,.35); }
+  .app .tile.round.fallback img { object-fit: cover; border-radius: 50%; transform: scale(.82); }
   .app.on .tile.round { box-shadow: 0 0 0 .2vw rgba(255,255,255,.9), 0 .4vw 1.4vw rgba(0,0,0,.35); }
   .app .name { font-size: .85vw; margin-top: .6vw; color: var(--muted); opacity: 0; transition: opacity .2s ease; }
   .app.on { transform: scale(1.12); }
@@ -526,8 +528,8 @@
     if (apps.length) {
       $("apps").innerHTML = apps.map(function (a) {
         var own = ICONS[a.pkg];
-        var cls = own ? " round" : (a.banner ? "" : " square");
-        return '<div class="app' + (own ? " r" : "") + '"><div class="tile' + cls + '"><img alt="" src="' + (own ? "icons/" + own + ".webp" : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
+        var cls = own ? " round" : " round fallback";   // apps without a custom icon: their own logo in a matching circle
+        return '<div class="app r"><div class="tile' + cls + '"><img alt="" src="' + (own ? "icons/" + own + ".webp" : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
       }).join("");
       show("apps", true);
     } else row = 0;

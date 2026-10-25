@@ -11,7 +11,7 @@ packages are **disabled, not uninstalled**, over ADB, so everything can be resto
 | Telemetry and metrics | `com.amazon.tv.fw.metrics`, `com.amazon.neo.minerva`, `com.amazon.neo.minerva.logcat`, `com.amazon.wirelessmetrics.service`, `com.amazon.perfcollection`, `com.amazon.perfc`, `com.amazon.dp.logger` |
 | Tutorials and promos | `com.amazon.storm.lightning.tutorial`, `com.amazon.tmm.tutorial`, `com.amazon.gamehub` |
 | Amazon extras (owner's choice) | `com.amazon.bueller.music`, `com.amazon.bueller.photos`, `com.amazon.minitv.android.app`, `com.amazon.naatyam` |
-| Unused apps (owner's choice) | `com.tubitv.ott`, `com.espn.gtv`, `com.bamnetworks.mobile.android.gameday.atbat`, `com.redbull.rbtv`, `com.zumobi.msnbc`, `com.att.tv`, `com.univision.prendetv`, `com.apple.atve.amazon.appletv` |
+| Unused apps (owner's choice) | `com.tubitv.ott`, `com.espn.gtv`, `com.bamnetworks.mobile.android.gameday.atbat`, `com.redbull.rbtv`, `com.zumobi.msnbc`, `com.att.tv`, `com.apple.atve.amazon.appletv` |
 
 Kept: Alexa, OTA updates, casting and screen mirroring, Netflix, YouTube, Prime Video, HBO Max,
 Disney+, Hulu, Spotify, Plex, and the stock home screen (Fire OS protects it).

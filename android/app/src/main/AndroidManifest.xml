@@ -15,6 +15,7 @@
         <package android:name="com.amazon.firebat" />
         <package android:name="com.hbo.hbonow" />
         <package android:name="com.disney.disneyplus" />
+        <package android:name="com.univision.prendetv" />
         <package android:name="com.spotify.tv.android" />
         <package android:name="com.amazon.tv.launcher" />
         <package android:name="com.amazon.tv.inputpreference.service" />
