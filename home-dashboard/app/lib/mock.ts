@@ -1,4 +1,4 @@
-import type { Command, Device, HomeData } from "./types";
+import type { Command, Device, HomeData, Schedule, ScheduleSlot } from "./types";
 
 // Sample data shaped exactly like the home function's response, for local development.
 const now = () => new Date().toISOString();
@@ -49,4 +49,37 @@ export function mockCommand(id: string, c: Command) {
     return { ...d, state: s } as Device;
   });
   return { ok: true, mock: true };
+}
+
+// ---------- sample schedule ----------
+
+const SLOT_NAMES = ["Morning", "Day", "Evening", "Night"];
+const SLOT_TIMES = ["07:00", "12:00", "18:00", "23:00"];
+let schedule: ScheduleSlot[] = [0, 1, 2, 3, 4, 5, 6].flatMap((day) =>
+  SLOT_NAMES.map((slot, i) => ({
+    day, slot, at_time: SLOT_TIMES[i],
+    command: { action: "set_state", mode: i % 2 === 0 ? "heat_pump" : "off", setpoint: day === 4 ? 140 : 135 },
+  })),
+);
+let scheduleOn = false;
+
+export function mockSchedule(deviceId: string): Schedule {
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const today = schedule.filter((s) => s.day === now.getDay())
+    .filter((s) => { const [h, m] = s.at_time.split(":").map(Number); return h * 60 + m <= mins; });
+  return {
+    device_id: deviceId, name: "Heat Pump Water Heater", enabled: scheduleOn, time_zone: "America/New_York",
+    slots: schedule, current: today.at(-1) ?? null, mock: true,
+  };
+}
+
+export function mockSaveSchedule(deviceId: string, slots: ScheduleSlot[]) {
+  schedule = slots;
+  return mockSchedule(deviceId);
+}
+
+export function mockEnableSchedule(deviceId: string, enabled: boolean) {
+  scheduleOn = enabled;
+  return mockSchedule(deviceId);
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Command, Device, Heater, HomeData, Light } from "@/lib/types";
+import HeaterSchedule from "./HeaterSchedule";
 
 const POLL_MS = 30_000;
 
@@ -173,7 +174,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
 
       <main className="layout">
         <section className="col-utilities" aria-label="Water and air">
-          {heaters.map((h) => <HeaterPanel key={h.id} heater={h} history={data.history?.[h.id]} send={send} />)}
+          {heaters.map((h) => <HeaterPanel key={h.id} heater={h} history={data.history?.[h.id]} send={send} notify={setToast} />)}
           <section className="ac-panel" aria-label="Air conditioning">
             <h2 className="panel-title">Air conditioning</h2>
             <p className="muted">Not connected yet. The AC will appear here once the ESP32 bridge is wired to the wall controller.</p>
@@ -209,7 +210,7 @@ type Send = (d: Device, c: Command, patch: Record<string, unknown>) => void;
 
 // ---------- water heater ----------
 
-function HeaterPanel({ heater, history, send }: { heater: Heater; history?: { t: string; state: any }[]; send: Send }) {
+function HeaterPanel({ heater, history, send, notify }: { heater: Heater; history?: { t: string; state: any }[]; send: Send; notify: (m: string) => void }) {
   const s = heater.state;
   const caps = heater.capabilities;
   const [target, setTarget] = useState<number | null>(null);
@@ -274,6 +275,8 @@ function HeaterPanel({ heater, history, send }: { heater: Heater; history?: { t:
           )}
         </div>
       </div>
+
+      <HeaterSchedule heater={heater} notify={notify} />
 
       {points.length > 2 && <Spark points={points} />}
     </section>

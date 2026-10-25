@@ -45,3 +45,9 @@ All calls need the header `x-home-key`.
 | `POST {"action":"command","device_id":"rheem_<serial>","command":{"action":"set_setpoint","value":120}}` | Change the set point |
 | `command: {"action":"set_mode","mode":"heat_pump"}` | Change mode (any value in `capabilities.modes`) |
 | `command: {"action":"power","on":false}` | Turn off or on |
+
+## Schedule
+
+Home HQ runs the water heater's weekly schedule (Morning, Day, Evening, Night for each day),
+copied from the Rheem app on setup. Edit it in the dashboard under Hot water, Edit schedule.
+Keep **Follow Schedule** turned off in the Rheem app so the two schedules don't fight.

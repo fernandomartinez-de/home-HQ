@@ -48,3 +48,23 @@ export type Command =
   | { action: "color_temp"; kelvin: number }
   | { action: "set_setpoint"; value: number }
   | { action: "set_mode"; mode: string };
+
+export type ScheduleSlot = {
+  id?: number;
+  day: number; // 0 = Sunday
+  slot: string;
+  at_time: string; // "HH:MM", 24 hour
+  command: { action: string; mode?: any; setpoint?: number; [key: string]: any };
+  enabled?: boolean;
+  last_run_at?: string | null;
+};
+
+export type Schedule = {
+  device_id: string;
+  name: string;
+  enabled: boolean;
+  time_zone: string;
+  slots: ScheduleSlot[];
+  current: ScheduleSlot | null;
+  mock?: boolean;
+};

@@ -12,6 +12,7 @@
 //        commands: {"action":"set_setpoint","value":120}
 //                  {"action":"set_mode","mode":"heat_pump"}   (any mode in capabilities.modes)
 //                  {"action":"power","on":false}
+//                  {"action":"set_state","mode":"heat_pump","setpoint":135}   (used by schedules)
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -278,8 +279,21 @@ async function command(deviceId: string, cmd: any, source = "ui") {
       const idx = modes.indexOf(want);
       if (idx >= 0) payload["@MODE"] = idx;
       else if (want !== "off" || !hasEnabled) throw new Error(`mode must be one of: ${modes.join(", ")}`);
+    } else if (cmd?.action === "set_state") {
+      // One step for schedules: mode and temperature together. Mode "off" turns the heater off.
+      const modes = n.capabilities.modes;
+      const want = String(cmd.mode);
+      const hasEnabled = e["@ENABLED"] !== undefined;
+      if (hasEnabled) payload["@ENABLED"] = want === "off" ? 0 : 1;
+      const idx = modes.indexOf(want);
+      if (idx >= 0) payload["@MODE"] = idx;
+      else if (want !== "off" || !hasEnabled) throw new Error(`mode must be one of: ${modes.join(", ")}`);
+      if (want !== "off" && cmd.setpoint != null) {
+        const lo = n.capabilities.setpoint_min_f ?? 0, hi = n.capabilities.setpoint_max_f ?? 999;
+        payload["@SETPOINT"] = Math.min(hi, Math.max(lo, Math.round(Number(cmd.setpoint))));
+      }
     } else {
-      throw new Error("unknown command; use set_setpoint, set_mode or power");
+      throw new Error("unknown command; use set_setpoint, set_mode, power or set_state");
     }
 
     await publish(session, e.device_name, e.serial_number, payload);

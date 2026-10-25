@@ -1,6 +1,6 @@
 import "server-only";
-import type { Command, HomeData } from "./types";
-import { mockData, mockCommand } from "./mock";
+import type { Command, HomeData, Schedule, ScheduleSlot } from "./types";
+import { mockData, mockCommand, mockSchedule, mockSaveSchedule, mockEnableSchedule } from "./mock";
 
 const useMock = () => process.env.HOME_MOCK === "1" || !process.env.SUPABASE_URL || !process.env.HOME_API_KEY;
 
@@ -48,4 +48,19 @@ export async function sendCommand(provider: string, deviceId: string, command: C
   if (!PROVIDERS.has(provider)) throw new Error("unknown appliance");
   if (useMock()) return mockCommand(deviceId, command);
   return call(provider, { method: "POST", body: JSON.stringify({ action: "command", device_id: deviceId, command, source: "ui" }) });
+}
+
+export async function getSchedule(deviceId: string): Promise<Schedule> {
+  if (useMock()) return mockSchedule(deviceId);
+  return call(`schedules?device_id=${encodeURIComponent(deviceId)}`);
+}
+
+export async function saveSchedule(deviceId: string, slots: ScheduleSlot[]): Promise<Schedule> {
+  if (useMock()) return mockSaveSchedule(deviceId, slots);
+  return call("schedules", { method: "PUT", body: JSON.stringify({ device_id: deviceId, slots }) });
+}
+
+export async function enableSchedule(deviceId: string, enabled: boolean): Promise<Schedule> {
+  if (useMock()) return mockEnableSchedule(deviceId, enabled);
+  return call("schedules", { method: "POST", body: JSON.stringify({ action: "enable", device_id: deviceId, enabled, apply_now: enabled }) });
 }
