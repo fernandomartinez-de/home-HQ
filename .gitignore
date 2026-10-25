@@ -5,3 +5,9 @@ android/local.properties
 *.iml
 .idea/
 _site/
+.env.local
+services/logger/.env
+homeassistant/secrets.yaml
+esphome/secrets.yaml
+node_modules/
+.next/

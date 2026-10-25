@@ -1,6 +1,13 @@
-# TV Dashboard
+# Home Dashboard
 
-A minimal home screen for a Fire TV: a looping background video with the time, weather,
+Everything for running the home from one repo:
+
+* **[TV dashboard](#tv-dashboard)**: a minimal home screen for the Fire TV with time, weather, portfolio, health, calendar, subway and a row of favorite apps. Live.
+* **[Home control center](docs/home-control.md)**: water heater, air conditioning and lighting through Home Assistant, a Next.js control UI and Supabase analytics. In progress. See the [interactive architecture diagram](docs/home-architecture.html).
+
+## TV dashboard
+
+A looping background video with the time, weather,
 portfolio, health stats, calendar, subway departures and a trip countdown on top, and a row of
 favorite apps in the middle. It replaces the ad heavy stock home screen as far as Fire OS allows.
 
@@ -29,7 +36,7 @@ flowchart LR
     ACT --> PAGES
 ```
 
-## What's on screen
+### What's on screen
 
 | Area | Shows | Source |
 |---|---|---|
@@ -40,7 +47,7 @@ flowchart LR
 | Bottom | Recovery, sleep, strain, today's workout, body composition trend, calorie balance (burned vs eaten), subway departures | `whoop_*`, `training_plan`, `body_composition`, `nutrition_log`, MTA realtime |
 | Background | Looping videos, switched with the remote | `videos/` |
 
-## Remote
+### Remote
 
 | Button | Action |
 |---|---|
@@ -55,7 +62,7 @@ flowchart LR
 The Wi‑Fi button shows the network name and signal; the name needs the location permission the
 app asks for on first launch.
 
-## Repository
+### Repository
 
 ```
 web/                      the dashboard page (index.html), background player (bg.js), app icons (icons/)
@@ -63,10 +70,16 @@ videos/                   background clips; compressed for the TV on publish
 supabase/functions/       tv-dashboard (data for the page), work-calendar-ingest (work calendar), tv-metrics-ingest (Gmail count)
 android/                  the TV app: full screen WebView, app row bridge, Home redirect, screensaver
 .github/workflows/        pages.yml (publish site), app.yml (build and release the APK)
-docs/                     architecture, TV setup, data and config, Power Automate flow, debloat list
+docs/                     architecture, TV setup, data and config, Power Automate flow, debloat list,
+                          home control center plan and diagram
+
+control-center/           home control center: Next.js UI (planned)
+homeassistant/            home control center: HA config, automations, scenes (planned)
+esphome/                  home control center: ESP32 bridge for the LG AC (planned)
+services/logger/          home control center: HA to Supabase event logger (planned)
 ```
 
-## Common changes
+### Common changes
 
 * **Background videos:** add or remove `.mp4` / `.mov` files in `videos/` (up to 25 MB through the GitHub website). They are trimmed to 40 s, made silent and compressed to 1080p on publish.
 * **Location, time zone, trips, subway stop:** edit the `tv_config` row in Supabase ([docs/data.md](docs/data.md)). No code change or publish needed.
@@ -76,7 +89,7 @@ docs/                     architecture, TV setup, data and config, Power Automat
 * **Website tiles:** add `{"label": "Name", "url": "https://...", "icon": "name"}` to `web/sites.json` and publish; no reinstall. They open in Silk (the TV's browser, with a remote cursor). `icon` is a file in `web/icons/` without `.webp`; leave it out for the globe icon.
 * **App icons:** round 192×192 WebP files in `web/icons/`, mapped by package in `ICONS` in `web/index.html`. Apps without one use the TV's own banner.
 
-## Docs
+### Docs
 
 * [Architecture](docs/architecture.md): components, request flow, publish pipeline, security
 * [TV setup and recovery](docs/tv-setup.md): install, Home button redirect, troubleshooting
@@ -84,6 +97,7 @@ docs/                     architecture, TV setup, data and config, Power Automat
 * [Work calendar flow](docs/power-automate.md): the Power Automate flow, step by step
 * [Gmail unread count](docs/gmail.md): the Apps Script that sends the count
 * [Debloat](docs/debloat.md): what was disabled on the TV and how to undo it
+* [Home control center](docs/home-control.md): plan, components and [architecture diagram](docs/home-architecture.html)
 
 ## Privacy
 
