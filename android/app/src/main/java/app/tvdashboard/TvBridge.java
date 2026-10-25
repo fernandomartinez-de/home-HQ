@@ -46,8 +46,11 @@ final class TvBridge {
      * exact package names don't need to be known: {shown label, text the app's own name contains}.
      */
     static final String[][] NEWS = {
-            {"NBC News", "nbc news"},
             {"ABC News", "abc news"},
+            {"TODAY", "today"},
+            {"Fox News", "fox news"},
+            {"Fox Local", "fox local"},
+            {"NBC News", "nbc news"},
             {"CBS News", "cbs news"},
     };
 
