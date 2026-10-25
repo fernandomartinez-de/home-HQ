@@ -13,6 +13,7 @@
 //                  {"action":"set_mode","mode":"heat_pump"}   (any mode in capabilities.modes)
 //                  {"action":"power","on":false}
 //                  {"action":"set_state","mode":"heat_pump","setpoint":135}   (used by schedules)
+//                  {"action":"follow_schedule","on":false}   (Rheem's own schedule; Home HQ keeps it off)
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -292,8 +293,11 @@ async function command(deviceId: string, cmd: any, source = "ui") {
         const lo = n.capabilities.setpoint_min_f ?? 0, hi = n.capabilities.setpoint_max_f ?? 999;
         payload["@SETPOINT"] = Math.min(hi, Math.max(lo, Math.round(Number(cmd.setpoint))));
       }
+    } else if (cmd?.action === "follow_schedule") {
+      // Rheem's own built in schedule. Home HQ runs the schedule, so this is normally off.
+      payload["@SCHEDULE"] = !!cmd.on;
     } else {
-      throw new Error("unknown command; use set_setpoint, set_mode, power or set_state");
+      throw new Error("unknown command; use set_setpoint, set_mode, power, set_state or follow_schedule");
     }
 
     await publish(session, e.device_name, e.serial_number, payload);
@@ -312,7 +316,7 @@ Deno.serve(async (req) => {
       const { heaters } = await liveState();
       const debug = new URL(req.url).searchParams.has("raw");
       const pick = (e: any) => Object.fromEntries(
-        ["@ENABLED", "@MODE", "@STATUS", "@RUNNING", "@SETPOINT", "@TANK", "@AWAY", "@VACATION", "@CONNECTED", "@TYPE"]
+        ["@ENABLED", "@MODE", "@STATUS", "@RUNNING", "@SETPOINT", "@TANK", "@AWAY", "@VACATION", "@CONNECTED", "@TYPE", "@SCHEDULE", "@SCHEDULESTATUS"]
           .map((k) => [k, k === "@MODE" || k === "@SETPOINT" ? { value: e[k]?.value, status: e[k]?.status, enumText: e[k]?.constraints?.enumText } : e[k]]),
       );
       return json({ heaters: heaters.map(({ e, n }) => ({ id: n.id, name: n.name, capabilities: n.capabilities, state: n.state, ...(debug ? { raw: pick(e) } : {}) })) });
