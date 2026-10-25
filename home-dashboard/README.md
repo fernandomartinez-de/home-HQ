@@ -47,7 +47,7 @@ docs/                 architecture diagram
 - [x] Polling every 5 minutes (pg_cron)
 - [ ] Schedules runner
 - [x] Next.js app with live state and controls
-- [ ] Deploy to Vercel
+- [x] Deploy to Vercel
 - [ ] ESP32 bridge for the AC, then its function
 - [ ] History and analytics views
 - [ ] Home status tile on the TV dashboard
