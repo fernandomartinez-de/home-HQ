@@ -20,6 +20,11 @@
         <package android:name="com.amazon.tv.launcher" />
         <package android:name="com.amazon.tv.inputpreference.service" />
         <intent><action android:name="android.settings.SETTINGS" /></intent>
+        <!-- folders (e.g. News) find their apps by name among installed TV apps -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
         <intent><action android:name="android.settings.WIFI_SETTINGS" /></intent>
     </queries>
     <uses-feature android:name="android.software.leanback" android:required="false" />

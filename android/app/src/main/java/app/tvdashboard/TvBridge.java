@@ -36,11 +36,23 @@ final class TvBridge {
             {"com.hbo.hbonow", "HBO Max"},
             {"com.disney.disneyplus", "Disney+"},
             {"com.univision.prendetv", "ViX"},
+            {"folder:news", "News"},
             {"com.spotify.tv.android", "Spotify"},
             {HomeService.AMAZON_HOME, "Fire TV"},
     };
 
+    /**
+     * Folders on the app row. Their apps are found by name among the installed apps, so the
+     * exact package names don't need to be known: {shown label, text the app's own name contains}.
+     */
+    static final String[][] NEWS = {
+            {"NBC News", "nbc news"},
+            {"ABC News", "abc news"},
+            {"CBS News", "cbs news"},
+    };
+
     private final Activity activity;
+    private final java.util.Set<String> folderPkgs = new java.util.HashSet<>();
     private String cached;
 
     TvBridge(Activity activity) { this.activity = activity; }
@@ -48,10 +60,23 @@ final class TvBridge {
     /** JSON list of {pkg, label, icon} where icon is the app's own TV banner (or icon) as a data URL. */
     @JavascriptInterface
     public String apps() {
-        if (cached != null) return cached;
+        // Rebuilt on every page load (once a day, or ☰ Menu) so newly installed folder apps show up.
         PackageManager pm = activity.getPackageManager();
         JSONArray out = new JSONArray();
         for (String[] a : APPS) {
+            if (a[0].startsWith("folder:")) {
+                try {
+                    JSONArray items = folderItems(pm, NEWS);
+                    if (items.length() == 0) continue; // nothing installed yet: no folder
+                    JSONObject o = new JSONObject();
+                    o.put("pkg", a[0]);
+                    o.put("label", a[1]);
+                    o.put("folder", true);
+                    o.put("items", items);
+                    out.put(o);
+                } catch (Exception ignored) { }
+                continue;
+            }
             try {
                 pm.getPackageInfo(a[0], 0); // skip apps that are not installed
                 Drawable d = pm.getApplicationBanner(a[0]);
@@ -70,9 +95,35 @@ final class TvBridge {
         return cached;
     }
 
+    /** Installed TV apps whose name contains each folder entry's text, in the folder's order. */
+    private JSONArray folderItems(PackageManager pm, String[][] wanted) throws Exception {
+        Intent tv = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+        java.util.List<android.content.pm.ResolveInfo> found = pm.queryIntentActivities(tv, 0);
+        JSONArray items = new JSONArray();
+        for (String[] w : wanted) {
+            for (android.content.pm.ResolveInfo ri : found) {
+                String pkg = ri.activityInfo.packageName;
+                String name = String.valueOf(ri.loadLabel(pm)).toLowerCase(java.util.Locale.US);
+                if (!name.contains(w[1])) continue;
+                Drawable d = pm.getApplicationBanner(pkg);
+                boolean banner = d != null;
+                if (d == null) d = pm.getApplicationIcon(pkg);
+                JSONObject o = new JSONObject();
+                o.put("pkg", pkg);
+                o.put("label", w[0]);
+                o.put("banner", banner);
+                o.put("icon", dataUrl(d, banner ? 320 : 144, banner ? 180 : 144));
+                items.put(o);
+                folderPkgs.add(pkg);
+                break;
+            }
+        }
+        return items;
+    }
+
     @JavascriptInterface
     public void launch(String pkg) {
-        boolean allowed = false;
+        boolean allowed = folderPkgs.contains(pkg);
         for (String[] a : APPS) if (a[0].equals(pkg)) allowed = true;
         if (!allowed) return;
         activity.runOnUiThread(() -> {

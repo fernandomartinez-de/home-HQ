@@ -36,7 +36,7 @@ flowchart LR
 | Top left | Time, date, portfolio total with today's change, 30 day line, holdings, home equity | `stocks_crypto_history`, `real_estate_history`, live quotes |
 | Top right | Weather and 3 day forecast, trip countdown, Gmail unread count, next meetings (personal and work) | Open-Meteo, `tv_config.trips`, `tv_metrics` (Apps Script), Google Calendar iCal, `work_calendar_events` |
 | Top center | Settings, Inputs and Wi‑Fi buttons; Wi‑Fi shows network name and signal | Fire OS |
-| Middle | Favorite apps; dims when idle. Below them, what Spotify is playing | Installed apps on the TV, Spotify's media session |
+| Middle | Favorite apps and a News folder; dims when idle. Below them, what Spotify is playing | Installed apps on the TV, Spotify's media session |
 | Bottom | Recovery, sleep, strain, today's workout, body composition trend, calorie balance (burned vs eaten), subway departures | `whoop_*`, `training_plan`, `body_composition`, `nutrition_log`, MTA realtime |
 | Background | Looping videos, switched with the remote | `videos/` |
 
@@ -46,7 +46,8 @@ flowchart LR
 |---|---|
 | Up / Down | Move between the top buttons (Settings, Inputs, Wi‑Fi) and the app row |
 | Left / Right | Move along the row |
-| OK | Open the app or screen |
+| OK | Open the app or screen (a folder opens a small row of apps) |
+| Back | Close an open folder |
 | ⏪ / ⏩ | Previous / next background video (previous / next track while Spotify is playing) |
 | ☰ Menu | Refresh the dashboard |
 | Home | Comes back to the dashboard (after a brief flash of the stock home) |
@@ -71,6 +72,7 @@ docs/                     architecture, TV setup, data and config, Power Automat
 * **Location, time zone, trips, subway stop:** edit the `tv_config` row in Supabase ([docs/data.md](docs/data.md)). No code change or publish needed.
 * **Look and layout:** edit `web/index.html`. The TV picks it up on its daily reload, or press ☰ Menu.
 * **App row:** edit the list in `android/app/src/main/java/app/tvdashboard/TvBridge.java` and reinstall the app ([docs/tv-setup.md](docs/tv-setup.md)).
+* **Folders:** `NEWS` in `TvBridge.java` lists the apps by the name they show on the TV (e.g. "cbs news"); installed matches appear inside the News tile.
 * **App icons:** round 192×192 WebP files in `web/icons/`, mapped by package in `ICONS` in `web/index.html`. Apps without one use the TV's own banner.
 
 ## Docs

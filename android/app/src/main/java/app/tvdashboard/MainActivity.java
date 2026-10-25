@@ -58,8 +58,8 @@ public class MainActivity extends Activity {
                 web.loadUrl(Dash.url(this));
                 web.reload();
                 return true;
-            // Back stays on the dashboard: it is the home screen.
-            case KeyEvent.KEYCODE_BACK: return true;
+            // Back closes an open folder; otherwise it stays on the dashboard (the home screen).
+            case KeyEvent.KEYCODE_BACK: send("back"); return true;
             default:
                 return super.onKeyDown(code, e);
         }

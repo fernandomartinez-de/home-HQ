@@ -122,6 +122,12 @@
   .app.on { transform: scale(1.12); }
   .app.on .tile { outline-color: rgba(255,255,255,.9); }
   .app.on .name { opacity: 1; color: var(--text); }
+  /* Folder (e.g. News): opens over the app row */
+  .folder { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(5,7,10,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: opacity .25s ease; }
+  .folder h2 { font-size: .9vw; letter-spacing: .2vw; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: 0 0 1.6vw; }
+  .folder .items { display: flex; gap: 2.2vw; }
+  .folder .app .name { opacity: .8; }
   /* Spotify now playing, under the app row; only while Spotify is playing or paused */
   .np { position: fixed; left: 50%; top: 70.5%; transform: translateX(-50%); display: flex; align-items: center; gap: 1.1vw;
     padding: .55vw 1.3vw .55vw .55vw; border-radius: .9vw; background: rgba(10,12,16,.38); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -239,6 +245,7 @@
     </div>
   </div>
   <div class="apps hidden" id="apps"></div>
+  <div class="folder hidden" id="folder"><h2 id="folderTitle"></h2><div class="items" id="folderItems"></div></div>
   <div class="np hidden" id="np">
     <img id="npArt" alt="">
     <div class="meta">
@@ -535,7 +542,7 @@
   var ICONS = {
     "com.amazon.tv.launcher": "firetv", "com.netflix.ninja": "netflix", "com.amazon.firetv.youtube": "youtube",
     "com.amazon.firebat": "prime", "com.hbo.hbonow": "hbomax", "com.disney.disneyplus": "disney",
-    "com.spotify.tv.android": "spotify"
+    "com.spotify.tv.android": "spotify", "folder:news": "news"
   };
   function loadApps() {
     if (!window.TV || !TV.apps) return;
@@ -561,6 +568,25 @@
   }
   setInterval(updateNetwork, 30000);
 
+  // Folders: a tile that opens a small row of apps (e.g. News)
+  var folder = null, fcol = 0;
+  function tileHtml(a) {
+    var own = ICONS[a.pkg];
+    return '<div class="app r"><div class="tile round' + (own ? "" : " fallback") + '"><img alt="" src="' +
+      (own ? "icons/" + own + ".webp" : a.icon) + '"></div><div class="name">' + esc(a.label) + "</div></div>";
+  }
+  function openFolder(f) {
+    folder = f; fcol = 0;
+    $("folderTitle").textContent = f.label;
+    $("folderItems").innerHTML = f.items.map(tileHtml).join("");
+    show("folder", true); drawFolder();
+  }
+  function closeFolder() { folder = null; show("folder", false); drawFocus(); }
+  function drawFolder() {
+    var els = $("folderItems").children;
+    for (var i = 0; i < els.length; i++) els[i].classList.toggle("on", i === fcol);
+  }
+
   window.tvKey = function (k) {
     wake();
     if (k === "ff" || k === "rw") {            // skip tracks while Spotify is on, otherwise switch background videos
@@ -568,19 +594,29 @@
       else if (window.bgVideo) window.bgVideo(k === "ff" ? "next" : "prev");
       return;
     }
+    if (folder) {                               // inside a folder: Left/Right pick, OK opens, anything else closes
+      var n = folder.items.length;
+      if (k === "left") fcol = (fcol - 1 + n) % n;
+      else if (k === "right") fcol = (fcol + 1) % n;
+      else if (k === "ok") { var pkg = folder.items[fcol].pkg; closeFolder(); if (window.TV) TV.launch(pkg); return; }
+      else { closeFolder(); return; }
+      drawFolder(); return;
+    }
+    if (k === "back") return;
     if (k === "up" && row === 1) row = 0;
     else if (k === "down" && row === 0 && apps.length) row = 1;
     else if (k === "left" && rowLen(row)) col[row] = (col[row] - 1 + rowLen(row)) % rowLen(row);
     else if (k === "right" && rowLen(row)) col[row] = (col[row] + 1) % rowLen(row);
     else if (k === "ok" && window.TV) {
       if (row === 0) TV.openSystem(tops[col[0]].getAttribute("data-act"));
+      else if (apps.length && apps[col[1]].folder) { openFolder(apps[col[1]]); return; }
       else if (apps.length) TV.launch(apps[col[1]].pkg);
     }
     drawFocus();
   };
   // Keyboard does the same in a desktop browser (arrows, Enter, [ and ] for videos)
   document.addEventListener("keydown", function (e) {
-    var map = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", Enter: "ok", "]": "ff", "[": "rw" };
+    var map = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", Enter: "ok", Escape: "back", "]": "ff", "[": "rw" };
     if (map[e.key]) window.tvKey(map[e.key]);
   });
   loadApps();
