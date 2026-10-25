@@ -1,11 +1,11 @@
 name: Dashboard page
 
-# Publishes web/ and the background videos to GitHub Pages.
+# Publishes tv-dashboard/web/ and the background videos to GitHub Pages.
 # Also serves the latest TV app build at /app.apk.
 on:
   push:
     branches: [main]
-    paths: ["web/**", "videos/**", ".github/workflows/pages.yml"]
+    paths: ["tv-dashboard/web/**", "tv-dashboard/videos/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
       - name: Copy the page
         run: |
           mkdir -p _site
-          cp -r web/. _site/
+          cp -r tv-dashboard/web/. _site/
           # Version stamp so the TV never runs a cached copy of the background script
           sed -i "s#src=\"bg.js\"#src=\"bg.js?v=${GITHUB_SHA::7}\"#" _site/index.html
           sed -i "s#var ASSET_V = \"dev\"#var ASSET_V = \"${GITHUB_SHA::7}\"#" _site/index.html
@@ -40,7 +40,7 @@ jobs:
           mkdir -p _site/videos
           shopt -s nullglob nocaseglob
           # TV friendly: max 1080p, 30 fps, 40 s, no audio, H.264, fast start so it plays while loading
-          for f in videos/*.mp4 videos/*.mov; do
+          for f in tv-dashboard/videos/*.mp4 tv-dashboard/videos/*.mov; do
             out="_site/videos/$(basename "${f%.*}").mp4"
             ffmpeg -nostdin -loglevel error -y -i "$f" -t 40 -an -vf "scale='min(1920,iw)':-2,fps=30" \
               -c:v libx264 -preset veryfast -crf 25 -pix_fmt yuv420p -movflags +faststart "$out" || rm -f "$out"

@@ -1,11 +1,11 @@
-# Home control center
+# Home Control
 
 One place to run the home: water heater, air conditioning and lighting, all driven through
 Home Assistant and shown in a custom Next.js UI, with every state change logged to Supabase for
 history and analytics.
 
-**[Interactive architecture diagram](home-architecture.html)** (open the HTML file in a browser;
-source in [`home-architecture.json`](home-architecture.json))
+**[Interactive architecture diagram](docs/home-architecture.html)** (open the HTML file in a browser;
+source in [`docs/home-architecture.json`](docs/home-architecture.json))
 
 ```mermaid
 flowchart LR
@@ -59,7 +59,7 @@ control-center/     Next.js control center
 homeassistant/      HA configuration, automations, scenes
 esphome/            ESP32 firmware config for the LG AC bridge
 services/logger/    HA to Supabase event logger
-supabase/           shared with the TV dashboard (migrations and functions)
+docs/               architecture diagram and notes
 ```
 
 ## Roadmap
@@ -80,8 +80,8 @@ of the repo, in `.env.local` files and Supabase secrets.
 ## Updating the diagram
 
 The diagram is generated with [Archify](https://github.com/tt-a1i/archify). Edit
-`docs/home-architecture.json`, then from the repo root:
+`home-control/docs/home-architecture.json`, then from the repo root:
 
 ```bash
-node <archify>/bin/archify.mjs finalize architecture docs/home-architecture.json docs/home-architecture.html --quality showcase
+node <archify>/bin/archify.mjs finalize architecture home-control/docs/home-architecture.json home-control/docs/home-architecture.html --quality showcase
 ```

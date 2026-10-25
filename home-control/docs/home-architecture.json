@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Home control architecture",
-    "output": "docs/home-architecture.html",
+    "output": "home-control/docs/home-architecture.html",
     "quality_profile": "showcase",
     "locale": "en"
   },

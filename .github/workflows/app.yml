@@ -3,7 +3,7 @@ name: TV app
 on:
   push:
     branches: [main]
-    paths: ["android/**", ".github/workflows/app.yml"]
+    paths: ["tv-dashboard/android/**", ".github/workflows/app.yml"]
   workflow_dispatch:
 
 permissions:
@@ -32,9 +32,9 @@ jobs:
           owner="${GITHUB_REPOSITORY%%/*}"; repo="${GITHUB_REPOSITORY#*/}"
           export PAGE_URL="https://${owner,,}.github.io/${repo}/"
           echo "Page: $PAGE_URL"
-          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-          gradle -p android assembleRelease --no-daemon -q
-          cp android/app/build/outputs/apk/release/app-release.apk tv-dashboard.apk
+          echo "sdk.dir=$ANDROID_HOME" > tv-dashboard/android/local.properties
+          gradle -p tv-dashboard/android assembleRelease --no-daemon -q
+          cp tv-dashboard/android/app/build/outputs/apk/release/app-release.apk tv-dashboard.apk
           ls -la tv-dashboard.apk
 
       - name: Publish release
