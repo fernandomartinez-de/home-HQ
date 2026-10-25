@@ -39,23 +39,29 @@ const MODE_LABEL: Record<string, string> = {
 };
 const modeLabel = (m: string) => MODE_LABEL[m] ?? m.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
-// Group lights by room: a first word shared by two or more lights becomes a room.
+// Rooms in the order they appear on screen; any other room follows alphabetically.
+const ROOM_ORDER = ["Kitchen", "Living room", "Bedroom"];
+
+// Group lights by their room from Supabase. A light with no room yet falls back to the first
+// word of its name when two or more lights share it, otherwise "Other lights".
 function groupLights(lights: Light[]) {
   const first = (n: string) => n.trim().split(/\s+/)[0].toLowerCase();
   const counts = new Map<string, number>();
   lights.forEach((l) => counts.set(first(l.name), (counts.get(first(l.name)) ?? 0) + 1));
-  const rooms = new Map<string, Light[]>();
-  const loose: Light[] = [];
-  for (const l of lights) {
+  const roomOf = (l: Light) => {
+    if (l.room?.trim()) return l.room.trim();
     const k = first(l.name);
-    if ((counts.get(k) ?? 0) > 1) {
-      const room = k.charAt(0).toUpperCase() + k.slice(1);
-      rooms.set(room, [...(rooms.get(room) ?? []), l]);
-    } else loose.push(l);
-  }
-  const groups = [...rooms.entries()].map(([room, items]) => ({ room, items }));
-  if (loose.length) groups.push({ room: groups.length ? "Around the apartment" : "Lights", items: loose });
-  return groups;
+    return (counts.get(k) ?? 0) > 1 ? k.charAt(0).toUpperCase() + k.slice(1) : "Other lights";
+  };
+  const rooms = new Map<string, Light[]>();
+  for (const l of lights) rooms.set(roomOf(l), [...(rooms.get(roomOf(l)) ?? []), l]);
+  const rank = (r: string) => {
+    const i = ROOM_ORDER.findIndex((x) => x.toLowerCase() === r.toLowerCase());
+    return i < 0 ? (r === "Other lights" ? 999 : 100) : i;
+  };
+  return [...rooms.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([room, items]) => ({ room, items: items.sort((x, y) => x.name.localeCompare(y.name)) }));
 }
 
 // Drop the room word from a light's name inside its room ("Kitchen Left" shows as "Left").
@@ -183,7 +189,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
               </div>
               <div className="tiles">
                 {g.items.map((l) => (
-                  <LightTile key={l.id} light={l} label={g.room === "Lights" || g.room === "Around the apartment" ? l.name : shortName(l.name, g.room)}
+                  <LightTile key={l.id} light={l} label={shortName(l.name, g.room)}
                     send={send} onAdjust={() => setAdjusting(l.id)} />
                 ))}
               </div>
@@ -301,7 +307,7 @@ function LightTile({ light, label, send, onAdjust }: { light: Light; label: stri
         aria-pressed={on} disabled={unreachable} aria-label={`${light.name}, ${on ? "on" : "off"}`}>
         <span className="tile-name">{label}</span>
         <span className="tile-state">
-          {unreachable ? "Unreachable. Check the wall switch." : on ? `On, ${s?.brightness ?? 100}%` : "Off"}
+          {unreachable ? "Offline. Check the wall switch or its WiFi." : on ? `On, ${s?.brightness ?? 100}%` : "Off"}
         </span>
       </button>
       {!unreachable && (

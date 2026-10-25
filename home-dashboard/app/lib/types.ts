@@ -33,7 +33,7 @@ export type HeaterCaps = {
   setpoint_max_f: number | null;
 };
 
-type Base = { id: string; name: string; provider: string; enabled: boolean; recorded_at: string | null };
+type Base = { id: string; name: string; provider: string; enabled: boolean; recorded_at: string | null; room?: string | null };
 export type Light = Base & { kind: "light"; state: LightState | null; capabilities: LightCaps };
 export type Heater = Base & { kind: "water_heater"; state: HeaterState | null; capabilities: HeaterCaps };
 export type AC = Base & { kind: "ac"; state: Record<string, unknown> | null; capabilities: Record<string, unknown> };
