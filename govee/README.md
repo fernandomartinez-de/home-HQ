@@ -23,7 +23,7 @@ home-dashboard ──> govee function (Supabase) ──> Govee Cloud API ──>
 ## Folder
 
 ```
-functions/govee/   Supabase Edge Function: device sync, state, commands, poll (to come)
+functions/govee/   Supabase Edge Function: device sync, live state, poll, commands (deployed)
 ```
 
 ## Setup
@@ -31,3 +31,16 @@ functions/govee/   Supabase Edge Function: device sync, state, commands, poll (t
 1. In the Govee Home app: Profile, Settings (gear), **Apply for API Key**. The key arrives by email.
 2. Add it as the Supabase function secret `GOVEE_API_KEY`.
 3. Deploy the function; its first sync adds every light to `home_devices`.
+
+## API
+
+All calls need the header `x-home-key`.
+
+| Call | Does |
+|---|---|
+| `GET /functions/v1/govee` | Live state of every light, nothing stored |
+| `POST {"action":"poll"}` | Sync lights into `home_devices` and store readings (runs every 5 minutes via pg_cron) |
+| `POST {"action":"command","device_id":"govee_<id>","command":{"action":"power","on":true}}` | Power |
+| `command: {"action":"brightness","value":60}` | Brightness in percent |
+| `command: {"action":"color","hex":"#ff8800"}` | Color |
+| `command: {"action":"color_temp","kelvin":3000}` | White temperature |

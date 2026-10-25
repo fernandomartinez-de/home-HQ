@@ -41,9 +41,10 @@ docs/                 architecture diagram
 ## Roadmap
 
 - [x] Shared Supabase schema
-- [ ] Govee function and API key
-- [ ] Rheem function and EcoNet login
-- [ ] Scheduled polling and schedules (pg_cron)
+- [x] Govee function (waiting on API key)
+- [x] Rheem function (waiting on login secrets)
+- [x] Polling every 5 minutes (pg_cron)
+- [ ] Schedules runner
 - [ ] Next.js app with live state and controls
 - [ ] ESP32 bridge for the AC, then its function
 - [ ] History and analytics views

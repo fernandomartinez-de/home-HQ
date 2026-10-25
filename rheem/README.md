@@ -25,7 +25,7 @@ home-dashboard ──> rheem function (Supabase) ──> Rheem EcoNet API ──
 ## Folder
 
 ```
-functions/rheem/   Supabase Edge Function: state, commands, poll (to come)
+functions/rheem/   Supabase Edge Function: live state, poll, commands (deployed)
 ```
 
 ## Setup
@@ -33,3 +33,15 @@ functions/rheem/   Supabase Edge Function: state, commands, poll (to come)
 1. Make sure the heater shows up and works in the Rheem EcoNet app.
 2. Add `RHEEM_EMAIL` and `RHEEM_PASSWORD` as Supabase function secrets.
 3. Deploy the function; the first poll adds the heater to `home_devices`.
+
+## API
+
+All calls need the header `x-home-key`.
+
+| Call | Does |
+|---|---|
+| `GET /functions/v1/rheem` | Live state of every water heater, nothing stored |
+| `POST {"action":"poll"}` | Store a reading in `home_readings` (runs every 5 minutes via pg_cron) |
+| `POST {"action":"command","device_id":"rheem_<serial>","command":{"action":"set_setpoint","value":120}}` | Change the set point |
+| `command: {"action":"set_mode","mode":"heat_pump"}` | Change mode (any value in `capabilities.modes`) |
+| `command: {"action":"power","on":false}` | Turn off or on |
