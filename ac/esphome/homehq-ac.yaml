@@ -14,12 +14,22 @@ esphome:
       # No external room sensor: let the indoor unit's own thermistor measure the room.
       - switch.turn_on: internal_thermistor
 
-# Board: Unexpected Maker FeatherS3 (ESP32-S3) on the project's "hardware-FeatherS3" interface PCB.
+# Board: Unexpected Maker FeatherS3 or FeatherS3[D] (ESP32-S3) on the project's "hardware-FeatherS3"
+# interface PCB. Both have the same header pinout, 16 MB flash and 8 MB PSRAM, so one build fits both.
 esp32:
   board: um_feathers3
   variant: esp32s3
   framework:
     type: esp-idf
+
+# FeatherS3[D] antenna switch on GPIO41: low selects the onboard antenna (high would select u.FL).
+# Held low from boot. On the plain FeatherS3 this pin is unused, so it is harmless there.
+switch:
+  - platform: gpio
+    id: antenna_external
+    pin: GPIO41
+    restore_mode: ALWAYS_OFF
+    internal: true
 
 wifi:
   ssid: !secret wifi_ssid
