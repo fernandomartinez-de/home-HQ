@@ -1,4 +1,5 @@
-# Home HQ LG AC bridge: one ESP32 on the PREMTB100 wire bus of one indoor unit.
+# Home HQ LG AC bridge: one ESP32 (FeatherS3) on the PREMTB100 wire bus of one indoor unit.
+# Setup: this bridge is the master controller; set each PREMTB100 to slave in its installer menu.
 # Uses the lg_controller component from github.com/JanM321/esphome-lg-controller (0BSD) and
 # talks to Home HQ (Supabase "ac" function) over HTTPS instead of Home Assistant.
 #
@@ -13,8 +14,10 @@ esphome:
       # No external room sensor: let the indoor unit's own thermistor measure the room.
       - switch.turn_on: internal_thermistor
 
+# Board: Unexpected Maker FeatherS3 (ESP32-S3) on the project's "hardware-FeatherS3" interface PCB.
 esp32:
-  board: esp32dev
+  board: um_feathers3
+  variant: esp32s3
   framework:
     type: esp-idf
 
@@ -42,9 +45,9 @@ http_request:
 
 uart:
   - id: ac_serial
-    tx_pin: GPIO25
+    tx_pin: GPIO18
     rx_pin:
-      number: GPIO26
+      number: GPIO17
       allow_other_uses: true
     baud_rate: 104
 
@@ -63,7 +66,7 @@ climate:
     id: ac
     uart_id: ac_serial
     rx_pin:
-      number: GPIO26
+      number: GPIO17
       allow_other_uses: true
     fahrenheit: true
     is_slave_controller: false
