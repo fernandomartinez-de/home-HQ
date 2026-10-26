@@ -1,0 +1,63 @@
+name: AC firmware
+
+# Builds the ESP32 firmware for both AC bridges. On pushes it only proves the code compiles
+# (with placeholder secrets). Run it by hand once the real secrets are set to get flashable files.
+on:
+  push:
+    branches: [main]
+    paths: ["ac/esphome/**", ".github/workflows/ac-firmware.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        device: [bedroom, living-room]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: pip install esphome==2026.10.0
+
+      - name: Secrets (real ones if set, placeholders otherwise)
+        working-directory: ac/esphome
+        env:
+          WIFI_SSID: ${{ secrets.AC_WIFI_SSID }}
+          WIFI_PASSWORD: ${{ secrets.AC_WIFI_PASSWORD }}
+          FALLBACK_PASSWORD: ${{ secrets.AC_FALLBACK_PASSWORD }}
+          OTA_PASSWORD: ${{ secrets.AC_OTA_PASSWORD }}
+          AC_DEVICE_KEY_BEDROOM: ${{ secrets.AC_DEVICE_KEY_BEDROOM }}
+          AC_DEVICE_KEY_LIVING_ROOM: ${{ secrets.AC_DEVICE_KEY_LIVING_ROOM }}
+        run: |
+          if [ -n "$WIFI_SSID" ]; then
+            {
+              echo "wifi_ssid: \"$WIFI_SSID\""
+              echo "wifi_password: \"$WIFI_PASSWORD\""
+              echo "fallback_password: \"$FALLBACK_PASSWORD\""
+              echo "ota_password: \"$OTA_PASSWORD\""
+            } > secrets.yaml
+          else
+            cp secrets.example.yaml secrets.yaml
+          fi
+          key_var="AC_DEVICE_KEY_$(echo '${{ matrix.device }}' | tr 'a-z-' 'A-Z_')"
+          echo "device_key: \"${!key_var:-placeholder}\"" >> secrets.yaml
+
+      - name: Compile
+        working-directory: ac/esphome
+        run: esphome compile ${{ matrix.device }}.yaml
+
+      - name: Keep the firmware files
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ac-${{ matrix.device }}-firmware
+          path: ac/esphome/.esphome/build/ac-${{ matrix.device }}/.pioenvs/ac-${{ matrix.device }}/firmware.factory.bin
+          retention-days: 7

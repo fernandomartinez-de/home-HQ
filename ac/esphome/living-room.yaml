@@ -1,0 +1,6 @@
+substitutions:
+  deviceid: ac-living-room
+  devicename: Living Room AC
+  supabase_url: https://uuvsvtpfcexhqojlrsxy.supabase.co
+
+<<: !include homehq-ac.yaml

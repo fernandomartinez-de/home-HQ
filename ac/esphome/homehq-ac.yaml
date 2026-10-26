@@ -1,0 +1,237 @@
+# Home HQ LG AC bridge: one ESP32 on the PREMTB100 wire bus of one indoor unit.
+# Uses the lg_controller component from github.com/JanM321/esphome-lg-controller (0BSD) and
+# talks to Home HQ (Supabase "ac" function) over HTTPS instead of Home Assistant.
+#
+# Per device: copy bedroom.yaml or living-room.yaml. Secrets live in secrets.yaml (git ignored).
+
+esphome:
+  name: ${deviceid}
+  friendly_name: ${devicename}
+  on_boot:
+    priority: -100
+    then:
+      # No external room sensor: let the indoor unit's own thermistor measure the room.
+      - switch.turn_on: internal_thermistor
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${deviceid} setup"
+    password: !secret fallback_password
+
+captive_portal:
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+logger:
+  level: INFO
+
+json:
+
+http_request:
+  verify_ssl: true
+  timeout: 10s
+
+uart:
+  - id: ac_serial
+    tx_pin: GPIO25
+    rx_pin:
+      number: GPIO26
+      allow_other_uses: true
+    baud_rate: 104
+
+external_components:
+  - source: components
+    components: [lg_controller]
+
+globals:
+  - id: last_state
+    type: std::string
+    initial_value: '""'
+
+climate:
+  - platform: lg_controller
+    name: ""
+    id: ac
+    uart_id: ac_serial
+    rx_pin:
+      number: GPIO26
+      allow_other_uses: true
+    fahrenheit: true
+    is_slave_controller: false
+    vane1:
+      name: Airflow 1 Up-Down
+      id: vane_position_1
+    vane2:
+      name: Airflow 2 Up-Down
+      id: vane_position_2
+    vane3:
+      name: Airflow 3 Up-Down
+      id: vane_position_3
+    vane4:
+      name: Airflow 4 Up-Down
+      id: vane_position_4
+    overheating:
+      name: Over Heating
+      id: overheating
+    fan_speed_slow:
+      name: Fan Speed Slow
+      id: fan_speed_slow
+      mode: box
+    fan_speed_low:
+      name: Fan Speed Low
+      id: fan_speed_low
+      mode: box
+    fan_speed_medium:
+      name: Fan Speed Medium
+      id: fan_speed_medium
+      mode: box
+    fan_speed_high:
+      name: Fan Speed High
+      id: fan_speed_high
+      mode: box
+    sleep_timer:
+      name: Sleep Timer
+      id: sleep_timer
+      mode: box
+    error_code:
+      name: Error Code
+      id: error_code
+    pipe_temp_in:
+      name: Pipe Temperature In
+      id: pipe_temperature_in
+    pipe_temp_mid:
+      name: Pipe Temperature Mid
+      id: pipe_temperature_mid
+    pipe_temp_out:
+      name: Pipe Temperature Out
+      id: pipe_temperature_out
+    defrost:
+      name: Defrost
+      id: defrost
+    preheat:
+      name: Preheat
+      id: preheat
+    outdoor:
+      name: Outdoor Unit
+      id: outdoor
+    auto_dry_active:
+      name: Auto Dry Active
+      id: auto_dry_active
+    purifier:
+      name: Air Purifier
+      id: air_purifier
+    internal_thermistor:
+      name: Internal Thermistor
+      id: internal_thermistor
+    auto_dry:
+      name: Auto Dry
+      id: auto_dry
+
+# ---------- Home HQ link ----------
+# Every 5 s: ask the ac function for a pending command and apply it.
+# Every 60 s, and right after any change: send the current state.
+interval:
+  - interval: 5s
+    then:
+      - if:
+          condition: wifi.connected
+          then:
+            - http_request.get:
+                url: !lambda 'return std::string("${supabase_url}/functions/v1/ac?device_id=${deviceid}");'
+                request_headers:
+                  x-device-key: !secret device_key
+                capture_response: true
+                max_response_buffer_size: 1024
+                on_response:
+                  then:
+                    - lambda: |-
+                        if (response->status_code != 200 || body.empty()) return;
+                        json::parse_json(body, [](JsonObject root) -> bool {
+                          if (!root["command"].is<JsonObject>()) return true;
+                          JsonObject cmd = root["command"];
+                          auto call = id(ac).make_call();
+                          if (cmd["mode"].is<const char*>()) {
+                            std::string m = cmd["mode"].as<std::string>();
+                            if (m == "off") call.set_mode(climate::CLIMATE_MODE_OFF);
+                            else if (m == "cool") call.set_mode(climate::CLIMATE_MODE_COOL);
+                            else if (m == "heat") call.set_mode(climate::CLIMATE_MODE_HEAT);
+                            else if (m == "dry") call.set_mode(climate::CLIMATE_MODE_DRY);
+                            else if (m == "fan") call.set_mode(climate::CLIMATE_MODE_FAN_ONLY);
+                            else if (m == "auto") call.set_mode(climate::CLIMATE_MODE_HEAT_COOL);
+                          }
+                          if (cmd["target_f"].is<float>()) {
+                            // The component works in Celsius internally; Home HQ speaks Fahrenheit.
+                            call.set_target_temperature((cmd["target_f"].as<float>() - 32.0f) * 5.0f / 9.0f);
+                          }
+                          if (cmd["fan"].is<const char*>()) {
+                            std::string f = cmd["fan"].as<std::string>();
+                            if (f == "low") call.set_fan_mode(climate::CLIMATE_FAN_LOW);
+                            else if (f == "medium") call.set_fan_mode(climate::CLIMATE_FAN_MEDIUM);
+                            else if (f == "high") call.set_fan_mode(climate::CLIMATE_FAN_HIGH);
+                            else if (f == "auto") call.set_fan_mode(climate::CLIMATE_FAN_AUTO);
+                          }
+                          call.perform();
+                          id(last_state) = "";  // force a state push on the next check
+                          return true;
+                        });
+  - interval: 60s
+    then:
+      - lambda: 'id(last_state) = "";'
+  - interval: 5s
+    then:
+      - if:
+          condition:
+            lambda: |-
+              // Build the state document; report true only when it changed (or the 60 s timer cleared it).
+              if (!wifi::global_wifi_component->is_connected()) return false;
+              auto mode_name = [](climate::ClimateMode m) -> const char* {
+                switch (m) {
+                  case climate::CLIMATE_MODE_OFF: return "off";
+                  case climate::CLIMATE_MODE_COOL: return "cool";
+                  case climate::CLIMATE_MODE_HEAT: return "heat";
+                  case climate::CLIMATE_MODE_DRY: return "dry";
+                  case climate::CLIMATE_MODE_FAN_ONLY: return "fan";
+                  case climate::CLIMATE_MODE_HEAT_COOL: return "auto";
+                  default: return "unknown";
+                }
+              };
+              auto fan_name = [](optional<climate::ClimateFanMode> f) -> const char* {
+                if (!f.has_value()) return "auto";
+                switch (*f) {
+                  case climate::CLIMATE_FAN_LOW: return "low";
+                  case climate::CLIMATE_FAN_MEDIUM: return "medium";
+                  case climate::CLIMATE_FAN_HIGH: return "high";
+                  default: return "auto";
+                }
+              };
+              auto c2f = [](float c) { return std::isnan(c) ? NAN : c * 9.0f / 5.0f + 32.0f; };
+              std::string doc = json::build_json([&](JsonObject root) {
+                root["device_id"] = "${deviceid}";
+                root["mode"] = mode_name(id(ac).mode);
+                root["power"] = id(ac).mode != climate::CLIMATE_MODE_OFF;
+                root["target_f"] = c2f(id(ac).target_temperature);
+                root["room_f"] = c2f(id(ac).current_temperature);
+                root["fan"] = fan_name(id(ac).fan_mode);
+                root["outdoor_running"] = id(outdoor).state;
+                root["defrost"] = id(defrost).state;
+                root["error_code"] = id(error_code).state;
+              });
+              if (doc == id(last_state)) return false;
+              id(last_state) = doc;
+              return true;
+          then:
+            - http_request.post:
+                url: !lambda 'return std::string("${supabase_url}/functions/v1/ac");'
+                request_headers:
+                  Content-Type: application/json
+                  x-device-key: !secret device_key
+                body: !lambda 'return id(last_state);'

@@ -11,3 +11,4 @@ ac/esphome/secrets.yaml
 node_modules/
 .next/
 tsconfig.tsbuildinfo
+ac/esphome/.esphome/

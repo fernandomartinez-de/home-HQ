@@ -1,0 +1,6 @@
+substitutions:
+  deviceid: ac-bedroom
+  devicename: Bedroom AC
+  supabase_url: https://uuvsvtpfcexhqojlrsxy.supabase.co
+
+<<: !include homehq-ac.yaml
