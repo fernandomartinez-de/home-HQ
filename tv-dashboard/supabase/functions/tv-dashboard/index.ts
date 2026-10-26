@@ -197,9 +197,10 @@ async function nutrition() {
   if (meals.error) throw meals.error;
   const rows = meals.data ?? [];
   const eaten = Math.round(rows.reduce((a, r) => a + Number(r.calories_kcal || 0), 0));
-  // A WHOOP cycle runs sleep to sleep, so today's starts with last night's sleep (after 6 pm yesterday)
+  // A WHOOP cycle runs sleep to sleep. Like the WHOOP app, the open cycle is "today" (even when no sleep
+  // was detected and it spans two days); a closed one counts only if it began last night (after 6 pm).
   const c = cyc.data?.[0];
-  const current = c && c.calories_kcal != null && new Date(c.start_time).getTime() >= start.getTime() - 6 * 3600000;
+  const current = c && c.calories_kcal != null && (!c.end_time || new Date(c.start_time).getTime() >= start.getTime() - 6 * 3600000);
   return { date: today, burned: current ? Math.round(Number(c.calories_kcal)) : null, eaten, meals: rows.length };
 }
 
