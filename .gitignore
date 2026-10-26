@@ -12,3 +12,4 @@ node_modules/
 .next/
 tsconfig.tsbuildinfo
 ac/esphome/.esphome/
+__pycache__/
