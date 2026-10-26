@@ -6,7 +6,7 @@ gets an ESP32 bridge on the controller's 3 wire bus. The bridge talks to Supabas
 | Zone | Indoor unit | Controller | Bridge (ESPHome) |
 |---|---|---|---|
 | Bedroom | LMDN097HV4 (9k BTU ducted) | PREMTB100 | `esphome/bedroom.yaml` |
-| Kitchen / living room | (confirm model) | PREMTB100 | `esphome/living-room.yaml` |
+| Kitchen / living room | LMDN097HV4 (identical to bedroom) | PREMTB100 | `esphome/living-room.yaml` |
 
 Outdoor unit: LMU183HV (Multi F).
 
@@ -33,7 +33,7 @@ home-dashboard ──> ac function (Supabase) <── ESP32 bridge (polls for co
 |---|---|---|
 | Interface PCB, `hardware-FeatherS3` design, assembled by JLCPCB | 1 order of 5 | Upload the GERBER, BOM and CPL files from the project's `hardware-FeatherS3/jlcpcb/production_files`. Must be 4 layers. About $50 for 5 plus shipping. Not the `hardware-tiny` board (open reports of 12V reaching the ESP32). |
 | Unexpected Maker **FeatherS3** (ESP32-S3) | 2 | Adafruit 5399 or Unexpected Maker. Plain FeatherS3, not Neo or [D]. Powered from the board; never plug USB in while installed. |
-| JST XH 3 pin cable (Adafruit 4873) | 2 | Check wire order against the PREMTB100 before connecting (red 12V, yellow signal, black ground). |
+| JST XH 3 pin cable (Adafruit 4873, or an XH compatible 2.54 mm pre wired pigtail kit) | 2 | Use the female plug with wires; it mates the board's male header. Must be XH, not PH or Dupont. Check wire order against the PREMTB100 before connecting (red 12V, yellow signal, black ground). |
 | WAGO 221-413 lever connectors | 6 | 3 per zone, to splice into the controller wires. |
 | Case | 2 | 3D printable case in the project, or a small project box. |
 | USB C data cable | 1 | For the first firmware load. |
