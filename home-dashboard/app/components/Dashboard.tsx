@@ -4,10 +4,10 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, type LucideIcon,
+  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
-import type { Activity as ActivityItem, Command, Device, Heater, HomeData, Light, Schedule, TV } from "@/lib/types";
+import type { Activity as ActivityItem, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Schedule, TV } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
 const POLL_MS = 30_000;
@@ -313,6 +313,169 @@ const tvStatus = (tv: TV | undefined) => {
   const fresh = !!tv.recorded_at && Date.now() - new Date(tv.recorded_at).getTime() < 6 * 60_000;
   return { seen: true, on: fresh && s.screen !== "off" };
 };
+
+
+// ---------- Ring camera ----------
+
+const MODE_LABEL: Record<string, string> = { disarmed: "Disarmed", home: "Home", away: "Away" };
+
+function minsAgo(ms: number | null, now: number) {
+  if (!ms) return null;
+  const m = Math.max(0, Math.round((now - ms) / 60000));
+  return m < 1 ? "JUST NOW" : m < 60 ? `${m} MIN AGO` : `${Math.round(m / 60)} H AGO`;
+}
+
+/** The latest Ring snapshot, refreshed every minute while on screen. Snap asks for a fresh one. */
+function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [taken, setTaken] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [now, setNow] = useState(() => Date.now());
+  const url = useRef<string | null>(null);
+
+  const load = useCallback(async (force = false) => {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/camera/snapshot?id=${encodeURIComponent(cam.id)}${force ? "&force=1" : ""}&t=${Date.now()}`, { cache: "no-store" });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+      const blob = await r.blob();
+      const next = URL.createObjectURL(blob);
+      if (url.current) URL.revokeObjectURL(url.current);
+      url.current = next;
+      setSrc(next);
+      const t = Number(r.headers.get("x-snapshot-ms"));
+      setTaken(Number.isFinite(t) && t > 0 ? t : Date.now());
+      setErr(null);
+    } catch (e) {
+      setErr((e as Error).message.replace(/ \(from .*\)$/, ""));
+    } finally {
+      setBusy(false);
+    }
+  }, [cam.id]);
+
+  useEffect(() => {
+    load();
+    const refresh = setInterval(() => document.visibilityState === "visible" && load(), 60_000);
+    const tick = setInterval(() => setNow(Date.now()), 15_000);
+    return () => { clearInterval(refresh); clearInterval(tick); if (url.current) URL.revokeObjectURL(url.current); };
+  }, [load]);
+
+  const s = cam.state;
+  const btn = `flex items-center gap-1.5 px-3 ${big ? "h-12 text-sm" : "h-10 text-[11px]"} rounded-xl font-medium active:scale-95 transition-transform`;
+  return (
+    <>
+      <div className="relative flex-1 min-h-[120px] rounded-2xl overflow-hidden border border-white/10 bg-black">
+        {src && <img src={src} alt={`${cam.name} camera snapshot`} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300" style={{ transform: `scale(${zoom})` }} />}
+        {!src && !err && <span className="absolute inset-0 flex items-center justify-center text-[12px] text-slate-500">Loading snapshot</span>}
+        {err && (
+          <span className={`absolute inset-x-3 ${src ? "bottom-3" : "top-1/2 -translate-y-1/2"} text-center text-[12px] text-rose-200 bg-black/80 border border-rose-500/30 rounded-xl px-3 py-2`}>{err}</span>
+        )}
+        <span className={`absolute top-2 left-2 bg-black/80 px-2 py-1 rounded-lg text-[10px] font-mono flex items-center gap-1.5 border border-white/10 ${s?.online === false ? "text-rose-400" : "text-emerald-400"}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${s?.online === false ? "bg-rose-400" : "bg-emerald-400"} ${busy ? "animate-pulse" : ""}`} />
+          {s?.online === false ? "CAMERA OFFLINE" : `SNAPSHOT${taken ? ` • ${minsAgo(taken, now)}` : ""}`}
+        </span>
+        {s?.battery != null && (
+          <span className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded-lg text-[10px] font-mono text-slate-300 border border-white/10">
+            {s.charging ? "CHARGING " : "BATTERY "}{s.battery}%
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        {/* Ring's web dashboard has live view in the browser. */}
+        <a href="https://account.ring.com/account/dashboard" target="_blank" rel="noreferrer"
+          className={`${btn} bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-semibold`}><Video className="w-3.5 h-3.5" /> Live view</a>
+        <span className="flex items-center gap-2">
+          <button onClick={() => load(true)} disabled={busy} className={`${btn} bg-white/5 border border-white/10 text-slate-200 disabled:opacity-50`}>
+            <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${busy ? "animate-spin" : ""}`} /> Snap
+          </button>
+          <span className={`flex items-center gap-1 px-1.5 ${big ? "h-12" : "h-10"} bg-black/40 rounded-xl border border-white/5 text-slate-400`}>
+            <button aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(1, +(z - 0.5).toFixed(1)))} className="w-8 h-8 flex items-center justify-center"><ZoomOut className="w-3.5 h-3.5" /></button>
+            <span className="text-amber-400 font-mono font-bold text-[11px] w-8 text-center">{zoom.toFixed(1)}x</span>
+            <button aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(3, +(z + 0.5).toFixed(1)))} className="w-8 h-8 flex items-center justify-center"><ZoomIn className="w-3.5 h-3.5" /></button>
+          </span>
+        </span>
+      </div>
+    </>
+  );
+}
+
+function ModeChip({ cam, onClick }: { cam: Camera; onClick: () => void }) {
+  const m = cam.state?.mode;
+  if (!m) return null;
+  const armed = m !== "disarmed";
+  return (
+    <button onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border active:scale-95 ${armed ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-rose-500/10 text-rose-400 border-rose-500/30"}`}>
+      {armed ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}{armed ? `Armed • ${MODE_LABEL[m] ?? m}` : "Disarmed"}
+    </button>
+  );
+}
+
+const eventLabel = (e: CameraEvent) =>
+  e.kind === "ding" ? "Doorbell" : e.kind === "on_demand" ? "Live view opened" : e.person ? "Person detected" : "Motion";
+
+/** Ring sign in: email and password, then the code Ring sends. Nothing is stored here. */
+function RingConnect({ onConnected }: { onConnected: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fetch("/api/ring/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, code: prompt ? code : undefined }),
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error);
+      if (body.need_code) { setPrompt(body.prompt); setCode(""); return; }
+      setPassword("");
+      onConnected();
+    } catch (e2) {
+      setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const input = "w-full h-12 px-4 rounded-xl bg-black/40 border border-white/10 text-[15px] text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 select-text";
+  return (
+    <form onSubmit={submit} className="w-full max-w-sm mx-auto flex flex-col gap-3">
+      <div className="text-center space-y-1 mb-1">
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400 flex items-center justify-center"><Video className="w-5 h-5" /></div>
+        <h3 className="text-[15px] font-bold text-white pt-2">Connect your Ring account</h3>
+        <p className="text-[12px] text-slate-400">{prompt ?? "Your password goes to Ring once and isn't saved. Ring will send you a code."}</p>
+      </div>
+      {!prompt ? (
+        <>
+          <label className="sr-only" htmlFor="ring-email">Ring email</label>
+          <input id="ring-email" className={input} type="email" autoComplete="username" placeholder="Ring email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label className="sr-only" htmlFor="ring-password">Ring password</label>
+          <input id="ring-password" className={input} type="password" autoComplete="current-password" placeholder="Ring password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </>
+      ) : (
+        <>
+          <label className="sr-only" htmlFor="ring-code">Verification code</label>
+          <input id="ring-code" className={`${input} text-center tracking-[0.4em] font-mono text-lg`} inputMode="numeric" autoComplete="one-time-code" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))} required autoFocus />
+        </>
+      )}
+      {err && <p role="alert" className="text-[12px] text-rose-300 text-center">{err}</p>}
+      <button type="submit" disabled={busy} className="h-12 rounded-xl bg-amber-500 text-slate-950 text-sm font-bold disabled:opacity-60 active:scale-[0.99]">
+        {busy ? "Connecting" : prompt ? "Verify and connect" : "Continue"}
+      </button>
+      {prompt && <button type="button" onClick={() => { setPrompt(null); setErr(null); }} className="text-[12px] text-slate-400 underline underline-offset-4">Start over</button>}
+    </form>
+  );
+}
 
 function TvPanel({ tv, send }: { tv: TV; send: Send }) {
   const s = tv.state;
@@ -775,6 +938,9 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const heater = data.devices.find((d): d is Heater => d.kind === "water_heater");
   const lights = useMemo(() => data.devices.filter((d): d is Light => d.kind === "light"), [data.devices]);
   const tv = data.devices.find((d): d is TV => d.kind === "tv");
+  const cams = data.devices.filter((d): d is Camera => d.kind === "camera");
+  const [camId, setCamId] = useState<string | null>(null);
+  const cam = cams.find((c) => c.id === camId) ?? cams[0];
   const { seen: tvSeen, on: tvOn } = tvStatus(tv);
   const lightsIn = useCallback((roomId: string) => lights.filter((l) => roomIdOf(l) === roomId).sort((a, b) => a.name.localeCompare(b.name)), [lights]);
   const roomName = (id: string) => ROOMS.find((r) => r.id === id)?.name ?? "Other";
@@ -893,6 +1059,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       const room = roomName(roomIdOf(l));
       out.push({ id: l.id, level: "warn", icon: WifiOff, text: `${l.name.toLowerCase().startsWith(room.split(" ")[0].toLowerCase()) ? l.name : `${room} ${l.name}`} offline`, since: ago(lastOnline(l.id)) || undefined });
     });
+    cams.forEach((c) => {
+      if (c.state?.online === false) out.push({ id: `${c.id}-off`, level: "warn", icon: WifiOff, text: `${c.name} camera offline` });
+      else if (c.state?.on_battery && c.state.battery != null && c.state.battery < 20) out.push({ id: `${c.id}-batt`, level: "info", icon: AlertTriangle, text: `${c.name} camera battery ${c.state.battery}%` });
+    });
     const hs = heater?.state;
     if (heater && hs && !hs.connected) out.push({ id: "heater-off", level: "warn", icon: WifiOff, text: "Water heater offline" });
     if (hs?.alert_count) out.push({ id: "heater-alert", level: "warn", icon: AlertTriangle, text: `Water heater has ${hs.alert_count} alert${hs.alert_count > 1 ? "s" : ""} in the Rheem app` });
@@ -910,7 +1080,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     { id: "kitchen", label: "Kitchen", icon: CookingPot, meta: `${onIn("kitchen")} on` },
     { id: "bedroom", label: "Bedroom", icon: BedDouble, meta: `${onIn("bedroom")} on` },
     { id: "water", label: "Water", icon: Flame, meta: heater?.state?.tank_pct != null ? `${heater.state.tank_pct}%` : undefined },
-    { id: "camera", label: "Camera", icon: Video },
+    { id: "camera", label: "Camera", icon: Video, meta: cam?.state?.mode ? MODE_LABEL[cam.state.mode] ?? undefined : undefined },
   ];
 
   // ---------- pieces that need dashboard state ----------
@@ -953,9 +1123,18 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           </Preview>
         </div>
         <div className={`flex-1 min-h-[240px] ${PANEL} p-3.5 flex flex-col gap-2.5`}>
-          <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring"
-            right={<span className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border bg-emerald-500/10 text-emerald-400/60 border-emerald-500/20"><ShieldCheck className="w-3.5 h-3.5" />Armed • Home</span>} />
-          <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>
+          {cam ? (
+            <>
+              <PanelHead icon={Video} tone={AMBER} title={`${cam.name} Camera`} sub="Ring" right={<ModeChip cam={cam} onClick={() => setSection("camera")} />} />
+              <RingFeed key={cam.id} cam={cam} />
+            </>
+          ) : (
+            <>
+              <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring"
+                right={<button onClick={() => setSection("camera")} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300">Connect</button>} />
+              <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>
+            </>
+          )}
         </div>
       </div>
 
@@ -1086,11 +1265,25 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     </main>
   );
 
-  const cameraView = (
+  const disconnectRing = async () => {
+    if (!window.confirm("Disconnect Ring from the dashboard? You can connect it again any time.")) return;
+    try {
+      const r = await fetch("/api/ring/login", { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json()).error);
+      setToast("Ring disconnected.");
+      await load();
+    } catch (e) {
+      setToast(`Couldn't disconnect Ring: ${(e as Error).message}`);
+    }
+  };
+
+  const cameraView = !cam ? (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
       <div className={`lg:col-span-8 ${PANEL} p-4 flex flex-col gap-3 min-h-[320px]`}>
-        <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring • snapshot refreshes every minute" />
-        <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn big /></Preview>
+        <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring" />
+        <div className="flex-1 flex items-center justify-center py-6">
+          <RingConnect onConnected={() => { setToast("Ring connected."); refresh(); load(); }} />
+        </div>
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 space-y-3`}>
@@ -1102,16 +1295,62 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           </Preview>
         </div>
         <div className={`flex-1 min-h-[160px] ${PANEL} p-4 flex flex-col gap-2`}>
-          <PanelHead icon={ShieldAlert} tone={AMBER} title="Recent Events" sub="Motion and mode changes" />
+          <PanelHead icon={ShieldAlert} tone={AMBER} title="Recent Events" sub="Motion and doorbell" />
           <Preview className="flex-1 min-h-0" corner="tr">
-            {[["Motion • Living room", "10:02 PM", true], ["Motion • Sofa area", "08:15 PM", true], ["Mode changed to Home", "07:48 PM", false], ["Motion • Living room", "01:22 PM", true]].map(([t, time, motion]) => (
+            {[["Person detected", "10:02 PM", true], ["Motion", "08:15 PM", true], ["Motion", "01:22 PM", true]].map(([t, time]) => (
               <span key={`${t}${time}`} className="flex items-center gap-2.5 bg-black/30 p-2 rounded-xl border border-white/5">
-                <span className={`w-12 h-8 rounded-lg border border-white/10 flex items-center justify-center ${motion ? "bg-[#2a211a]" : "bg-emerald-500/10"}`}>{motion ? <Footprints className="w-3.5 h-3.5 text-amber-400" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}</span>
+                <span className="w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center bg-[#2a211a]"><Footprints className="w-3.5 h-3.5 text-amber-400" /></span>
                 <span className="flex-1 text-[12px] text-slate-200 truncate">{t as string}</span>
                 <span className="text-[10px] font-mono text-slate-500">{time as string}</span>
               </span>
             ))}
           </Preview>
+        </div>
+      </div>
+    </main>
+  ) : (
+    <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
+      <div className={`lg:col-span-8 ${PANEL} p-4 flex flex-col gap-3 min-h-[320px]`}>
+        <PanelHead icon={Video} tone={AMBER} title={`${cam.name} Camera`}
+          sub={`Ring • ${cam.state?.online === false ? "offline" : cam.state?.on_battery ? "battery camera, Ring refreshes snapshots every few minutes" : "snapshot refreshes every minute"}`}
+          right={cams.length > 1 ? (
+            <div className="flex gap-1">{cams.map((c) => (
+              <button key={c.id} onClick={() => setCamId(c.id)} className={`px-3 h-9 rounded-xl text-[11px] font-medium border ${c.id === cam.id ? "bg-white/10 border-amber-500/40 text-white" : "bg-white/5 border-white/10 text-slate-400"}`}>{c.name}</button>
+            ))}</div>
+          ) : undefined} />
+        <RingFeed key={cam.id} cam={cam} big />
+      </div>
+      <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
+        <div className={`${PANEL} p-4 space-y-3`}>
+          <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub={cam.capabilities.modes?.length ? "Same modes as the Ring app" : "Turn on Modes in the Ring app to use these"} />
+          <div className={`grid grid-cols-3 gap-1 p-1 bg-black/50 rounded-xl border border-white/5 ${cam.capabilities.modes?.length ? "" : "opacity-40 pointer-events-none"}`}>
+            {(["disarmed", "home", "away"] as const).map((m) => {
+              const on = cam.state?.mode === m;
+              const Icon = m === "disarmed" ? ShieldAlert : m === "home" ? HomeIcon : ShieldCheck;
+              return (
+                <button key={m} aria-pressed={on} onClick={() => !on && send(cam, { action: "set_mode", mode: m }, { mode: m })}
+                  className={`py-3 rounded-lg text-xs font-semibold flex flex-col items-center gap-1 transition-colors ${on ? (m === "disarmed" ? "bg-rose-500 text-slate-950" : "bg-emerald-500 text-slate-950") : "text-slate-400"}`}>
+                  <Icon className="w-4 h-4" />{MODE_LABEL[m]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className={`flex-1 min-h-[160px] ${PANEL} p-4 flex flex-col gap-2`}>
+          <PanelHead icon={BellRing} tone={AMBER} title="Recent Events" sub="Motion and doorbell, from Ring"
+            right={<button onClick={disconnectRing} aria-label="Disconnect Ring" className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-500"><LogOut className="w-3.5 h-3.5" /></button>} />
+          <div className="space-y-1.5 overflow-hidden">
+            {(cam.state?.events ?? []).filter((e) => e.t).slice(0, 6).map((e, i) => (
+              <div key={`${e.t}${i}`} className="flex items-center gap-2.5 bg-black/30 p-2 rounded-xl border border-white/5">
+                <span className={`w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center ${e.person ? "bg-amber-500/10" : "bg-[#2a211a]"}`}>
+                  {e.kind === "ding" ? <BellRing className="w-3.5 h-3.5 text-amber-400" /> : e.person ? <UserRound className="w-3.5 h-3.5 text-amber-300" /> : e.kind === "on_demand" ? <Video className="w-3.5 h-3.5 text-cyan-400" /> : <Footprints className="w-3.5 h-3.5 text-amber-400" />}
+                </span>
+                <span className="flex-1 text-[12px] text-slate-200 truncate">{eventLabel(e)}</span>
+                <span className="text-[10px] font-mono text-slate-500">{clockTime(e.t!)}</span>
+              </div>
+            ))}
+            {!(cam.state?.events ?? []).some((e) => e.t) && <p className="text-[12px] text-slate-500 px-1">No recent events.</p>}
+          </div>
         </div>
       </div>
     </main>

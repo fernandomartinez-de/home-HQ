@@ -49,7 +49,20 @@ export type TvState = {
 };
 export type TvCaps = { apps: { pkg: string; name: string }[]; actions: string[] };
 export type TV = Base & { kind: "tv"; state: TvState | null; capabilities: TvCaps };
-export type Device = Light | Heater | AC | TV;
+export type CameraEvent = { t: string | null; kind: string | null; person: boolean | null };
+export type CameraState = {
+  online: boolean;
+  battery: number | null;
+  on_battery: boolean;
+  charging: boolean | null;
+  motion_enabled: boolean;
+  mode: string | null;
+  wifi: string | null;
+  events: CameraEvent[];
+};
+export type CameraCaps = { modes: string[]; battery: boolean };
+export type Camera = Base & { kind: "camera"; state: CameraState | null; capabilities: CameraCaps };
+export type Device = Light | Heater | AC | TV | Camera;
 
 // One command from the home_commands log, newest first.
 export type Activity = {
@@ -81,7 +94,8 @@ export type Command =
   | { action: "home" }
   | { action: "back" }
   | { action: "sleep" }
-  | { action: "volume"; dir: "up" | "down" | "mute" };
+  | { action: "volume"; dir: "up" | "down" | "mute" }
+  | { action: "set_mode"; mode: string };
 
 export type ScheduleBlock = {
   id?: number;

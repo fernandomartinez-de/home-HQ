@@ -18,6 +18,16 @@ let devices: Device[] = [
     ], actions: ["launch", "home", "back", "volume", "sleep"] },
     state: { online: true, screen: "on", app: "com.netflix.ninja", app_name: "Netflix", volume: 12, max_volume: 30, muted: false, version: "1.0" },
   },
+  ...(process.env.HOME_MOCK_NO_RING ? [] : [{
+    id: "ring_1", kind: "camera", provider: "ring", name: "Living Room", room: "Living room", enabled: true, recorded_at: now(),
+    capabilities: { modes: ["disarmed", "home", "away"], battery: false },
+    state: { online: true, battery: null, on_battery: false, charging: null, motion_enabled: true, mode: "home", wifi: null,
+      events: [
+        { t: new Date(Date.now() - 22 * 60_000).toISOString(), kind: "motion", person: true },
+        { t: new Date(Date.now() - 135 * 60_000).toISOString(), kind: "motion", person: null },
+        { t: new Date(Date.now() - 410 * 60_000).toISOString(), kind: "on_demand", person: null },
+      ] },
+  } as Device]),
   light("govee_floor", "Floor Lamp", { online: true, power: true, brightness: 70, color: "#ffb15e", color_temp_k: 2200 }, "Living room"),
   light("govee_strip", "Kitchen Strip Light", { online: true, power: false, brightness: 80, color: "#ff6804", color_temp_k: null }, "Kitchen"),
   light("govee_kl", "Kitchen Left", { online: true, power: true, brightness: 40, color: "#ffb969", color_temp_k: 3000 }, "Kitchen"),
@@ -63,7 +73,7 @@ export function mockCommand(id: string, c: Command) {
     if (c.action === "color_temp") s.color_temp_k = c.kelvin;
     if (c.action === "scene") s.power = true;
     if (c.action === "set_setpoint") s.setpoint_f = c.value;
-    if (c.action === "set_mode") { s.mode = c.mode; s.power = c.mode !== "off"; }
+    if (c.action === "set_mode") { s.mode = c.mode; if (d.kind === "water_heater") s.power = c.mode !== "off"; }
     if (c.action === "launch") { s.app = c.app; s.app_name = (d.capabilities as any).apps?.find((a: any) => a.pkg === c.app)?.name ?? c.app; }
     if (c.action === "home") { s.app = "app.tvdashboard"; s.app_name = "Dashboard"; }
     if (c.action === "sleep") s.screen = "off";
@@ -104,4 +114,16 @@ export function mockSaveSchedule(deviceId: string, next: ScheduleBlock[]) {
 export function mockEnableSchedule(deviceId: string, enabled: boolean) {
   scheduleOn = enabled;
   return mockSchedule(deviceId);
+}
+
+// A drawn stand in for a camera snapshot.
+export function mockSnapshot() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+<defs><radialGradient id="a" cx="22%" cy="62%" r="45%"><stop offset="0" stop-color="#f59e0b" stop-opacity=".6"/><stop offset="1" stop-color="#f59e0b" stop-opacity="0"/></radialGradient>
+<radialGradient id="b" cx="78%" cy="70%" r="35%"><stop offset="0" stop-color="#6366f1" stop-opacity=".5"/><stop offset="1" stop-color="#6366f1" stop-opacity="0"/></radialGradient>
+<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b231d"/><stop offset="1" stop-color="#0f0c0a"/></linearGradient></defs>
+<rect width="640" height="360" fill="url(#g)"/><rect width="640" height="360" fill="url(#a)"/><rect width="640" height="360" fill="url(#b)"/>
+<rect x="51" y="230" width="538" height="80" rx="28" fill="#3a2e25" opacity=".85"/><rect x="90" y="200" width="100" height="50" rx="12" fill="#4a3a2e"/>
+<rect x="420" y="65" width="190" height="120" rx="6" fill="#000" opacity=".7"/></svg>`;
+  return { image: new TextEncoder().encode(svg).buffer as ArrayBuffer, takenMs: Date.now() - 60_000, svg: true };
 }
