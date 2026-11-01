@@ -275,14 +275,14 @@ function AcZoneSample() {
     <>
       <div className="flex items-center justify-between px-4">
         <span className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 text-3xl font-bold flex items-center justify-center">−</span>
-        <span className="relative w-56 h-56">
+        <span className="relative w-44 h-44">
           <svg viewBox="0 0 250 250" className="w-full h-full">
             <circle cx="125" cy="125" r="105" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="12" strokeDasharray="495 660" strokeLinecap="round" transform="rotate(135 125 125)" />
             <circle cx="125" cy="125" r="105" fill="none" stroke="#22d3ee" strokeWidth="12" strokeDasharray="271 660" strokeLinecap="round" transform="rotate(135 125 125)" />
           </svg>
           <span className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[10px] font-mono text-slate-400 tracking-widest">SET TO</span>
-            <span className="text-6xl font-bold font-mono">72°</span>
+            <span className="text-5xl font-bold font-mono">72°</span>
             <span className="text-[11px] font-mono text-cyan-400 tracking-wider">COOL</span>
           </span>
         </span>
@@ -296,6 +296,11 @@ function AcZoneSample() {
       <span className="grid grid-cols-4 gap-1 p-1 bg-black/50 rounded-xl border border-white/5">
         {["Auto", "Low", "Med", "High"].map((m, i) => <span key={m} className={`py-3 text-sm rounded-lg text-center font-medium ${i === 0 ? "bg-cyan-500 text-slate-950 font-bold" : "text-slate-400"}`}>{m}</span>)}
       </span>
+      <span className="flex items-baseline justify-between pt-1">
+        <span className="text-[10px] font-mono text-slate-500 tracking-wider">ROOM TEMPERATURE</span>
+        <span className="text-[10px] font-mono text-slate-600">LAST 24 HOURS</span>
+      </span>
+      <RoomTempSample />
     </>
   );
 }
@@ -586,7 +591,7 @@ function RingConnect({ onConnected }: { onConnected: () => void }) {
   );
 }
 
-function TvPanel({ tv, send }: { tv: TV; send: Send }) {
+function TvPanel({ tv, send, compact }: { tv: TV; send: Send; compact?: boolean }) {
   const s = tv.state;
   const { on } = tvStatus(tv);
   const apps = tv.capabilities.apps?.length ? tv.capabilities.apps : TV_APPS;
@@ -594,13 +599,13 @@ function TvPanel({ tv, send }: { tv: TV; send: Send }) {
   const vol = s?.volume ?? 0, max = s?.max_volume ?? 30;
   return (
     <>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className={`grid ${compact ? "grid-cols-6 gap-1" : "grid-cols-3 gap-1.5"}`}>
         {apps.map((a) => {
           const active = on && s?.app === a.pkg;
           return (
-            <button key={a.pkg} disabled={!on} aria-pressed={active} onClick={() => send(tv, { action: "launch", app: a.pkg }, { app: a.pkg, app_name: a.name })}
-              className={`h-9 rounded-xl border text-[11px] font-bold transition-all active:scale-95 disabled:opacity-40 ${active ? "bg-white/10 border-white/30 shadow-lg shadow-black/40" : "bg-black/30 border-white/5"}`}
-              style={{ color: TV_APPS.find((x) => x.pkg === a.pkg)?.color ?? "#e2e8f0" }}>{a.name}</button>
+            <button key={a.pkg} disabled={!on} aria-pressed={active} aria-label={`Open ${a.name}`} onClick={() => send(tv, { action: "launch", app: a.pkg }, { app: a.pkg, app_name: a.name })}
+              className={`${compact ? "h-8 text-[10px]" : "h-9 text-[11px]"} rounded-xl border font-bold transition-all active:scale-95 disabled:opacity-40 ${active ? "bg-white/10 border-white/30 shadow-lg shadow-black/40" : "bg-black/30 border-white/5"}`}
+              style={{ color: TV_APPS.find((x) => x.pkg === a.pkg)?.color ?? "#e2e8f0" }}>{compact ? a.name.replace(" Video", "").replace(" Max", "") : a.name}</button>
           );
         })}
       </div>
@@ -1294,22 +1299,56 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     </main>
   );
 
+  // Appliances and tech in a room (not lights or the AC): the TV and the camera so far.
+  const techIn = (room: string) => data.devices.filter((d) => (d.kind === "tv" || d.kind === "camera") && (d.room ?? "").toLowerCase().startsWith(room === "living" ? "living" : room));
+
+  const techBox = (room: "living" | "bedroom") => {
+    const items = techIn(room);
+    const roomTv = items.find((d): d is TV => d.kind === "tv");
+    const roomCam = items.find((d): d is Camera => d.kind === "camera");
+    return (
+      <div className={`flex-1 min-h-[150px] ${PANEL} p-4 flex flex-col gap-3 overflow-hidden`}>
+        <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={items.length ? `${items.length} in the ${room === "living" ? "living room" : "bedroom"}` : "Nothing here yet"}
+          right={roomCam ? (
+            <button onClick={() => setSection("camera")} aria-label={`Open the ${roomCam.name} camera`}
+              className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border bg-amber-500/10 border-amber-500/25 text-amber-300 active:scale-95">
+              <Video className="w-3.5 h-3.5" />Camera
+              <span className={`w-1.5 h-1.5 rounded-full ${roomCam.state?.online === false ? "bg-rose-400" : "bg-emerald-400"}`} />
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          ) : undefined} />
+        {roomTv && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] font-semibold text-slate-200 flex items-center gap-1.5"><Tv className="w-3.5 h-3.5 text-cyan-400" />{roomTv.name}</span>
+              <span className="text-[11px] text-slate-400">{tvOn ? roomTv.state?.app_name ?? "On" : tvSeen ? "Asleep or off" : ""}{tvOn && roomTv.state?.volume != null ? ` • Vol ${roomTv.state.volume}` : ""}</span>
+            </div>
+            {tvSeen ? <TvPanel tv={roomTv} send={send} compact /> : <Preview><TvSample /></Preview>}
+          </div>
+        )}
+        {roomCam && !roomTv && (
+          <p className="text-[12px] text-slate-400">{roomCam.name} camera: {roomCam.state?.online === false ? "offline" : "online"}. Tap Camera to watch.</p>
+        )}
+        {!items.length && (
+          <p className="text-[12px] text-slate-500 leading-relaxed">No appliances or tech assigned to the {room === "living" ? "living room" : "bedroom"} yet. Devices you add to this room will show up here.</p>
+        )}
+      </div>
+    );
+  };
+
   const zoneView = (room: "living" | "bedroom") => (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
       <div className={`${PANEL} lg:col-span-7 p-5 flex flex-col gap-4 min-h-0`}>
         <PanelHead icon={Wind} tone={CYAN} title={`${room === "living" ? "Living Room" : "Bedroom"} AC`} sub="LG ducted unit"
           right={<div className="flex items-center gap-2">{unitToggle}<PowerBtn on={false} disabled label="AC power" /></div>} />
-        <Preview className="flex-1 min-h-0 flex flex-col justify-center" corner="tr"><AcZoneSample /></Preview>
+        <Preview className="flex-1 min-h-0"><AcZoneSample /></Preview>
       </div>
       <div className="lg:col-span-5 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a light's name for colors" />
           {room === "living" ? <>{roomLights("living", 2)}{roomLights("kitchen", 2)}</> : roomLights("bedroom", 2)}
         </div>
-        <div className={`flex-1 min-h-[150px] ${PANEL} p-4 flex flex-col gap-2`}>
-          <PanelHead icon={Activity} tone={GREEN} title="Room Temperature" sub="Last 24 hours" />
-          <Preview className="flex-1 min-h-0" corner="tr"><RoomTempSample /></Preview>
-        </div>
+        {techBox(room)}
       </div>
     </main>
   );
