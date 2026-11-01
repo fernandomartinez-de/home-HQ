@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Info, Video, RefreshCw, Plug, type LucideIcon,
+  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, Footprints, type LucideIcon,
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Command, Device, Heater, HomeData, Light, Schedule } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
 const POLL_MS = 30_000;
+const DESIGN_WIDTH = 1180;
 
 // ---------- helpers ----------
 
@@ -80,7 +81,24 @@ function describe(a: ActivityItem) {
 
 // ---------- shared pieces ----------
 
-const PANEL = "bg-[#171310]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl";
+// Charts get their size from layout pixels (clientWidth), which the iPad scaling doesn't change;
+// the chart library's own sizing reads screen pixels and would draw too big under the scale.
+function Sized({ children }: { children: (w: number, h: number) => ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return <div ref={ref} className="absolute inset-0">{size && size.w > 0 && size.h > 0 ? children(size.w, size.h) : null}</div>;
+}
+
+const PANEL = "relative bg-[#171310]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl";
 const CYAN = "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
 const AMBER = "bg-amber-500/10 text-amber-400 border-amber-500/20";
 const GREEN = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
@@ -125,6 +143,179 @@ function Clock() {
       <span className="text-lg font-bold font-mono tracking-tight text-slate-100 tabular-nums">{now ? now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--"}</span>
       <span className="text-[11px] text-slate-400 font-medium hidden md:inline">{now?.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
     </div>
+  );
+}
+
+// ---------- previews of what isn't connected yet ----------
+// These draw the finished design with example values, dimmed and disabled, with a small badge in a
+// corner, so the screen shows what's coming without passing the examples off as real readings.
+
+type Corner = "tr" | "br" | "bl";
+const CORNER: Record<Corner, string> = { tr: "top-2 right-2", br: "bottom-2 right-2", bl: "bottom-2 left-2" };
+
+// The badge anchors to the panel (the nearest positioned box), sitting on its top edge like a tab,
+// so it never covers the preview's controls.
+function Preview({ children, className = "" }: { children: ReactNode; className?: string; corner?: Corner }) {
+  return (
+    <div className={`flex flex-col ${className}`}>
+      <div aria-hidden="true" className="flex-1 min-h-0 flex flex-col gap-2.5 opacity-55 saturate-50 pointer-events-none select-none">{children}</div>
+      <span className="absolute -top-2.5 right-6 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#110e0c] border border-white/15 text-[9px] font-mono tracking-wider text-slate-400">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />NOT CONNECTED
+      </span>
+    </div>
+  );
+}
+
+function SampleAcRow({ name, room, set, mode }: { name: string; room: number; set: number; mode: string }) {
+  return (
+    <div className="bg-black/30 p-2.5 rounded-2xl border border-white/5 flex items-center gap-2.5">
+      <span className="flex-1 min-w-0">
+        <span className="text-[13px] font-bold text-white flex items-center gap-1 whitespace-nowrap"><Wind className="w-3.5 h-3.5 text-cyan-400 shrink-0" />{name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
+        <span className="text-[11px] text-slate-400">Room {room}° • <span className="text-cyan-400 font-mono uppercase">{mode}</span></span>
+      </span>
+      <span className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold">−</span>
+      <span className="w-[60px] text-center text-2xl font-bold font-mono">{set}°</span>
+      <span className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold">+</span>
+      <span className="w-10 h-10 rounded-xl border bg-cyan-500/20 text-cyan-300 border-cyan-500/40 flex items-center justify-center"><Power className="w-4 h-4" /></span>
+    </div>
+  );
+}
+
+function CamStandIn({ big }: { big?: boolean }) {
+  return (
+    <>
+      <div className="relative flex-1 min-h-[120px] rounded-2xl overflow-hidden border border-white/10 bg-black">
+        <div className="absolute inset-0" style={{ background: "radial-gradient(40% 55% at 22% 62%, rgba(245,158,11,0.55), transparent 70%), radial-gradient(30% 40% at 78% 70%, rgba(99,102,241,0.45), transparent 70%), linear-gradient(180deg, #2b231d 0%, #1a1512 55%, #0f0c0a 100%)" }}>
+          <div className="absolute left-[8%] right-[8%] bottom-[14%] h-[22%] rounded-t-[28px] bg-[#3a2e25]/80" />
+          <div className="absolute left-[14%] bottom-[30%] w-[16%] h-[14%] rounded-xl bg-[#4a3a2e]/80" />
+          <div className="absolute right-[12%] top-[18%] w-[30%] h-[34%] rounded-md bg-black/70 border border-white/10" />
+        </div>
+        <span className="absolute top-2 left-2 bg-black/80 px-2 py-1 rounded-lg text-[10px] font-mono text-emerald-400 flex items-center gap-1.5 border border-white/10"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />SNAPSHOT • 1 MIN AGO</span>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`flex items-center gap-1.5 px-3 ${big ? "h-12 text-sm" : "h-10 text-[11px]"} rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-semibold`}><Video className="w-3.5 h-3.5" /> Live view</span>
+        <span className="flex items-center gap-2">
+          <span className={`flex items-center gap-1.5 px-3 ${big ? "h-12 text-sm" : "h-10 text-[11px]"} bg-white/5 border border-white/10 rounded-xl text-slate-200`}><RefreshCw className="w-3.5 h-3.5 text-amber-400" /> Snap</span>
+          <span className={`flex items-center px-3 ${big ? "h-12" : "h-10"} bg-black/40 rounded-xl border border-white/5 text-amber-400 font-mono font-bold text-[11px]`}>1.0x</span>
+        </span>
+      </div>
+    </>
+  );
+}
+
+const POWER_SAMPLE = (() => {
+  const ac = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.6, 0.9, 1.1, 1.2, 1.1, 0.9, 0.8, 0.9, 1.0, 0.9, 0.8, 0.7, 0.5];
+  const water = [0, 0, 0, 0, 0, 0, 0, 0.5, 0.6, 0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0.5, 0.3, 0.2, 0, 0];
+  const lights = [0, 0, 0, 0, 0, 0, 0, 0.02, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0.03, 0.05, 0.06, 0.06, 0.06, 0.05, 0.03];
+  const other = [0.15, 0.15, 0.14, 0.14, 0.14, 0.15, 0.18, 0.3, 0.35, 0.2, 0.18, 0.2, 0.25, 0.22, 0.2, 0.2, 0.22, 0.3, 0.45, 0.5, 0.48, 0.42, 0.35, 0.25];
+  return {
+    hourly: ac.map((_, h) => ({ time: `${String(h).padStart(2, "0")}:00`, ac: ac[h], water: water[h], lights: lights[h], other: other[h] })),
+    sources: [
+      { key: "ac", label: "AC", color: "#22d3ee", share: 58 },
+      { key: "water", label: "Water", color: "#f59e0b", share: 13 },
+      { key: "other", label: "Other", color: "#94a3b8", share: 28 },
+      { key: "lights", label: "Lights", color: "#a78bfa", share: 2 },
+    ],
+  };
+})();
+
+function PowerSample() {
+  return (
+    <>
+      <div className="relative flex-1 min-h-[90px]">
+        <div className="absolute inset-0">
+          <Sized>{(w, h) => (
+            <AreaChart width={w} height={h} data={POWER_SAMPLE.hourly} margin={{ top: 5, right: 4, left: -26, bottom: 0 }}>
+              <XAxis dataKey="time" stroke="#64748b" fontSize={9} tickLine={false} interval={5} />
+              <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
+              {POWER_SAMPLE.sources.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.2} strokeWidth={1.5} isAnimationActive={false} />)}
+            </AreaChart>
+          )}</Sized>
+        </div>
+      </div>
+      <div className="flex h-2 rounded-full overflow-hidden bg-white/5">{POWER_SAMPLE.sources.map((s) => <div key={s.key} style={{ width: `${s.share}%`, backgroundColor: s.color }} />)}</div>
+      <div className="grid grid-cols-4 gap-1">
+        {POWER_SAMPLE.sources.map((s) => (
+          <span key={s.key} className="text-[10px] leading-tight">
+            <span className="flex items-center gap-1 text-slate-400"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />{s.label}</span>
+            <span className="font-mono text-slate-200 font-bold">{s.share}%</span>
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+const ROOM_TEMP_SAMPLE = [76, 75, 74, 74, 73, 74, 77, 79, 80, 78, 76, 75, 74].map((v, i) => ({ time: `${String((22 + i * 2) % 24).padStart(2, "0")}:00`, v }));
+
+function RoomTempSample() {
+  return (
+    <div className="relative flex-1 min-h-[110px]">
+      <div className="absolute inset-0">
+        <Sized>{(w, h) => (
+          <AreaChart width={w} height={h} data={ROOM_TEMP_SAMPLE} margin={{ top: 5, right: 4, left: -22, bottom: 0 }}>
+            <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} interval={2} />
+            <YAxis stroke="#64748b" fontSize={10} tickLine={false} domain={[68, 84]} />
+            <Area type="monotone" dataKey="v" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.15} strokeWidth={2} isAnimationActive={false} />
+          </AreaChart>
+        )}</Sized>
+      </div>
+    </div>
+  );
+}
+
+function AcZoneSample() {
+  return (
+    <>
+      <div className="flex items-center justify-between px-4">
+        <span className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 text-3xl font-bold flex items-center justify-center">−</span>
+        <span className="relative w-56 h-56">
+          <svg viewBox="0 0 250 250" className="w-full h-full">
+            <circle cx="125" cy="125" r="105" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="12" strokeDasharray="495 660" strokeLinecap="round" transform="rotate(135 125 125)" />
+            <circle cx="125" cy="125" r="105" fill="none" stroke="#22d3ee" strokeWidth="12" strokeDasharray="271 660" strokeLinecap="round" transform="rotate(135 125 125)" />
+          </svg>
+          <span className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-[10px] font-mono text-slate-400 tracking-widest">SET TO</span>
+            <span className="text-6xl font-bold font-mono">72°</span>
+            <span className="text-[11px] font-mono text-cyan-400 tracking-wider">COOL</span>
+          </span>
+        </span>
+        <span className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 text-3xl font-bold flex items-center justify-center">+</span>
+      </div>
+      <span className="text-[10px] font-mono text-slate-500 tracking-wider">MODE</span>
+      <span className="grid grid-cols-5 gap-1 p-1 bg-black/50 rounded-xl border border-white/5">
+        {["Cool", "Heat", "Auto", "Dry", "Fan"].map((m, i) => <span key={m} className={`py-3 text-sm rounded-lg text-center font-medium ${i === 0 ? "bg-cyan-500 text-slate-950 font-bold" : "text-slate-400"}`}>{m}</span>)}
+      </span>
+      <span className="text-[10px] font-mono text-slate-500 tracking-wider">FAN</span>
+      <span className="grid grid-cols-4 gap-1 p-1 bg-black/50 rounded-xl border border-white/5">
+        {["Auto", "Low", "Med", "High"].map((m, i) => <span key={m} className={`py-3 text-sm rounded-lg text-center font-medium ${i === 0 ? "bg-cyan-500 text-slate-950 font-bold" : "text-slate-400"}`}>{m}</span>)}
+      </span>
+    </>
+  );
+}
+
+const TV_APPS = [
+  { name: "Netflix", color: "#e50914" }, { name: "YouTube", color: "#ff3b30" }, { name: "Prime Video", color: "#38bdf8" },
+  { name: "HBO Max", color: "#a78bfa" }, { name: "Disney+", color: "#60a5fa" }, { name: "Spotify", color: "#22c55e" },
+];
+
+function TvSample() {
+  const key = "h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200";
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-1.5">
+        {TV_APPS.map((a, i) => (
+          <span key={a.name} className={`h-9 rounded-xl border flex items-center justify-center text-[11px] font-bold ${i === 0 ? "bg-white/10 border-white/25" : "bg-black/30 border-white/5"}`} style={{ color: a.color }}>{a.name}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        <span className={`${key} bg-amber-500/20 border-amber-500/40 text-amber-300`}><Power className="w-4 h-4" /></span>
+        <span className={key}><HomeIcon className="w-4 h-4" /></span>
+        <span className={key}><Undo2 className="w-4 h-4" /></span>
+        <span className={key}><Volume1 className="w-4 h-4" /></span>
+        <span className={key}><Volume2 className="w-4 h-4" /></span>
+      </div>
+    </>
   );
 }
 
@@ -353,15 +544,15 @@ function HeaterPanel({ heater, send, unit, big }: { heater: Heater; send: Send; 
 function TankChart({ points }: { points: { time: string; tank: number }[] }) {
   if (points.length < 3) return <NotConnected icon={Activity} title="Collecting history" text="The tank chart fills in as readings arrive every 5 minutes." />;
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={points} margin={{ top: 5, right: 4, left: -22, bottom: 0 }}>
+    <Sized>{(w, h) => (
+      <AreaChart width={w} height={h} data={points} margin={{ top: 5, right: 4, left: -22, bottom: 0 }}>
         <defs><linearGradient id="g-tank" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} /><stop offset="95%" stopColor="#f59e0b" stopOpacity={0} /></linearGradient></defs>
         <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} minTickGap={40} />
         <YAxis stroke="#64748b" fontSize={10} tickLine={false} domain={[0, 100]} />
         <Tooltip contentStyle={{ backgroundColor: "#1c1511", borderColor: "#ffffff20", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`${v}%`, "Tank"]} />
         <Area type="monotone" dataKey="tank" stroke="#f59e0b" fill="url(#g-tank)" strokeWidth={2} isAnimationActive={false} />
       </AreaChart>
-    </ResponsiveContainer>
+    )}</Sized>
   );
 }
 
@@ -404,6 +595,25 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const holdUntil = useRef(0); // ignore stale polls right after a command
+  const [fit, setFit] = useState<{ z: number; h: number } | null>(null);
+
+  // On iPad and larger, lay the dashboard out on a canvas 1180 wide (the iPad Air in landscape)
+  // and scale it to the screen, so every iPad gets the same proportions instead of stretched panels.
+  // Layout effect so the scale is in place before the first paint.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const w = document.documentElement.clientWidth;
+      if (w >= 1024) setFit({ z: w / DESIGN_WIDTH, h: 0 }); else setFit(null);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => { window.removeEventListener("resize", measure); window.removeEventListener("orientationchange", measure); };
+  }, []);
+  useEffect(() => {
+    document.documentElement.style.overflow = fit ? "hidden" : "";
+    document.body.style.overflow = fit ? "hidden" : "";
+  }, [fit]);
 
   // Sample screens can open on a section with ?s=water; the unit choice is remembered per device.
   useEffect(() => {
@@ -593,36 +803,6 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     );
   };
 
-  const acRow = (name: string, room: string) => (
-    <button onClick={() => setSection(room)} className="w-full bg-black/30 p-3 rounded-2xl border border-white/5 flex items-center gap-2.5 text-left">
-      <span className="flex-1 min-w-0">
-        <span className="text-[13px] font-bold text-white flex items-center gap-1 whitespace-nowrap"><Wind className="w-3.5 h-3.5 text-cyan-400 shrink-0" />{name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
-        <span className="text-[11px] text-slate-500">Bridge not installed yet</span>
-      </span>
-      <span className="w-[68px] text-center text-2xl font-bold font-mono text-slate-700">--°</span>
-      <PowerBtn on={false} disabled label={`${name} AC power`} />
-    </button>
-  );
-
-  const acZone = (name: string) => (
-    <div className={`${PANEL} lg:col-span-7 p-5 flex flex-col gap-4 min-h-0`}>
-      <PanelHead icon={Wind} tone={CYAN} title={`${name} AC`} sub="LG ducted unit • ESP32 bridge not installed yet" right={<div className="flex items-center gap-2">{unitToggle}<PowerBtn on={false} disabled label="AC power" /></div>} />
-      <div className="flex items-center justify-center py-2">
-        <div className="relative w-56 h-56">
-          <svg viewBox="0 0 250 250" className="w-full h-full" aria-hidden="true">
-            <circle cx="125" cy="125" r="105" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="12" strokeDasharray="495 660" strokeLinecap="round" transform="rotate(135 125 125)" />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-mono text-slate-500 tracking-widest">SET TO</span>
-            <span className="text-6xl font-bold font-mono text-slate-700">--°</span>
-            <span className="text-[11px] font-mono text-slate-600 uppercase tracking-wider">Not connected</span>
-          </div>
-        </div>
-      </div>
-      <NotConnected icon={Plug} title="AC controls arrive with the bridge" text="Mode, fan speed and set temperature will work here, synced with the wall controller, once the ESP32 is wired in." />
-    </div>
-  );
-
   // ---------- views ----------
 
   const overview = (
@@ -630,11 +810,15 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
           <PanelHead icon={Thermometer} tone={CYAN} title="Climate Controls" sub="Dual LG zones" right={unitToggle} />
-          {acs.length === 0 ? <>{acRow("Living", "living")}{acRow("Bedroom", "bedroom")}</> : null}
+          <Preview corner="br" className="flex flex-col">
+            <SampleAcRow name="Living" room={74} set={72} mode="Cool" />
+            <SampleAcRow name="Bedroom" room={71} set={68} mode="Cool" />
+          </Preview>
         </div>
         <div className={`flex-1 min-h-[240px] ${PANEL} p-3.5 flex flex-col gap-2.5`}>
-          <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring" />
-          <NotConnected icon={Video} title="Ring camera not connected yet" text="Snapshots, motion events and your Ring mode will show here, with a button to open live view in the Ring app." />
+          <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring"
+            right={<span className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border bg-emerald-500/10 text-emerald-400/60 border-emerald-500/20"><ShieldCheck className="w-3.5 h-3.5" />Armed • Home</span>} />
+          <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>
         </div>
       </div>
 
@@ -649,13 +833,13 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             </>
           ) : <NotConnected icon={Flame} title="No water heater" text="It shows up here once the Rheem function reports it." />}
         </div>
-        <div className={`flex-1 min-h-[160px] ${PANEL} p-3.5 flex flex-col gap-2`}>
+        <div className={`flex-1 min-h-[170px] ${PANEL} p-3.5 flex flex-col gap-2`}>
           <PanelHead icon={Zap} tone={GREEN} title="Power & Energy" sub="Who is using power today" />
-          <NotConnected icon={Zap} title="Coming with Con Edison and the AC" text="A breakdown of today's power by AC, water heater, lights and everything else." />
+          <Preview className="flex-1 min-h-0" corner="tr"><PowerSample /></Preview>
         </div>
-        <div className={`${PANEL} p-3.5 flex flex-col gap-2 shrink-0`}>
-          <PanelHead icon={Zap} tone={GREEN} title="Electricity" sub="Con Edison" />
-          <NotConnected icon={Plug} title="Con Edison not connected yet" text="Bill so far, projected bill and daily usage, updated once a day." />
+        <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
+          <PanelHead icon={Tv} tone={CYAN} title="Living Room TV" sub="Fire TV • Netflix" />
+          <Preview corner="br"><TvSample /></Preview>
         </div>
       </div>
 
@@ -675,15 +859,19 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
 
   const zoneView = (room: "living" | "bedroom") => (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
-      {acZone(room === "living" ? "Living Room" : "Bedroom")}
+      <div className={`${PANEL} lg:col-span-7 p-5 flex flex-col gap-4 min-h-0`}>
+        <PanelHead icon={Wind} tone={CYAN} title={`${room === "living" ? "Living Room" : "Bedroom"} AC`} sub="LG ducted unit"
+          right={<div className="flex items-center gap-2">{unitToggle}<PowerBtn on={false} disabled label="AC power" /></div>} />
+        <Preview className="flex-1 min-h-0 flex flex-col justify-center" corner="tr"><AcZoneSample /></Preview>
+      </div>
       <div className="lg:col-span-5 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a card for color and brightness" />
           {room === "living" ? <>{roomLights("living", 2)}{roomLights("kitchen", 2)}</> : roomLights("bedroom", 2)}
         </div>
-        <div className={`flex-1 min-h-[140px] ${PANEL} p-4 flex flex-col gap-2`}>
+        <div className={`flex-1 min-h-[150px] ${PANEL} p-4 flex flex-col gap-2`}>
           <PanelHead icon={Activity} tone={GREEN} title="Room Temperature" sub="Last 24 hours" />
-          <NotConnected icon={Thermometer} title="Arrives with the AC bridge" text="The indoor unit's own sensor will chart this room's temperature." />
+          <Preview className="flex-1 min-h-0" corner="tr"><RoomTempSample /></Preview>
         </div>
       </div>
     </main>
@@ -702,7 +890,13 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       <div className="lg:col-span-4 flex flex-col gap-3">
         <div className={`${PANEL} p-4 flex flex-col gap-3`}>
           <PanelHead icon={Wind} tone={CYAN} title="Shared AC" sub="Kitchen and living room are one zone" />
-          <NotConnected icon={Plug} title="Bridge not installed yet" text="This zone's AC will show here once it's connected." />
+          <Preview corner="br">
+            <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+              <span className="text-[11px] text-slate-400">Room 74°</span>
+              <span className="text-3xl font-bold font-mono">72°</span>
+              <span className="text-[11px] font-mono text-cyan-400">COOL</span>
+            </div>
+          </Preview>
           <button onClick={() => setSection("living")} className="py-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-sm font-semibold">Open living room</button>
         </div>
       </div>
@@ -742,7 +936,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         </div>
         <div className={`flex-1 min-h-[180px] ${PANEL} p-4 flex flex-col gap-2`}>
           <PanelHead icon={Activity} tone={GREEN} title="Hot Water in Tank" sub="Last 24 hours" />
-          <div className="h-[240px] flex"><TankChart points={tankPoints} /></div>
+          <div className="relative flex-1 min-h-[200px] flex flex-col"><TankChart points={tankPoints} /></div>
         </div>
       </div>
     </main>
@@ -751,19 +945,29 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const cameraView = (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
       <div className={`lg:col-span-8 ${PANEL} p-4 flex flex-col gap-3 min-h-[320px]`}>
-        <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring" />
-        <NotConnected icon={Video} title="Ring camera not connected yet" text="Once your Ring account is linked, this shows the latest snapshot with zoom, a refresh button and Live view in the Ring app." />
+        <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring • snapshot refreshes every minute" />
+        <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn big /></Preview>
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub="Same modes as the Ring app" />
-          <div className="grid grid-cols-3 gap-1 p-1 bg-black/50 rounded-xl border border-white/5 opacity-40">
-            {["Disarmed", "Home", "Away"].map((m) => <span key={m} className="py-3 rounded-lg text-xs font-semibold text-center text-slate-400">{m}</span>)}
-          </div>
+          <Preview corner="br">
+            <span className="grid grid-cols-3 gap-1 p-1 bg-black/50 rounded-xl border border-white/5">
+              {["Disarmed", "Home", "Away"].map((m) => <span key={m} className={`py-3 rounded-lg text-xs font-semibold text-center ${m === "Home" ? "bg-emerald-500 text-slate-950" : "text-slate-400"}`}>{m}</span>)}
+            </span>
+          </Preview>
         </div>
         <div className={`flex-1 min-h-[160px] ${PANEL} p-4 flex flex-col gap-2`}>
           <PanelHead icon={ShieldAlert} tone={AMBER} title="Recent Events" sub="Motion and mode changes" />
-          <NotConnected icon={ShieldAlert} title="No events yet" text="Motion and mode changes from Ring will list here." />
+          <Preview className="flex-1 min-h-0" corner="tr">
+            {[["Motion • Living room", "10:02 PM", true], ["Motion • Sofa area", "08:15 PM", true], ["Mode changed to Home", "07:48 PM", false], ["Motion • Living room", "01:22 PM", true]].map(([t, time, motion]) => (
+              <span key={`${t}${time}`} className="flex items-center gap-2.5 bg-black/30 p-2 rounded-xl border border-white/5">
+                <span className={`w-12 h-8 rounded-lg border border-white/10 flex items-center justify-center ${motion ? "bg-[#2a211a]" : "bg-emerald-500/10"}`}>{motion ? <Footprints className="w-3.5 h-3.5 text-amber-400" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}</span>
+                <span className="flex-1 text-[12px] text-slate-200 truncate">{t as string}</span>
+                <span className="text-[10px] font-mono text-slate-500">{time as string}</span>
+              </span>
+            ))}
+          </Preview>
         </div>
       </div>
     </main>
@@ -772,8 +976,11 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const activity = data.activity ?? [];
 
   return (
-    <div className="min-h-[100dvh] lg:h-[100dvh] w-full bg-[#110e0c] text-slate-100 font-sans select-none lg:overflow-hidden flex flex-col gap-3 relative antialiased"
-      style={{ padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))" }}>
+    <div className={`${fit ? "fixed top-0 left-0 overflow-hidden" : "min-h-[100dvh] w-full relative"} bg-[#110e0c] text-slate-100 font-sans select-none flex flex-col gap-3 antialiased`}
+      style={{
+        padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
+        ...(fit ? { width: DESIGN_WIDTH, height: `calc(100dvh / ${fit.z})`, transform: `scale(${fit.z})`, transformOrigin: "0 0" } : {}),
+      }}>
       <div className="fixed top-0 left-1/3 w-[600px] h-[600px] bg-amber-600/10 rounded-full blur-[180px] pointer-events-none" />
       <div className="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[180px] pointer-events-none" />
 
@@ -853,12 +1060,15 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
 
       {error && <p role="alert" className="shrink-0 z-10 text-[12px] px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200">Can&apos;t reach your home right now: {error}. Showing the last known state.</p>}
 
-      {section === "overview" && overview}
-      {section === "living" && zoneView("living")}
-      {section === "bedroom" && zoneView("bedroom")}
-      {section === "kitchen" && kitchenView}
-      {section === "water" && waterView}
-      {section === "camera" && cameraView}
+      {/* Keyed by the scale so charts measure again after the iPad scaling changes (e.g. rotation). */}
+      <Fragment key={fit ? fit.z.toFixed(3) : "free"}>
+        {section === "overview" && overview}
+        {section === "living" && zoneView("living")}
+        {section === "bedroom" && zoneView("bedroom")}
+        {section === "kitchen" && kitchenView}
+        {section === "water" && waterView}
+        {section === "camera" && cameraView}
+      </Fragment>
 
       {openLight && <LightSheet key={openLight.id} light={openLight} send={send} onClose={() => setLightId(null)} />}
       {editingSchedule && heater && schedule && (
