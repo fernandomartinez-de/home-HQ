@@ -54,7 +54,7 @@ Done
 - [x] Ring camera: sign in from the dashboard, snapshots, live view, events (2026-11-01)
 - [x] Light buttons with power and dim slider; kitchen ceiling as one circuit (2026-11-01)
 - [x] Con Edison connected: bill so far, projected and unposted bill estimates in Power & Energy (2026-11-01)
-- [x] Overview layout: Climate and Water Heater (with 24 h tank chart) left, Security (camera and lock) and TV middle (2026-11-01)
+- [x] Overview layout: Climate and Water Heater (with 24 h tank chart) left, Security (camera and lock) and TV middle; Camera tab became Security (2026-11-01)
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)

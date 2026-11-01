@@ -805,7 +805,7 @@ function TvPanel({ tv, send, compact }: { tv: TV; send: Send; compact?: boolean 
 }
 
 // Front door smart lock, shown as a preview until a lock is installed.
-function LockSample() {
+function LockSample({ noButton }: { noButton?: boolean }) {
   return (
     <div className="flex items-center gap-3">
       <span className="w-12 h-12 shrink-0 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center"><Lock className="w-5 h-5" /></span>
@@ -815,9 +815,25 @@ function LockSample() {
       </span>
       <span className="flex flex-col items-end gap-1.5 shrink-0">
         <span className="text-[10px] font-mono text-slate-400">BATTERY 86%</span>
-        <span className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl bg-white/5 border border-white/10 text-[12px] font-semibold text-slate-200"><LockOpen className="w-4 h-4 text-amber-400" />Unlock</span>
+        {!noButton && <span className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl bg-white/5 border border-white/10 text-[12px] font-semibold text-slate-200"><LockOpen className="w-4 h-4 text-amber-400" />Unlock</span>}
       </span>
     </div>
+  );
+}
+
+// The Security tab's lock panel: status with lock and unlock, battery and auto lock, and the last few entries.
+function LockPanelSample() {
+  return (
+    <>
+      <LockSample noButton />
+      <span className="grid grid-cols-2 gap-1.5">
+        <span className="h-11 rounded-xl bg-emerald-500 text-slate-950 text-[12px] font-bold flex items-center justify-center gap-1.5"><Lock className="w-4 h-4" />Lock</span>
+        <span className="h-11 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-[12px] font-semibold flex items-center justify-center gap-1.5"><LockOpen className="w-4 h-4 text-amber-400" />Unlock</span>
+      </span>
+      <span className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+        <span>Auto lock after 2 min</span><span className="font-mono text-slate-500">DOOR CLOSED</span>
+      </span>
+    </>
   );
 }
 
@@ -1173,7 +1189,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   // Sample screens can open on a section with ?s=water; the unit choice is remembered per device.
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("s");
-    if (s) setSection(s);
+    if (s) setSection(s === "camera" ? "security" : s); // the Camera tab became Security
     try { const u = localStorage.getItem("hq-unit"); if (u === "C" || u === "F") setUnit(u); } catch {}
   }, []);
   const chooseUnit = (u: Unit) => { setUnit(u); try { localStorage.setItem("hq-unit", u); } catch {} };
@@ -1413,7 +1429,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     { id: "kitchen", label: "Kitchen", icon: CookingPot, meta: `${onIn("kitchen")} on` },
     { id: "bedroom", label: "Bedroom", icon: BedDouble, meta: `${onIn("bedroom")} on` },
     { id: "water", label: "Water", icon: Flame, meta: heater?.state?.tank_pct != null ? `${heater.state.tank_pct}%` : undefined },
-    { id: "camera", label: "Camera", icon: Video, meta: cam?.state?.mode ? MODE_LABEL[cam.state.mode] : undefined },
+    { id: "security", label: "Security", icon: ShieldCheck, meta: cam?.state?.mode ? MODE_LABEL[cam.state.mode] : undefined },
   ];
 
   // ---------- pieces that need dashboard state ----------
@@ -1474,8 +1490,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`flex-1 min-h-[300px] ${PANEL} p-3.5 flex flex-col gap-2.5`}>
           <PanelHead icon={ShieldCheck} tone={AMBER} title="Security" sub="Camera and front door"
-            right={cam ? <ModeChip cam={cam} onClick={() => setSection("camera")} />
-              : <button onClick={() => setSection("camera")} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300">Connect</button>} />
+            right={cam ? <ModeChip cam={cam} onClick={() => setSection("security")} />
+              : <button onClick={() => setSection("security")} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300">Connect</button>} />
           {cam ? <RingFeed key={cam.id} cam={cam} /> : <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>}
           {/* The lock row is its own positioned box so its "not connected" tag sits on the row, not on the camera. */}
           <div className="relative mt-1 pt-3 border-t border-white/10">
@@ -1523,7 +1539,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       <div className={`flex-1 min-h-[150px] ${PANEL} p-4 flex flex-col gap-3 overflow-hidden`}>
         <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={items.length ? `${items.length} in the ${room === "living" ? "living room" : "bedroom"}` : "Nothing here yet"}
           right={roomCam ? (
-            <button onClick={() => setSection("camera")} aria-label={`Open the ${roomCam.name} camera`}
+            <button onClick={() => setSection("security")} aria-label={`Open the ${roomCam.name} camera`}
               className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border bg-amber-500/10 border-amber-500/25 text-amber-300 active:scale-95">
               <Video className="w-3.5 h-3.5" />Camera
               <span className={`w-1.5 h-1.5 rounded-full ${roomCam.state?.online === false ? "bg-rose-400" : "bg-emerald-400"}`} />
@@ -1643,7 +1659,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     }
   };
 
-  const cameraView = !cam ? (
+  const securityView = !cam ? (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
       <div className={`lg:col-span-8 ${PANEL} p-4 flex flex-col gap-3 min-h-[320px]`}>
         <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring" />
@@ -1652,6 +1668,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         </div>
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
+        <div className={`${PANEL} p-4 flex flex-col gap-3 shrink-0`}>
+          <PanelHead icon={DoorClosed} tone={GREEN} title="Front Door Lock" sub="Smart lock" />
+          <Preview corner="tr"><LockPanelSample /></Preview>
+        </div>
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub="Same modes as the Ring app" />
           <Preview corner="br">
@@ -1687,6 +1707,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <RingFeed key={cam.id} cam={cam} big />
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
+        <div className={`${PANEL} p-4 flex flex-col gap-3 shrink-0`}>
+          <PanelHead icon={DoorClosed} tone={GREEN} title="Front Door Lock" sub="Smart lock" />
+          <Preview corner="tr"><LockPanelSample /></Preview>
+        </div>
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub={cam.state?.mode && MODE_LABEL[cam.state.mode] ? "Same modes as the Ring app" : "Turn on Modes in the Ring app to use these"} />
           <div className={`grid grid-cols-3 gap-1 p-1 bg-black/50 rounded-xl border border-white/5 ${cam.state?.mode && MODE_LABEL[cam.state.mode] ? "" : "opacity-40 pointer-events-none"}`}>
@@ -1816,7 +1840,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         {section === "bedroom" && zoneView("bedroom")}
         {section === "kitchen" && kitchenView}
         {section === "water" && waterView}
-        {section === "camera" && cameraView}
+        {section === "security" && securityView}
       </Fragment>
 
       {conedOpen && <ConEdConnect onClose={() => setConedOpen(false)} onConnected={() => { setConedOpen(false); setToast("Con Edison connected."); load(); }} />}
