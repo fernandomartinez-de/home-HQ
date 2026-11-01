@@ -24,8 +24,9 @@ With no passcode set, the app is open; set `DASHBOARD_PASSCODE` to test the sign
 | `DASHBOARD_PASSCODE` | the passcode you'll type to sign in |
 | `SESSION_SECRET` | any long random string (signs the sign in cookie) |
 
-3. Deploy. Open the URL on the iPad, sign in once (it remembers the device for 90 days), and use
-   Share, **Add to Home Screen** to get a full screen app icon.
+3. Deploy. Open the URL on the iPad, use Share, **Add to Home Screen**, then open the new icon and
+   sign in there. The home screen app keeps its own cookies, separate from Safari, so sign in inside
+   the app; it remembers the device for 90 days.
 
 ## How it works
 
