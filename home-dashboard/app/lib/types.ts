@@ -39,7 +39,23 @@ export type Heater = Base & { kind: "water_heater"; state: HeaterState | null; c
 export type AC = Base & { kind: "ac"; state: Record<string, unknown> | null; capabilities: Record<string, unknown> };
 export type Device = Light | Heater | AC;
 
-export type HomeData = { devices: Device[]; history?: Record<string, { t: string; state: any }[]>; mock?: boolean };
+// One command from the home_commands log, newest first.
+export type Activity = {
+  id: number;
+  device_id: string;
+  device_name: string;
+  command: Record<string, any>;
+  source: string;
+  status: string;
+  t: string;
+};
+
+export type HomeData = {
+  devices: Device[];
+  history?: Record<string, { t: string; state: any }[]>;
+  activity?: Activity[];
+  mock?: boolean;
+};
 
 export type Command =
   | { action: "power"; on: boolean }

@@ -117,7 +117,7 @@ export default function HeaterSchedule({ heater, notify }: { heater: Heater; not
 
 // ---------- editor ----------
 
-function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
+export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
   heater: Heater; schedule: Schedule; notify: (m: string) => void; onClose: () => void; onSaved: (s: Schedule) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);

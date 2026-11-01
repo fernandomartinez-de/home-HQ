@@ -1,5 +1,13 @@
+@import "tailwindcss";
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { scrollbar-width: none; }
+
+/* The original styles, used by the sign in page and the schedule editor. In the base layer so
+   Tailwind utilities in the dashboard take precedence over them. */
+@layer base {
 :root {
-  --wall: #1d1b19;      /* warm graphite, the room */
+  --wall: #110e0c;      /* warm graphite, the room */
   --walnut: #2a2521;    /* surfaces */
   --raised: #36302a;    /* controls */
   --linen: #ece5da;     /* text */
@@ -438,3 +446,4 @@ body:has(dialog[open]) { overflow: hidden; }
 .block-add { justify-self: start; }
 
 .block-temp-label { color: var(--stone); font-size: 0.875rem; }
+}

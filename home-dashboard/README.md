@@ -50,6 +50,10 @@ docs/                 architecture diagram
 - [x] Deploy to Vercel
 - [ ] ESP32 bridge for the AC, then its function
 - [ ] History and analytics views
+- [x] Command center design: sections per room, alerts, scenes, Tailwind (2026-10-31)
+- [ ] Ring camera: snapshot, motion events and modes (unofficial ring-client-api)
+- [ ] Con Edison usage and bill (Opower), daily job
+- [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights)
 - [ ] Home status tile on the TV dashboard
 
 ## Updating the diagram

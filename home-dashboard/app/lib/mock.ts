@@ -33,7 +33,15 @@ export function mockData(): HomeData {
       state: { ...heater.state, tank_pct: Math.round(55 + 40 * Math.abs(Math.sin(i / 7))) },
     })),
   };
-  return { devices, history, mock: true };
+  const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+  const activity = [
+    { id: 5, device_id: "govee_kl", device_name: "Kitchen Left", command: { action: "brightness", value: 40 }, source: "ui", status: "done", t: ago(35) },
+    { id: 4, device_id: "govee_tv", device_name: "TV Backlight", command: { action: "color", hex: "#5b6cff" }, source: "ui", status: "done", t: ago(95) },
+    { id: 3, device_id: "rheem_sample", device_name: "Heat Pump Water Heater", command: { action: "set_state", setpoint: 135 }, source: "schedule", status: "done", t: ago(240) },
+    { id: 2, device_id: "govee_floor", device_name: "Floor Lamp", command: { action: "power", on: true }, source: "ui", status: "done", t: ago(300) },
+    { id: 1, device_id: "rheem_sample", device_name: "Heat Pump Water Heater", command: { action: "set_state", setpoint: 135 }, source: "schedule", status: "done", t: ago(900) },
+  ];
+  return { devices, history, activity, mock: true };
 }
 
 export function mockCommand(id: string, c: Command) {

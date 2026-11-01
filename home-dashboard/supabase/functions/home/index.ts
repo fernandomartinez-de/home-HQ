@@ -3,7 +3,7 @@
 // Auth: header x-home-key (checked against home_config.api_key_sha256).
 //
 //   GET  /home                         every device with its latest state
-//   GET  /home?history=24              ...plus readings from the last N hours (max 168)
+//   GET  /home?history=24              ...plus readings and commands from the last N hours (max 168)
 //   POST /home {"action":"refresh"}    poll every appliance now, then return devices
 //
 // Commands go straight to the appliance functions (rheem, govee, ac).
@@ -53,6 +53,19 @@ async function history(hours: number) {
   return out;
 }
 
+// The command log, newest first, with each device's name, for the dashboard's activity list.
+async function activity(hours: number) {
+  const since = new Date(Date.now() - hours * 3600_000).toISOString();
+  const { data, error } = await db.from("home_commands")
+    .select("id, device_id, command, source, status, requested_at, home_devices(name)")
+    .gte("requested_at", since).order("requested_at", { ascending: false }).limit(25);
+  if (error) throw error;
+  return (data ?? []).map((c) => ({
+    id: c.id, device_id: c.device_id, command: c.command, source: c.source, status: c.status, t: c.requested_at,
+    device_name: (c.home_devices as { name?: string } | null)?.name ?? c.device_id,
+  }));
+}
+
 Deno.serve(async (req) => {
   try {
     const key = req.headers.get("x-home-key");
@@ -73,7 +86,10 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const h = Math.min(168, Math.max(0, Number(url.searchParams.get("history") ?? 0) || 0));
-    return json({ devices: await devices(), ...(h ? { history: await history(h) } : {}) });
+    if (!h) return json({ devices: await devices() });
+    // The activity list is a nice to have; if it fails, the dashboard still loads.
+    const [d, hist, act] = await Promise.all([devices(), history(h), activity(h).catch(() => [])]);
+    return json({ devices: d, history: hist, activity: act });
   } catch (err) {
     return json({ error: String((err as Error).message ?? err) }, 502);
   }
