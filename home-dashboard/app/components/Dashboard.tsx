@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
+  Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
   AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
@@ -2402,7 +2402,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       <header className="min-h-14 bg-[#1a1512]/80 backdrop-blur-2xl border border-white/10 rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xl relative z-30">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-700 flex items-center justify-center text-white shadow-lg shadow-amber-500/20"><Sparkles className="w-4 h-4" /></div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/apple-icon.png" alt="" width={32} height={32} className="w-8 h-8 rounded-xl shadow-lg shadow-violet-500/25 ring-1 ring-white/10" />
             <div className="hidden sm:block">
               <h1 className="text-sm font-semibold text-white leading-tight">Home Command Center</h1>
               <p className="text-[9px] text-amber-400/80 font-mono tracking-wider">{data.mock ? "SAMPLE DATA" : `UPDATED ${ago(lastUpdate).toUpperCase() || "NOW"}${ago(lastUpdate) && ago(lastUpdate) !== "now" ? " AGO" : ""}`}</p>
