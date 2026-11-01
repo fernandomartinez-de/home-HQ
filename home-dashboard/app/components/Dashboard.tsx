@@ -6,7 +6,7 @@ import {
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
   AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
-import { AreaChart, Area, BarChart, Bar, Cell, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
+import { AreaChart, Area, BarChart, Bar, Cell, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
@@ -1552,44 +1552,190 @@ function HeaterPanel({ heater, send, unit, big }: { heater: Heater; send: Send; 
   );
 }
 
-function TankChart({ points }: { points: { time: string; tank: number }[] }) {
-  if (points.length < 3) return <NotConnected icon={Activity} title="Collecting history" text="The tank chart fills in as readings arrive every 5 minutes." />;
+// ---------- Water tab pieces ----------
+
+const MODE_NAME: Record<string, string> = { energy_saver: "Energy Saver", heat_pump: "Heat Pump", high_demand: "High Demand", electric: "Electric", vacation: "Vacation", gas: "Gas", off: "Off" };
+
+/** A glass tank drawn to the hot water level, with a moving surface and bubbles while it heats. */
+function GlassTank({ pct, heating, off }: { pct: number | null; heating: boolean; off: boolean }) {
+  const level = Math.max(0, Math.min(100, pct ?? 0));
+  const top = 14 + 332 * (1 - level / 100); // liquid surface, inside a 332 tall tank starting at y 14
+  const warm = off ? ["#94a3b8", "#475569"] : ["#fcd34d", "#ea580c"];
+  const wave = (y: number, amp: number) => `M0 ${y} q 30 ${-amp} 60 0 t 60 0 t 60 0 t 60 0 t 60 0 V 360 H 0 Z`;
   return (
-    <Sized>{(w, h) => (
-      <AreaChart width={w} height={h} data={points} margin={{ top: 5, right: 4, left: -22, bottom: 0 }}>
-        <defs><linearGradient id="g-tank" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} /><stop offset="95%" stopColor="#f59e0b" stopOpacity={0} /></linearGradient></defs>
-        <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} minTickGap={40} />
-        <YAxis stroke="#64748b" fontSize={10} tickLine={false} domain={[0, 100]} />
-        <Tooltip contentStyle={{ backgroundColor: "#1c1511", borderColor: "#ffffff20", borderRadius: 8, fontSize: 11 }} formatter={(v) => [`${v}%`, "Tank"]} />
-        <Area type="monotone" dataKey="tank" stroke="#f59e0b" fill="url(#g-tank)" strokeWidth={2} isAnimationActive={false} />
-      </AreaChart>
-    )}</Sized>
+    <div className="relative w-full h-full" role="img" aria-label={`Hot water ${pct ?? "unknown"}%`}>
+      <svg viewBox="0 0 176 360" className="absolute inset-0 w-full h-full">
+        <defs>
+          <clipPath id="tank-clip"><rect x="14" y="14" width="132" height="332" rx="62" /></clipPath>
+          <linearGradient id="tank-liquid" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={warm[0]} /><stop offset="100%" stopColor={warm[1]} /></linearGradient>
+          <linearGradient id="tank-glass" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#fff" stopOpacity="0.10" /><stop offset="35%" stopColor="#fff" stopOpacity="0.02" /><stop offset="100%" stopColor="#fff" stopOpacity="0.06" />
+          </linearGradient>
+          <radialGradient id="tank-glow-r" cx="50%" cy="100%" r="80%"><stop offset="0%" stopColor="#f97316" stopOpacity="0.35" /><stop offset="100%" stopColor="#f97316" stopOpacity="0" /></radialGradient>
+        </defs>
+        {!off && <ellipse cx="80" cy="340" rx="90" ry="40" fill="url(#tank-glow-r)" />}
+        <rect x="14" y="14" width="132" height="332" rx="62" fill="#0b0908" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
+        <g clipPath="url(#tank-clip)">
+          <g className="tank-wave-slow" style={{ opacity: 0.45 }}><path d={wave(top + 2, 6)} fill="url(#tank-liquid)" transform="translate(0 0)" /></g>
+          <g className="tank-wave"><path d={wave(top, 8)} fill="url(#tank-liquid)" /></g>
+          {heating && !off && [22, 48, 70, 96, 118, 60, 104].map((x, i) => (
+            <circle key={i} className="tank-bubble" cx={x + 14} cy={340} r={2 + (i % 3)} fill="#fff" fillOpacity={0.5}
+              style={{ animationDelay: `${(i * 0.47) % 3.4}s` }} />
+          ))}
+          <rect x="14" y="14" width="132" height="332" fill="url(#tank-glass)" />
+          <rect x="30" y="40" width="10" height="250" rx="5" fill="#fff" fillOpacity="0.07" />
+        </g>
+        {[25, 50, 75].map((t) => {
+          const y = 14 + 332 * (1 - t / 100);
+          return (
+            <g key={t}>
+              <line x1="132" x2="146" y1={y} y2={y} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+              <text x="152" y={y + 3.5} fontSize="10" fill="#64748b" fontFamily="ui-monospace, monospace">{t}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <span className="absolute inset-y-0 left-0 w-[91%] flex flex-col items-center justify-center pointer-events-none">
+        <span className={`text-[34px] leading-none font-bold font-mono tabular-nums drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] ${off ? "text-slate-300" : "text-white"}`}>{pct ?? "--"}<span className="text-[18px]">%</span></span>
+        <span className="mt-1 text-[9px] font-mono tracking-[0.2em] text-white/70 drop-shadow">HOT WATER</span>
+      </span>
+    </div>
+  );
+}
+
+/** Setpoint as an arc between the heater's lowest and highest temperature, with − and + on either side. */
+function SetpointDial({ value, lo, hi, unit, off, mode, onNudge }: { value: number; lo: number; hi: number; unit: Unit; off: boolean; mode: string; onNudge: (d: number) => void }) {
+  const frac = Math.max(0, Math.min(1, (value - lo) / (hi - lo || 1)));
+  const arc = 495; // 270° of a circle with r 105
+  const btn = "w-14 h-14 rounded-2xl bg-white/5 border border-white/10 text-white text-2xl font-bold active:scale-95 disabled:opacity-30 transition-transform";
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <button onClick={() => onNudge(-1)} disabled={value <= lo} aria-label="Lower temperature" className={btn}>−</button>
+      <span className="relative w-48 h-48">
+        <svg viewBox="0 0 250 250" className="w-full h-full">
+          <defs><linearGradient id="dial-heat" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#f43f5e" /></linearGradient></defs>
+          <circle cx="125" cy="125" r="105" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="14" strokeDasharray={`${arc} 660`} strokeLinecap="round" transform="rotate(135 125 125)" />
+          <circle cx="125" cy="125" r="105" fill="none" stroke={off ? "#475569" : "url(#dial-heat)"} strokeWidth="14" strokeDasharray={`${Math.max(8, arc * frac)} 660`} strokeLinecap="round" transform="rotate(135 125 125)"
+            style={{ filter: off ? undefined : "drop-shadow(0 0 8px rgba(244,63,94,0.45))", transition: "stroke-dasharray 0.4s" }} />
+          {Array.from({ length: 7 }, (_, i) => {
+            const ang = ((135 + (270 * i) / 6) * Math.PI) / 180;
+            return <line key={i} x1={125 + 88 * Math.cos(ang)} y1={125 + 88 * Math.sin(ang)} x2={125 + 80 * Math.cos(ang)} y2={125 + 80 * Math.sin(ang)} stroke="rgba(255,255,255,0.2)" strokeWidth="2" />;
+          })}
+        </svg>
+        <span className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[10px] font-mono text-slate-400 tracking-widest">SET TO</span>
+          <span className={`text-5xl font-bold font-mono tabular-nums ${off ? "text-slate-500" : "text-white"}`}>{toUnit(value, unit)}°</span>
+          <span className={`text-[11px] font-mono tracking-wider ${off ? "text-slate-500" : "text-amber-400"}`}>{(MODE_NAME[mode] ?? mode).toUpperCase()}</span>
+        </span>
+        <span className="absolute bottom-3 left-6 text-[10px] font-mono text-slate-500">{toUnit(lo, unit)}°</span>
+        <span className="absolute bottom-3 right-6 text-[10px] font-mono text-slate-500">{toUnit(hi, unit)}°</span>
+      </span>
+      <button onClick={() => onNudge(1)} disabled={value >= hi} aria-label="Raise temperature" className={btn}>+</button>
+    </div>
+  );
+}
+
+/** The week as timelines, today highlighted, a line at the current time and each block's temperature. */
+function WeekTimeline({ schedule }: { schedule: Schedule }) {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t); }, []);
+  const tz = schedule.time_zone || "America/New_York";
+  const parts = now ? new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now) : [];
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const today = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  const nowMin = now ? (Number(get("hour")) % 24) * 60 + Number(get("minute")) : null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      {DAY_ROWS.map(({ d, s: label }) => {
+        const isToday = d === today;
+        return (
+          <div key={d} className={`grid grid-cols-[44px_1fr] gap-2 items-center rounded-lg ${isToday ? "bg-amber-500/5" : ""}`}>
+            <span className={`text-[11px] font-mono pl-1 ${isToday ? "text-amber-300 font-bold" : "text-slate-500"}`}>{label}</span>
+            <div className={`relative h-6 rounded-md overflow-hidden ${isToday ? "bg-white/[0.07]" : "bg-white/[0.04]"}`}>
+              {[6, 12, 18].map((h) => <span key={h} className="absolute inset-y-0 w-px bg-white/5" style={{ left: `${(h / 24) * 100}%` }} />)}
+              {schedule.blocks.filter((b) => b.day === d).map((b, i) => {
+                const a = toMin(b.start), z = toMin(b.stop) > a ? toMin(b.stop) : 1440;
+                const wide = (z - a) / 1440 > 0.07;
+                const offBlock = b.command.mode === "off";
+                return (
+                  <span key={i} title={`${b.start} to ${b.stop}${b.command.setpoint ? `, ${b.command.setpoint}°` : ""}`}
+                    className={`absolute inset-y-0.5 rounded flex items-center justify-center text-[10px] font-mono font-bold overflow-hidden ${!schedule.enabled ? "bg-slate-600/60 text-slate-300"
+                      : offBlock ? "bg-slate-500/40 text-slate-300" : "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.35)]"}`}
+                    style={{ left: `${(a / 1440) * 100}%`, width: `${((z - a) / 1440) * 100}%` }}>
+                    {wide && (offBlock ? "OFF" : b.command.setpoint ? `${b.command.setpoint}°` : "")}
+                  </span>
+                );
+              })}
+              {isToday && nowMin != null && (
+                <span className="absolute -inset-y-0 w-0.5 bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.9)]" style={{ left: `${(nowMin / 1440) * 100}%` }} />
+              )}
+            </div>
+          </div>
+        );
+      })}
+      <div className="grid grid-cols-[44px_1fr] gap-2"><span /><div className="flex justify-between text-[10px] font-mono text-slate-500"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div></div>
+    </div>
+  );
+}
+
+type TankPoint = { time: string; t?: string; tank: number; heating?: boolean; off?: boolean };
+
+// Runs of consecutive points with a flag, as chart bands.
+function bands(points: TankPoint[], key: "heating" | "off") {
+  const out: { x1: string; x2: string }[] = [];
+  let start: string | null = null;
+  points.forEach((p, i) => {
+    if (p[key] && start === null) start = p.time;
+    if ((!p[key] || i === points.length - 1) && start !== null) { out.push({ x1: start, x2: p.time }); start = null; }
+  });
+  return out;
+}
+
+function TankChart({ points, legend }: { points: TankPoint[]; legend?: boolean }) {
+  if (points.length < 3) return <NotConnected icon={Activity} title="Collecting history" text="The tank chart fills in as readings arrive every 5 minutes." />;
+  const heat = bands(points, "heating"), off = bands(points, "off");
+  const last = points[points.length - 1];
+  return (
+    <>
+      <div className="relative flex-1 min-h-0">
+        <Sized>{(w, h) => (
+          <AreaChart width={w} height={h} data={points} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+            <defs>
+              <linearGradient id="g-tank" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.45} />
+                <stop offset="60%" stopColor="#f97316" stopOpacity={0.12} />
+                <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="g-tank-line" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#22d3ee" />
+                <stop offset="100%" stopColor="#fbbf24" />
+              </linearGradient>
+              <filter id="tank-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            </defs>
+            {off.map((b, i) => <ReferenceArea key={`o${i}`} x1={b.x1} x2={b.x2} fill="#64748b" fillOpacity={0.08} strokeOpacity={0} />)}
+            {heat.map((b, i) => <ReferenceArea key={`h${i}`} x1={b.x1} x2={b.x2} fill="#f43f5e" fillOpacity={0.14} strokeOpacity={0} />)}
+            <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
+            <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} />
+            <Tooltip {...TIP} formatter={(v, _n, p) => [`${v}%${(p.payload as TankPoint).heating ? " • heating" : (p.payload as TankPoint).off ? " • off" : ""}`, "Hot water"]} />
+            <Area type="monotone" dataKey="tank" stroke="url(#g-tank-line)" fill="url(#g-tank)" strokeWidth={2.5} filter="url(#tank-glow)" isAnimationActive={false}
+              dot={false} activeDot={{ r: 4, fill: "#fbbf24", stroke: "#110e0c", strokeWidth: 2 }} />
+            <ReferenceDot x={last.time} y={last.tank} r={4} fill="#fbbf24" stroke="#110e0c" strokeWidth={2} />
+          </AreaChart>
+        )}</Sized>
+      </div>
+      {legend && (
+        <div className="flex items-center gap-4 text-[10px] text-slate-400">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded bg-gradient-to-r from-cyan-400 to-amber-400" />Hot water level</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm bg-rose-500/30" />Heating</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm bg-slate-500/25" />Off</span>
+        </div>
+      )}
+    </>
   );
 }
 
 const DAY_ROWS = [{ d: 1, s: "MON" }, { d: 2, s: "TUE" }, { d: 3, s: "WED" }, { d: 4, s: "THU" }, { d: 5, s: "FRI" }, { d: 6, s: "SAT" }, { d: 0, s: "SUN" }];
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-
-function WeekBars({ schedule }: { schedule: Schedule }) {
-  return (
-    <div className="space-y-2">
-      {DAY_ROWS.map(({ d, s }) => (
-        <div key={d} className="grid grid-cols-[44px_1fr] gap-2 items-center">
-          <span className="text-[11px] font-mono text-slate-400">{s}</span>
-          <div className="relative h-3.5 rounded-md bg-white/5 overflow-hidden">
-            {schedule.blocks.filter((b) => b.day === d).map((b, i) => {
-              const a = toMin(b.start), z = toMin(b.stop) > a ? toMin(b.stop) : 1440;
-              return <span key={i} title={`${b.start} to ${b.stop}, ${b.command.setpoint}°`}
-                className={`absolute inset-y-0 rounded-md ${schedule.enabled ? "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]" : "bg-slate-600"}`}
-                style={{ left: `${(a / 1440) * 100}%`, width: `${((z - a) / 1440) * 100}%` }} />;
-            })}
-          </div>
-        </div>
-      ))}
-      <div className="grid grid-cols-[44px_1fr] gap-2"><span /><div className="flex justify-between text-[10px] font-mono text-slate-500"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>
-    </div>
-  );
-}
 
 // ---------- main ----------
 
@@ -1837,7 +1983,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     const h = heater ? data.history?.[heater.id] ?? [] : [];
     const pts = h.filter((x) => typeof x.state?.tank_pct === "number");
     const step = Math.max(1, Math.ceil(pts.length / 96));
-    return pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map((x) => ({ time: clockTime(x.t), tank: x.state.tank_pct as number }));
+    return pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map((x) => ({
+      time: clockTime(x.t), t: x.t, tank: x.state.tank_pct as number,
+      heating: !!x.state.running, off: x.state.mode === "off" || x.state.power === false,
+    }));
   }, [data.history, heater]);
 
   // Alerts, compiled from the latest readings and their history.
@@ -2047,24 +2196,78 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     </main>
   );
 
+  // Today's heater numbers for the Water tab, from the last 24 hours of readings.
+  const heaterDay = useMemo(() => {
+    const h = heater ? data.history?.[heater.id] ?? [] : [];
+    let heating = 0;
+    for (let i = 0; i < h.length; i++) {
+      if (!h[i].state?.running) continue;
+      const next = h[i + 1] ? Date.parse(h[i + 1].t) : Date.now();
+      heating += Math.min(next - Date.parse(h[i].t), 15 * 60_000);
+    }
+    const tanks = h.map((x) => x.state?.tank_pct).filter((x): x is number => typeof x === "number");
+    return { heatingH: heating / 3600_000, low: tanks.length ? Math.min(...tanks) : null, readings: h.length };
+  }, [data.history, heater]);
+  const setpoint = useSetpoint(heater, send);
+
   const waterView = (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
-      <div className={`lg:col-span-5 ${PANEL} p-5 flex flex-col gap-4`}>
-        {heater ? (
-          <>
-            <PanelHead icon={Flame} tone={AMBER} title="Water Heater" sub={`Rheem heat pump • ${heater.state?.connected === false ? "offline" : heater.state?.running ?? "idle"}`} right={unitToggle} />
-            <div className="flex gap-4 flex-1 min-h-[220px]">
-              <div className="relative w-24 rounded-[48px] bg-black/60 border border-white/10 overflow-hidden" role="img" aria-label={`Tank ${heater.state?.tank_pct ?? 0}% full`}>
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-amber-600 via-amber-400 to-cyan-300 transition-all duration-700" style={{ height: `${heater.state?.tank_pct ?? 0}%` }} />
-                <span className="absolute inset-x-0 bottom-4 text-center font-mono font-bold text-slate-950">{heater.state?.tank_pct ?? "--"}%</span>
+      <div className={`lg:col-span-5 ${PANEL} p-5 flex flex-col gap-4 overflow-hidden`}>
+        {heater ? (() => {
+          const hs = heater.state;
+          const off = hs?.power === false || hs?.mode === "off";
+          const heating = !!hs?.running && !off;
+          const modes = heater.capabilities.modes.filter((m) => m !== "off");
+          const onMode = modes.includes("energy_saver") ? "energy_saver" : modes[0] ?? "energy_saver";
+          const next = schedule?.enabled ? (schedule.active ? `${schedule.active.command.mode === "off" ? "Off" : `${schedule.active.command.setpoint ?? ""}°`} until ${schedule.active.stop}` : schedule.next ? `${schedule.next.command.mode === "off" ? "Off" : "On"} at ${schedule.next.start}` : "No changes") : "Schedule off";
+          return (
+            <>
+              <PanelHead icon={Flame} tone={AMBER} title="Water Heater" sub={`Rheem heat pump • ${hs?.connected === false ? "offline" : off ? "off" : MODE_NAME[hs?.mode ?? ""] ?? "on"}`} right={unitToggle} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`flex items-center gap-1.5 px-2.5 h-7 rounded-lg border text-[11px] font-medium ${heating ? "bg-rose-500/10 border-rose-500/30 text-rose-200" : off ? "bg-white/5 border-white/10 text-slate-400" : "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${heating ? "bg-rose-400 heat-pulse" : off ? "bg-slate-500" : "bg-emerald-400"}`} />
+                  {heating ? hs?.running : off ? "Off" : "Ready • not heating"}
+                </span>
+                {hs?.connected === false && <span className="px-2.5 h-7 flex items-center rounded-lg bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-300">Offline</span>}
+                {!!hs?.alert_count && <span className="px-2.5 h-7 flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300"><AlertTriangle className="w-3 h-3" />{hs.alert_count} alert{hs.alert_count > 1 ? "s" : ""}</span>}
+                {(hs?.away || hs?.vacation) && <span className="px-2.5 h-7 flex items-center rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-[11px] text-cyan-300">{hs.vacation ? "Vacation" : "Away"}</span>}
               </div>
-              <div className="flex-1 flex flex-col justify-center gap-4"><HeaterPanel heater={heater} send={send} unit={unit} big /></div>
-            </div>
-          </>
-        ) : <NotConnected icon={Flame} title="No water heater" text="It shows up here once the Rheem function reports it." />}
+              <div className="flex-1 min-h-0 grid grid-cols-[150px_1fr] gap-4 items-stretch">
+                <div className="min-h-0 relative py-1"><GlassTank pct={hs?.tank_pct ?? null} heating={heating} off={off} /></div>
+                <div className="min-w-0 flex flex-col justify-center gap-3">
+                  <SetpointDial value={setpoint.value} lo={setpoint.lo} hi={setpoint.hi} unit={unit} off={off} mode={off ? "off" : hs?.mode ?? ""} onNudge={setpoint.nudge} />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {modes.map((m) => {
+                      const on = !off && hs?.mode === m;
+                      return (
+                        <button key={m} aria-pressed={on} onClick={() => !on && send(heater, { action: "set_mode", mode: m }, { mode: m, power: true })}
+                          className={`h-10 rounded-xl text-[11px] font-semibold border transition-all active:scale-95 ${on ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 border-white/10 text-slate-300"} ${modes.length % 2 && m === modes[modes.length - 1] ? "col-span-2" : ""}`}>
+                          {MODE_NAME[m] ?? m}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {heater.capabilities.supports_power && (
+                    <button onClick={() => off
+                      ? send(heater, { action: "set_mode", mode: onMode }, { power: true, mode: onMode })
+                      : send(heater, { action: "power", on: false }, { power: false, mode: "off" })}
+                      className={`h-11 rounded-xl border text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.99] ${off ? "bg-amber-500 text-slate-950 border-amber-400" : "bg-white/5 text-slate-200 border-white/10"}`}>
+                      <Power className="w-4 h-4" />{off ? "Turn on" : "Turn off"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 shrink-0">
+                <MiniStat label="HEATED • 24 H" value={heaterDay.readings ? hoursText(heaterDay.heatingH) : "--"} sub="Compressor and element" tone="text-rose-300" />
+                <MiniStat label="LOWEST • 24 H" value={heaterDay.low != null ? `${heaterDay.low}%` : "--"} sub="Hot water left" tone="text-cyan-300" />
+                <MiniStat label="SCHEDULE" value={schedule?.enabled ? "On" : "Off"} sub={next} tone={schedule?.enabled ? "text-amber-300" : "text-slate-400"} />
+              </div>
+            </>
+          );
+        })() : <NotConnected icon={Flame} title="No water heater" text="It shows up here once the Rheem function reports it." />}
       </div>
       <div className="lg:col-span-7 flex flex-col gap-3 min-h-0">
-        <div className={`${PANEL} p-4 space-y-3`}>
+        <div className={`${PANEL} p-4 space-y-3 shrink-0`}>
           <PanelHead icon={Sliders} tone={AMBER} title="Weekly Schedule"
             sub={schedule ? (schedule.enabled ? (schedule.active ? `On now until ${schedule.active.stop}` : schedule.next ? `Next at ${schedule.next.start}` : "On") : "Off • the heater only changes when you change it") : "Loading"}
             right={schedule && (
@@ -2076,11 +2279,11 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
                 <button onClick={() => setEditingSchedule(true)} className="px-3 h-9 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Edit</button>
               </div>
             )} />
-          {schedule && <WeekBars schedule={schedule} />}
+          {schedule && <WeekTimeline schedule={schedule} />}
         </div>
         <div className={`flex-1 min-h-[180px] ${PANEL} p-4 flex flex-col gap-2`}>
-          <PanelHead icon={Activity} tone={GREEN} title="Hot Water in Tank" sub="Last 24 hours" />
-          <div className="relative flex-1 min-h-[200px] flex flex-col"><TankChart points={tankPoints} /></div>
+          <PanelHead icon={Activity} tone={GREEN} title="Hot Water in Tank" sub="Last 24 hours, with when it was heating" />
+          <div className="relative flex-1 min-h-[160px] flex flex-col gap-2"><TankChart points={tankPoints} legend /></div>
         </div>
       </div>
     </main>

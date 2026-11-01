@@ -464,3 +464,19 @@ body:has(dialog[open]) { overflow: hidden; }
 
 .block-temp-label { color: var(--stone); font-size: 0.875rem; }
 }
+
+/* Water tab: the tank's moving surface and the bubbles while it heats. */
+@keyframes wave-x { from { transform: translateX(0); } to { transform: translateX(-120px); } }
+.tank-wave { animation: wave-x 5s linear infinite; }
+.tank-wave-slow { animation: wave-x 8s linear infinite reverse; }
+@keyframes bubble-up {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 0.7; }
+  100% { transform: translateY(-240px); opacity: 0; }
+}
+.tank-bubble { animation: bubble-up 3.4s ease-in infinite; transform-box: fill-box; }
+@keyframes heat-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.heat-pulse { animation: heat-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .tank-wave, .tank-wave-slow, .tank-bubble, .heat-pulse { animation: none; }
+}
