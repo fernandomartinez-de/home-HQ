@@ -325,6 +325,91 @@ function minsAgo(ms: number | null, now: number) {
   return m < 1 ? "JUST NOW" : m < 60 ? `${m} MIN AGO` : `${Math.round(m / 60)} H AGO`;
 }
 
+const RING_ICE = [
+  "stun:stun.kinesisvideo.us-east-1.amazonaws.com:443", "stun:stun.kinesisvideo.us-east-2.amazonaws.com:443",
+  "stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302",
+].map((urls) => ({ urls }));
+const LIVE_MAX_MS = 10 * 60_000; // Ring ends live sessions on its own after about 10 minutes
+
+/**
+ * Ring live view over WebRTC: the browser makes an offer, Ring answers through our function, and the
+ * video then streams from Ring straight to this page (same flow as ring-client-api's browser session).
+ */
+function useRingLive(camId: string) {
+  const [status, setStatus] = useState<"off" | "starting" | "live">("off");
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const pc = useRef<RTCPeerConnection | null>(null);
+  const session = useRef<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stop = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    pc.current?.close();
+    pc.current = null;
+    const sid = session.current;
+    session.current = null;
+    if (sid) fetch("/api/camera/live", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "end", session_id: sid }), keepalive: true }).catch(() => {});
+    setStream(null);
+    setStatus("off");
+  }, []);
+
+  const start = useCallback(async () => {
+    setErr(null);
+    setStatus("starting");
+    try {
+      const conn = new RTCPeerConnection({ iceServers: RING_ICE });
+      pc.current = conn;
+      conn.addTransceiver("audio", { direction: "sendrecv" });
+      conn.addTransceiver("video", { direction: "recvonly" });
+      const media = new MediaStream();
+      conn.ontrack = (e) => {
+        media.addTrack(e.track);
+        setStream(media);
+        setStatus("live");
+      };
+      conn.onconnectionstatechange = () => {
+        if (conn.connectionState === "failed") { setErr("The live stream dropped. Tap Live to try again."); stop(); }
+      };
+      await conn.setLocalDescription(await conn.createOffer());
+      // Ring doesn't take candidates afterwards, so wait for them to be gathered (or 2.5 s).
+      await new Promise<void>((resolve) => {
+        if (conn.iceGatheringState === "complete") return resolve();
+        const t = setTimeout(resolve, 2500);
+        conn.addEventListener("icegatheringstatechange", () => { if (conn.iceGatheringState === "complete") { clearTimeout(t); resolve(); } });
+      });
+      const r = await fetch("/api/camera/live", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start", id: camId, sdp: conn.localDescription?.sdp }),
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error);
+      if (pc.current !== conn) return; // stopped while waiting
+      session.current = body.session_id;
+      await conn.setRemoteDescription({ type: "answer", sdp: body.sdp });
+      timer.current = setTimeout(stop, LIVE_MAX_MS);
+    } catch (e) {
+      setErr((e as Error).message);
+      stop();
+    }
+  }, [camId, stop]);
+
+  useEffect(() => () => stop(), [stop]); // leaving the page ends the session
+  return { status, stream, err, start, stop };
+}
+
+function LiveVideo({ stream, muted, zoom }: { stream: MediaStream; muted: boolean; zoom: number }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.srcObject = stream;
+    v.play().catch(() => {});
+  }, [stream]);
+  useEffect(() => { if (ref.current) ref.current.muted = muted; }, [muted]);
+  return <video ref={ref} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover transition-transform duration-300" style={{ transform: `scale(${zoom})` }} />;
+}
+
 /** The latest Ring snapshot, refreshed every minute while on screen. Snap asks for a fresh one. */
 function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -334,6 +419,8 @@ function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
   const [zoom, setZoom] = useState(1);
   const [now, setNow] = useState(() => Date.now());
   const url = useRef<string | null>(null);
+  const live = useRingLive(cam.id);
+  const [muted, setMuted] = useState(true);
 
   const load = useCallback(async (force = false) => {
     setBusy(true);
@@ -368,14 +455,27 @@ function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
     <>
       <div className="relative flex-1 min-h-[120px] rounded-2xl overflow-hidden border border-white/10 bg-black">
         {src && <img src={src} alt={`${cam.name} camera snapshot`} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300" style={{ transform: `scale(${zoom})` }} />}
-        {!src && !err && <span className="absolute inset-0 flex items-center justify-center text-[12px] text-slate-500">Loading snapshot</span>}
-        {err && (
-          <span className={`absolute inset-x-3 ${src ? "bottom-3" : "top-1/2 -translate-y-1/2"} text-center text-[12px] text-rose-200 bg-black/80 border border-rose-500/30 rounded-xl px-3 py-2`}>{err}</span>
+        {live.stream && <LiveVideo stream={live.stream} muted={muted} zoom={zoom} />}
+        {!src && !err && !live.stream && <span className="absolute inset-0 flex items-center justify-center text-[12px] text-slate-500">Loading snapshot</span>}
+        {(live.err || (err && !live.stream)) && (
+          <span className={`absolute inset-x-3 ${src ? "bottom-3" : "top-1/2 -translate-y-1/2"} text-center text-[12px] text-rose-200 bg-black/80 border border-rose-500/30 rounded-xl px-3 py-2`}>{live.err ?? err}</span>
         )}
-        <span className={`absolute top-2 left-2 bg-black/80 px-2 py-1 rounded-lg text-[10px] font-mono flex items-center gap-1.5 border border-white/10 ${s?.online === false ? "text-rose-400" : "text-emerald-400"}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${s?.online === false ? "bg-rose-400" : "bg-emerald-400"} ${busy ? "animate-pulse" : ""}`} />
-          {s?.online === false ? "CAMERA OFFLINE" : `SNAPSHOT${taken ? ` • ${minsAgo(taken, now)}` : ""}`}
-        </span>
+        {live.status === "live" ? (
+          <span className="absolute top-2 left-2 bg-black/80 px-2 py-1 rounded-lg text-[10px] font-mono flex items-center gap-1.5 border border-white/10 text-rose-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />LIVE
+          </span>
+        ) : (
+          <span className={`absolute top-2 left-2 bg-black/80 px-2 py-1 rounded-lg text-[10px] font-mono flex items-center gap-1.5 border border-white/10 ${s?.online === false ? "text-rose-400" : "text-emerald-400"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${s?.online === false ? "bg-rose-400" : "bg-emerald-400"} ${busy || live.status === "starting" ? "animate-pulse" : ""}`} />
+            {s?.online === false ? "CAMERA OFFLINE" : live.status === "starting" ? "CONNECTING LIVE" : `SNAPSHOT${taken ? ` • ${minsAgo(taken, now)}` : ""}`}
+          </span>
+        )}
+        {live.status === "live" && (
+          <button onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"}
+            className="absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center rounded-lg bg-black/80 border border-white/10 text-slate-200">
+            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        )}
         {s?.battery != null && (
           <span className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded-lg text-[10px] font-mono text-slate-300 border border-white/10">
             {s.charging ? "CHARGING " : "BATTERY "}{s.battery}%
@@ -383,11 +483,17 @@ function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        {/* Ring's web dashboard has live view in the browser. */}
-        <a href="https://account.ring.com/account/dashboard" target="_blank" rel="noreferrer"
-          className={`${btn} bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-semibold`}><Video className="w-3.5 h-3.5" /> Live view</a>
+        {live.status === "off" ? (
+          <button onClick={live.start} disabled={s?.online === false} className={`${btn} bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-semibold disabled:opacity-40`}>
+            <Video className="w-3.5 h-3.5" /> Live
+          </button>
+        ) : (
+          <button onClick={live.stop} className={`${btn} bg-rose-500/15 border border-rose-500/40 text-rose-300 font-semibold`}>
+            <span className={`w-2 h-2 rounded-sm bg-rose-400 ${live.status === "starting" ? "animate-pulse" : ""}`} /> {live.status === "starting" ? "Connecting" : "Stop"}
+          </button>
+        )}
         <span className="flex items-center gap-2">
-          <button onClick={() => load(true)} disabled={busy} className={`${btn} bg-white/5 border border-white/10 text-slate-200 disabled:opacity-50`}>
+          <button onClick={() => load(true)} disabled={busy || live.status !== "off"} className={`${btn} bg-white/5 border border-white/10 text-slate-200 disabled:opacity-50`}>
             <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${busy ? "animate-spin" : ""}`} /> Snap
           </button>
           <span className={`flex items-center gap-1 px-1.5 ${big ? "h-12" : "h-10"} bg-black/40 rounded-xl border border-white/5 text-slate-400`}>
@@ -403,7 +509,7 @@ function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
 
 function ModeChip({ cam, onClick }: { cam: Camera; onClick: () => void }) {
   const m = cam.state?.mode;
-  if (!m) return null;
+  if (!m || !MODE_LABEL[m]) return null;
   const armed = m !== "disarmed";
   return (
     <button onClick={onClick}
@@ -1080,7 +1186,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     { id: "kitchen", label: "Kitchen", icon: CookingPot, meta: `${onIn("kitchen")} on` },
     { id: "bedroom", label: "Bedroom", icon: BedDouble, meta: `${onIn("bedroom")} on` },
     { id: "water", label: "Water", icon: Flame, meta: heater?.state?.tank_pct != null ? `${heater.state.tank_pct}%` : undefined },
-    { id: "camera", label: "Camera", icon: Video, meta: cam?.state?.mode ? MODE_LABEL[cam.state.mode] ?? undefined : undefined },
+    { id: "camera", label: "Camera", icon: Video, meta: cam?.state?.mode ? MODE_LABEL[cam.state.mode] : undefined },
   ];
 
   // ---------- pieces that need dashboard state ----------
@@ -1312,7 +1418,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
       <div className={`lg:col-span-8 ${PANEL} p-4 flex flex-col gap-3 min-h-[320px]`}>
         <PanelHead icon={Video} tone={AMBER} title={`${cam.name} Camera`}
-          sub={`Ring • ${cam.state?.online === false ? "offline" : cam.state?.on_battery ? "battery camera, Ring refreshes snapshots every few minutes" : "snapshot refreshes every minute"}`}
+          sub={`Ring • ${cam.state?.online === false ? "offline" : "tap Live for real time video"}`}
           right={cams.length > 1 ? (
             <div className="flex gap-1">{cams.map((c) => (
               <button key={c.id} onClick={() => setCamId(c.id)} className={`px-3 h-9 rounded-xl text-[11px] font-medium border ${c.id === cam.id ? "bg-white/10 border-amber-500/40 text-white" : "bg-white/5 border-white/10 text-slate-400"}`}>{c.name}</button>
@@ -1322,8 +1428,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 space-y-3`}>
-          <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub={cam.capabilities.modes?.length ? "Same modes as the Ring app" : "Turn on Modes in the Ring app to use these"} />
-          <div className={`grid grid-cols-3 gap-1 p-1 bg-black/50 rounded-xl border border-white/5 ${cam.capabilities.modes?.length ? "" : "opacity-40 pointer-events-none"}`}>
+          <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub={cam.state?.mode && MODE_LABEL[cam.state.mode] ? "Same modes as the Ring app" : "Turn on Modes in the Ring app to use these"} />
+          <div className={`grid grid-cols-3 gap-1 p-1 bg-black/50 rounded-xl border border-white/5 ${cam.state?.mode && MODE_LABEL[cam.state.mode] ? "" : "opacity-40 pointer-events-none"}`}>
             {(["disarmed", "home", "away"] as const).map((m) => {
               const on = cam.state?.mode === m;
               const Icon = m === "disarmed" ? ShieldAlert : m === "home" ? HomeIcon : ShieldCheck;

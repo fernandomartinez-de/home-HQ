@@ -17,5 +17,7 @@ The password goes to Ring once and is never stored. Ring's refresh token is kept
 
 * **Snapshots:** fetched from Ring when the dashboard shows the camera, every minute and on Snap.
   Wired cameras take a fresh one on Snap; battery cameras keep Ring's own cadence to save battery.
-* **Live view:** opens Ring's web dashboard, which streams in the browser.
+* **Live view:** the Live button opens a WebRTC session: the browser sends an offer, the function
+  passes it to Ring's live view API, and the video streams from Ring straight to the browser (no
+  relay). It starts muted (iPad autoplay rules) and ends after 10 minutes or when you leave the page.
 * **Poll:** every 5 minutes (pg_cron) for battery, online status, mode and recent events.

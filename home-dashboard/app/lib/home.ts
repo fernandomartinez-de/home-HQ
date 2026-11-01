@@ -97,3 +97,14 @@ export async function ringSnapshot(deviceId: string, force: boolean): Promise<{ 
   const taken = Number(r.headers.get("x-snapshot-ms"));
   return { image: await r.arrayBuffer(), takenMs: Number.isFinite(taken) && taken > 0 ? taken : null };
 }
+
+/** Starts Ring live view: sends the browser's WebRTC offer, returns Ring's answer. */
+export async function ringLiveStart(deviceId: string, sdp: string): Promise<{ sdp: string; session_id: string }> {
+  if (useMock()) throw new Error("Live view needs a real Ring camera (sample data is on).");
+  return call("ring", { method: "POST", body: JSON.stringify({ action: "live_start", device_id: deviceId, sdp }) });
+}
+
+export async function ringLiveEnd(sessionId: string) {
+  if (useMock()) return { ok: true };
+  return call("ring", { method: "POST", body: JSON.stringify({ action: "live_end", session_id: sessionId }) });
+}

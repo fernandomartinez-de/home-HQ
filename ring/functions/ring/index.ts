@@ -13,6 +13,10 @@
 //                                                      (online, battery, mode, recent events)
 //   POST /ring {"action":"command","device_id":"ring_<id>","command":{"action":"set_mode","mode":"home"}}
 //        modes: disarmed, home, away (Ring's location modes)
+//   POST /ring {"action":"live_start","device_id":"ring_<id>","sdp":"<browser offer>"}
+//        starts live view: Ring answers the browser's WebRTC offer and the video then streams from
+//        Ring straight to the browser. Returns {"sdp":"<answer>","session_id":"..."}.
+//   POST /ring {"action":"live_end","session_id":"..."}  ends it
 //   GET  /ring?snapshot=ring_<id>[&force=1]           latest snapshot as image/jpeg; header x-snapshot-ms
 //                                                      is when it was taken. force asks a wired camera for a
 //                                                      fresh one (battery cameras keep Ring's own cadence).
@@ -159,7 +163,7 @@ async function mode(locationId: string): Promise<string | null> {
   const r = await ring(APP_API + `mode/location/${locationId}`);
   if (!r.ok) return null; // Modes turned off in the Ring app
   const j = await r.json().catch(() => ({}));
-  return typeof j.mode === "string" ? j.mode : null;
+  return MODES.includes(j.mode) ? j.mode : null; // "unset" when Modes isn't set up
 }
 
 async function events(c: Cam) {
@@ -235,6 +239,32 @@ async function command(id: string, cmd: any, source = "ui") {
   }
 }
 
+// ---------- live view ----------
+
+const LIVE = "https://api.ring.com/integrations/v1/liveview/";
+
+async function liveStart(id: string, sdp: string) {
+  if (typeof sdp !== "string" || !sdp.startsWith("v=")) throw new UserError("missing WebRTC offer");
+  const rid = Number(ringId(id));
+  const cam = (await cameras()).find((c) => c.id === rid);
+  if (!cam) throw new UserError("camera not found on the Ring account");
+  if (cam.settings?.live_view_disabled === true) throw new UserError("Live view is turned off for this camera in the Ring app (Modes settings).");
+  const session_id = crypto.randomUUID();
+  const r = await ring(LIVE + "start", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id, device_id: rid, sdp, protocol: "webrtc" }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || typeof j.sdp !== "string") throw new Error(`Ring live view failed: HTTP ${r.status}${j.error ? ` ${j.error}` : ""}`);
+  return { sdp: j.sdp, session_id };
+}
+
+async function liveEnd(session_id: string) {
+  if (!session_id) return { ok: true };
+  await ring(LIVE + "end", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id }) }).catch(() => {});
+  return { ok: true };
+}
+
 async function snapshot(id: string, force: boolean) {
   const rid = ringId(id);
   const r = await ring(`https://app-snaps.ring.com/snapshots/next/${rid}${force ? "?extras=force" : ""}`, { headers: { accept: "image/jpeg" } });
@@ -269,7 +299,9 @@ Deno.serve(async (req) => {
       return json({ connected: true, polled: await poll() });
     }
     if (body.action === "command") return json(await command(body.device_id, body.command, body.source ?? "ui"));
-    return json({ error: "use GET ?snapshot=, or POST with action login, logout, poll or command" }, 400);
+    if (body.action === "live_start") return json(await liveStart(body.device_id, body.sdp));
+    if (body.action === "live_end") return json(await liveEnd(body.session_id));
+    return json({ error: "use GET ?snapshot=, or POST with action login, logout, poll, command, live_start or live_end" }, 400);
   } catch (err) {
     if (err instanceof NotConnected) return json({ error: err.message, not_connected: true }, 409);
     if (err instanceof UserError) return json({ error: err.message }, 400);
