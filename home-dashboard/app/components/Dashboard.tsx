@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, type LucideIcon,
+  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Schedule, TV } from "@/lib/types";
@@ -493,6 +493,9 @@ function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
           </button>
         )}
         <span className="flex items-center gap-2">
+          {/* Ring has no public link into its app, so this runs an iPad Shortcut named "Open Ring" (Open App: Ring). */}
+          <a href="shortcuts://run-shortcut?name=Open%20Ring" aria-label="Open the Ring app"
+            className={`${btn} bg-white/5 border border-white/10 text-slate-200`}><ExternalLink className="w-3.5 h-3.5 text-cyan-400" />{big ? " Ring app" : ""}</a>
           <button onClick={() => load(true)} disabled={busy || live.status !== "off"} className={`${btn} bg-white/5 border border-white/10 text-slate-200 disabled:opacity-50`}>
             <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${busy ? "animate-spin" : ""}`} /> Snap
           </button>
