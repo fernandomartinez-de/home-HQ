@@ -13,3 +13,6 @@ node_modules/
 tsconfig.tsbuildinfo
 ac/esphome/.esphome/
 __pycache__/
+
+# Written by the Next.js dev server
+home-dashboard/app/AGENTS.md
