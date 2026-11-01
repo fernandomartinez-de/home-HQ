@@ -74,6 +74,7 @@ export type Command =
   | { action: "brightness"; value: number }
   | { action: "color"; hex: string }
   | { action: "color_temp"; kelvin: number }
+  | { action: "scene"; name: string }
   | { action: "set_setpoint"; value: number }
   | { action: "set_mode"; mode: string }
   | { action: "launch"; app: string }

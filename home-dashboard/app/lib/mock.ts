@@ -61,6 +61,7 @@ export function mockCommand(id: string, c: Command) {
     if (c.action === "brightness") s.brightness = c.value;
     if (c.action === "color") { s.color = c.hex; s.color_temp_k = null; }
     if (c.action === "color_temp") s.color_temp_k = c.kelvin;
+    if (c.action === "scene") s.power = true;
     if (c.action === "set_setpoint") s.setpoint_f = c.value;
     if (c.action === "set_mode") { s.mode = c.mode; s.power = c.mode !== "off"; }
     if (c.action === "launch") { s.app = c.app; s.app_name = (d.capabilities as any).apps?.find((a: any) => a.pkg === c.app)?.name ?? c.app; }

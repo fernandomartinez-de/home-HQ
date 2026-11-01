@@ -72,6 +72,7 @@ function describe(a: ActivityItem) {
     : c.action === "brightness" ? `Brightness ${c.value}%`
     : c.action === "color" ? "Color changed"
     : c.action === "color_temp" ? `White ${c.kelvin}K`
+    : c.action === "scene" ? `${c.name} scene`
     : c.action === "set_setpoint" ? `Set to ${c.value}°`
     : c.action === "set_mode" ? (c.mode === "off" ? "Off" : "On")
     : c.action === "set_state" ? (c.setpoint ? `Schedule ${c.setpoint}°` : "Schedule")
@@ -363,7 +364,7 @@ function TvSample() {
   );
 }
 
-type Send = (d: Device, c: Command, patch: Record<string, unknown>) => void;
+type Send = (d: Device, c: Command, patch: Record<string, unknown>) => void | Promise<void>;
 type Unit = "F" | "C";
 const toUnit = (f: number, u: Unit) => (u === "C" ? Math.round((f - 32) * (5 / 9)) : f);
 
@@ -742,21 +743,64 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const setRoom = (roomId: string, on: boolean) =>
     lightsIn(roomId).filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
 
-  // Scenes switch the lights now; the AC parts join once the bridges are installed.
-  const applyScene = (name: string) => {
+  // Modes. Each light gets a target; a light already there is left alone. The TV and the water
+  // heater join in: Sleep and Away put the TV to sleep, Away shuts the heater off and pauses its
+  // schedule, and any other mode resumes the schedule (which sets the heater for the current slot).
+  type Target = { on: boolean; brightness?: number | "min"; scene?: string };
+  const isTvLight = (l: Light) => /tv|backlight|65/i.test(l.name);
+  const isFloorLamp = (l: Light) => /lamp/i.test(l.name);
+  const sceneTarget = (name: string, l: Light): Target => {
+    const room = roomIdOf(l);
+    if (name === "Home") return { on: true };
+    if (name === "Movie") {
+      if (room === "living" && isTvLight(l)) return { on: true, scene: "Movie" };
+      if (room === "living" && isFloorLamp(l)) return { on: true, brightness: "min" };
+      return { on: false };
+    }
+    if (name === "Sleep") return room === "bedroom" ? { on: true, brightness: 20 } : { on: false };
+    return { on: false }; // Away
+  };
+
+  const applyLight = async (l: Light, t: Target) => {
+    const isOn = !!l.state?.power;
+    if (!t.on) { if (isOn) await send(l, { action: "power", on: false }, { power: false }); return; }
+    if (!isOn) await send(l, { action: "power", on: true }, { power: true });
+    if (t.brightness !== undefined) {
+      const value = t.brightness === "min" ? l.capabilities?.brightness?.min ?? 1 : t.brightness;
+      if (l.state?.brightness !== value) await send(l, { action: "brightness", value }, { brightness: value, power: true });
+    }
+    if (t.scene) await send(l, { action: "scene", name: t.scene }, { power: true });
+  };
+
+  const setHeaterSchedule = async (enabled: boolean) => {
+    if (!heater) return;
+    const r = await fetch("/api/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device_id: heater.id, enabled }) });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error);
+    setSchedule(body);
+  };
+
+  const applyScene = async (name: string) => {
     setScene(name);
-    const want = (l: Light): { on: boolean; brightness?: number } => {
-      const n = shortName(l.name, roomName(roomIdOf(l))).toLowerCase();
-      if (name === "Home") return { on: ["left", "middle", "floor lamp"].includes(n) || !!l.state?.power };
-      if (name === "Movie") return n === "tv backlight" ? { on: true, brightness: 75 } : { on: false };
-      return { on: false }; // Sleep and Away
-    };
-    lights.filter((l) => l.state?.online !== false).forEach((l) => {
-      const w = want(l);
-      if (w.on && w.brightness && l.state?.brightness !== w.brightness) send(l, { action: "brightness", value: w.brightness }, { brightness: w.brightness, power: true });
-      else if (!!l.state?.power !== w.on) send(l, { action: "power", on: w.on }, { power: w.on });
-    });
-    setTimeout(() => setScene(null), 4000);
+    const jobs: Promise<unknown>[] = lights.filter((l) => l.state?.online !== false).map((l) => applyLight(l, sceneTarget(name, l)));
+    if ((name === "Sleep" || name === "Away") && tv && tvOn) jobs.push(Promise.resolve(send(tv, { action: "sleep" }, { screen: "off" })));
+    if (heater) {
+      jobs.push((async () => {
+        try {
+          if (name === "Away") {
+            if (schedule?.enabled !== false) await setHeaterSchedule(false);
+            if (heater.state?.power !== false) await send(heater, { action: "power", on: false }, { power: false, mode: "off" });
+          } else if (schedule && !schedule.enabled) {
+            await setHeaterSchedule(true);
+            setTimeout(refresh, 6000);
+          }
+        } catch (e) {
+          setToast(`Water heater: ${(e as Error).message}`);
+        }
+      })());
+    }
+    await Promise.all(jobs);
+    setTimeout(() => setScene(null), 2000);
   };
 
   // The water heater schedule, kept current for the Water tab and the overview line.

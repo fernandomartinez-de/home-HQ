@@ -10,6 +10,7 @@
 //                  {"action":"brightness","value":60}         (percent)
 //                  {"action":"color","hex":"#ff8800"}
 //                  {"action":"color_temp","kelvin":3000}
+//                  {"action":"scene","name":"Movie"}             (any scene the light offers in the Govee app)
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -103,6 +104,33 @@ async function control(d: Device, instance: string, value: unknown) {
   });
 }
 
+// Every scene a light offers: the built in list on the device, the dynamic scenes Govee serves
+// separately, and the user's own DIY scenes. Each comes with the capability to send it through.
+async function sceneOptions(d: Device) {
+  const out: { name: string; value: unknown; type: string; instance: string }[] = [];
+  const add = (c?: Cap) => (c?.parameters?.options ?? []).forEach((o: any) =>
+    o?.name && out.push({ name: String(o.name), value: o.value, type: c!.type, instance: c!.instance }));
+  d.capabilities.filter((c) => /scene/i.test(c.instance)).forEach(add);
+  for (const path of ["/device/scenes", "/device/diy-scenes"]) {
+    try {
+      const j = await govee(path, { requestId: crypto.randomUUID(), payload: { sku: d.sku, device: d.device } });
+      (j.payload?.capabilities ?? []).forEach(add);
+    } catch { /* not every light has both lists */ }
+  }
+  return out;
+}
+
+async function scene(d: Device, name: string) {
+  const options = await sceneOptions(d);
+  const want = name.trim().toLowerCase();
+  const pick = options.find((o) => o.name.trim().toLowerCase() === want) ?? options.find((o) => o.name.toLowerCase().includes(want));
+  if (!pick) throw new Error(`${d.deviceName ?? d.sku} has no "${name}" scene${options.length ? `; it has ${options.slice(0, 12).map((o) => o.name).join(", ")}` : ""}`);
+  return govee("/device/control", {
+    requestId: crypto.randomUUID(),
+    payload: { sku: d.sku, device: d.device, capability: { type: pick.type, instance: pick.instance, value: pick.value } },
+  });
+}
+
 // ---------- actions ----------
 
 async function live() {
@@ -154,8 +182,11 @@ async function command(id: string, cmd: any, source = "ui") {
     } else if (cmd?.action === "color_temp") {
       const r = range(cap(d, "colorTemperatureK")) ?? { min: 2000, max: 9000 };
       res = await control(d, "colorTemperatureK", Math.min(r.max, Math.max(r.min, Math.round(Number(cmd.kelvin)))));
+    } else if (cmd?.action === "scene") {
+      if (!cmd.name) throw new Error("scene needs a name, like Movie");
+      res = await scene(d, String(cmd.name));
     } else {
-      throw new Error("unknown command; use power, brightness, color or color_temp");
+      throw new Error("unknown command; use power, brightness, color, color_temp or scene");
     }
     await finish("done", { govee: res?.capability ?? res });
     return { ok: true, command_id: row.id };
