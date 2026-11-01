@@ -420,13 +420,13 @@ function CircuitCard({ lights, label, onOpen, onPower }: { lights: Light[]; labe
         </span>
         <span className="flex flex-col">
           <span className={`text-sm font-medium ${on ? "text-amber-200/90" : "text-slate-500"}`}>{status}</span>
-          <span className="text-[11px] text-slate-500">{lights.length} bulbs as one circuit • tap for color and brightness</span>
+          <span className="text-[11px] text-slate-500">{lights.length} bulbs, one circuit</span>
         </span>
       </button>
       <button onClick={() => onPower(!on)} disabled={!reachable.length} aria-label={on ? `Turn off ${label}` : `Turn on ${label}`}
-        className={`relative z-10 shrink-0 mr-4 w-14 h-14 flex items-center justify-center rounded-2xl border transition-all active:scale-95 ${on
+        className={`relative z-10 shrink-0 mr-3 w-11 h-11 flex items-center justify-center rounded-xl border transition-all active:scale-95 ${on
           ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
-        <Power className="w-5 h-5" />
+        <Power className="w-4 h-4" />
       </button>
     </div>
   );
@@ -473,7 +473,7 @@ function RoomButton({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[numb
 const PRESETS = ["#f59e0b", "#60a5fa", "#f43f5e", "#a855f7", "#10b981", "#06b6d4"];
 const WHITES = [2700, 4000, 6500];
 
-function LightSheet({ light, send, onClose, title, sub }: { light: Light; send: Send; onClose: () => void; title?: string; sub?: string }) {
+function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light; send: Send; onClose: () => void; title?: string; sub?: string; footer?: ReactNode }) {
   const s = light.state;
   const caps = light.capabilities;
   const on = !!s?.power;
@@ -568,6 +568,7 @@ function LightSheet({ light, send, onClose, title, sub }: { light: Light; send: 
               className="w-full accent-amber-500 h-8" />
           </div>
         )}
+        {footer}
       </div>
     </div>
   );
@@ -677,7 +678,6 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const [scene, setScene] = useState<string | null>(null);
   const [lightId, setLightId] = useState<string | null>(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [eachBulb, setEachBulb] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const holdUntil = useRef(0); // ignore stale polls right after a command
@@ -1026,21 +1026,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <PanelHead icon={Palette} tone={AMBER} title="Kitchen Lights" sub={`${onIn("kitchen")} on • tap a card for color and brightness`}
           right={<button onClick={() => setRoom("kitchen", !lightsIn("kitchen").some((l) => l.state?.power && l.state?.online !== false))}
             className="px-3 h-10 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium flex items-center gap-1.5"><Power className="w-3.5 h-3.5" />{onIn("kitchen") ? "All off" : "All on"}</button>} />
-        {circuit.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <CircuitCard lights={circuit} label="Ceiling lights" onOpen={() => setLightId(CIRCUIT)} onPower={setCircuit} />
-            <button onClick={() => setEachBulb((v) => !v)} aria-expanded={eachBulb}
-              className="self-start flex items-center gap-1 px-2 h-8 rounded-lg text-[12px] text-slate-400 active:scale-95">
-              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${eachBulb ? "rotate-90" : ""}`} />{eachBulb ? "Hide each bulb" : "Control each bulb"}
-            </button>
-            {eachBulb && (
-              <div className="grid grid-cols-3 gap-3">
-                {circuit.map((l) => <LightCard key={l.id} light={l} label={shortName(l.name, "Kitchen")} onOpen={() => setLightId(l.id)} />)}
-              </div>
-            )}
-          </div>
-        )}
         <div className="grid grid-cols-2 gap-3">
+          {circuit.length > 0 && <CircuitCard lights={circuit} label="Ceiling lights" onOpen={() => setLightId(CIRCUIT)} onPower={setCircuit} />}
           {lightsIn("kitchen").filter((l) => !circuit.includes(l)).map((l) => <LightCard key={l.id} light={l} label={shortName(l.name, "Kitchen")} onOpen={() => setLightId(l.id)} big />)}
         </div>
       </div>
@@ -1230,7 +1217,24 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       {openLight && <LightSheet key={openLight.id} light={openLight} send={send} onClose={() => setLightId(null)} />}
       {lightId === CIRCUIT && circuitLead && (
         <LightSheet key={CIRCUIT} light={circuitLead} send={sendCircuit} onClose={() => setLightId(null)}
-          title="Kitchen ceiling lights" sub={`Left, middle and right together`} />
+          title="Kitchen ceiling lights" sub="Left, middle and right together"
+          footer={
+            <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-400 font-medium">Each bulb</span>
+              <div className="flex gap-1.5">
+                {circuit.map((l) => {
+                  const lit = !!l.state?.power && l.state?.online !== false;
+                  return (
+                    <button key={l.id} onClick={() => setLightId(l.id)} disabled={l.state?.online === false}
+                      className="h-8 px-2.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-slate-200 flex items-center gap-1.5 active:scale-95 disabled:opacity-40">
+                      <span className="w-2 h-2 rounded-full border border-white/30" style={{ backgroundColor: lit ? lightHex(l) : "transparent" }} />
+                      {shortName(l.name, "Kitchen")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          } />
       )}
       {editingSchedule && heater && schedule && (
         <ScheduleEditor heater={heater} schedule={schedule} notify={setToast}
