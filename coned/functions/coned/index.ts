@@ -166,6 +166,10 @@ async function goJson(jar: Jar, url: string, init: RequestInit = {}) {
   try { return JSON.parse(text); } catch { throw new Error("Con Edison sent an unexpected answer during sign in"); }
 }
 
+// Field names and yes/no values only, so a changed answer from Con Edison can be seen without exposing anything.
+const shapeOf = (o: unknown) =>
+  Object.entries((o ?? {}) as Record<string, unknown>).map(([k, v]) => (typeof v === "boolean" || v === null ? `${k}=${v}` : `${k}:${typeof v}`)).join(", ") || "empty";
+
 // ---------- sign in ----------
 // Mirrors opower/utilities/coned.py: Login API, then 2FA with an authenticator code when Con Edison
 // doesn't know this device, then the Okta redirects, then the Energy Use page mints an Opower token.
@@ -201,8 +205,17 @@ async function signIn(login: Login, sess: Sess): Promise<Sess> {
     }
     if (!mfa.code) throw new UserError("Con Edison didn't accept the authenticator code. Check the setup key.");
     redirect = mfa.authRedirectUrl;
+    if (!redirect) {
+      const shape = shapeOf(mfa);
+      console.log("coned 2FA answer without redirect:", shape);
+      throw new Error(`Con Edison accepted the 2FA code but didn't finish (no redirect). Answer: ${shape}`);
+    }
   }
-  if (!redirect) throw new Error("Con Edison sign in didn't finish (no redirect). It may need a check on coned.com.");
+  if (!redirect) {
+    const shape = shapeOf(res);
+    console.log("coned login answer without redirect:", shape);
+    throw new Error(`Con Edison sign in didn't finish (no redirect). Answer: ${shape}`);
+  }
 
   await go(jar, new URL(redirect, BASE).toString());
   const page = await go(jar, BASE + RETURN_URL);
@@ -270,7 +283,8 @@ async function reads(tok: string, a: Account, agg: "day" | "hour", from: Date, t
   try {
     const q = `aggregateType=${agg}&startDate=${encodeURIComponent(nyDate(from) + "T00:00:00" + nyOffset(from))}&endDate=${encodeURIComponent(nyDate(to) + "T00:00:00" + nyOffset(to))}`;
     const j = await opower(tok, `/DataBrowser-v1/cws/cost/utilityAccount/${a.uuid}?${q}`, a.customer);
-    const list = (j.reads ?? []).map((r: any) => ({ t: r.startTime, kwh: readKwh(r), cost: num(r.providedCost) }));
+    // Con Edison answers 0 for cost below bill level; keep that as unknown, not free.
+    const list = (j.reads ?? []).map((r: any) => ({ t: r.startTime, kwh: readKwh(r), cost: num(r.providedCost) || null }));
     if (list.some((r: any) => r.kwh || r.cost)) return list;
   } catch { /* fall back */ }
   const q = `aggregateType=${agg}&startDate=${nyDate(from)}&endDate=${nyDate(to)}`;
@@ -313,7 +327,11 @@ async function forecast(tok: string, a: Account) {
 
 // The smart meter's recent 15 minute reads (about the last day), for "right now" numbers.
 async function live(tok: string, a: Account) {
-  const m = await opower(tok, `/cws-real-time-ami-v1/cws/cned/accounts/${a.uuid}/meters`, a.customer);
+  let m: any;
+  try { m = await opower(tok, `/cws-real-time-ami-v1/cws/cned/accounts/${a.uuid}/meters`, a.customer); } catch (e) {
+    if ((e as any).status === 424 || (e as any).status === 404) return null; // this meter has no near live reads
+    throw e;
+  }
   const meter = (m.meters_ids ?? [])[0];
   if (!meter) return null;
   const j = await opower(tok, `/cws-real-time-ami-v1/cws/cned/accounts/${a.uuid}/meters/${encodeURIComponent(meter)}/usage`, a.customer);

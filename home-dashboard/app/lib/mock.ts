@@ -38,30 +38,24 @@ let devices: Device[] = [
   light("govee_tv", "TV Backlight", { online: true, power: true, brightness: 55, color: "#5b6cff", color_temp_k: null }, "Living room"),
 ];
 
-// A sample Con Edison meter: a bill cycle 12 days in, 40 days of daily kWh and the last day of
-// 15 minute smart meter reads.
+// A sample Con Edison meter shaped like a real account: a cycle that just started (no cost so far or
+// forecast yet), the previous cycle's bill not posted, daily kWh without cost, and no live reads.
 function mockMeter(): Device {
   const day = (n: number) => new Date(Date.now() - n * 86400_000).toISOString().slice(0, 10);
   const daily = Array.from({ length: 35 }, (_, i) => {
     const n = 35 - i, wd = new Date(Date.now() - n * 86400_000).getDay();
-    const kwh = Math.round((5.2 + 1.8 * Math.sin(i / 3) + (wd === 0 || wd === 6 ? 2.1 : 0)) * 100) / 100;
-    return { d: day(n), kwh, cost: Math.round(kwh * 0.34 * 100) / 100 };
-  });
-  const reads = Array.from({ length: 96 }, (_, i) => {
-    const h = (new Date().getHours() - 24 + i / 4 + 24) % 24;
-    const kwh = 0.06 + (h >= 7 && h < 9 ? 0.12 : 0) + (h >= 18 && h < 23 ? 0.16 : 0) + 0.02 * Math.sin(i);
-    return { t: new Date(Date.now() - (96 - i) * 15 * 60_000).toISOString(), kwh: Math.round(kwh * 1000) / 1000 };
+    const kwh = Math.round((6.4 + 1.6 * Math.sin(i / 3) + (wd === 0 || wd === 6 ? 1.8 : 0)) * 100) / 100;
+    return { d: day(n), kwh, cost: null };
   });
   return {
     id: "coned_electric", kind: "meter", provider: "coned", name: "Con Edison", enabled: true, recorded_at: new Date(Date.now() - 40 * 60_000).toISOString(),
-    capabilities: { live: true, cost_by_day: true },
+    capabilities: { live: false, cost_by_day: false },
     state: {
       connected: true,
-      bill: { start: day(12), end: day(-18), as_of: day(1), kwh_so_far: 71.4, cost_so_far: 26.18, kwh_forecast: 186, cost_forecast: 68.4, typical_kwh: 201, typical_cost: 71.9 },
-      last_bill: { start: day(43), end: day(13), kwh: 192, cost: 70.12 },
-      bills: [{ start: day(43), end: day(13), kwh: 192, cost: 70.12 }, { start: day(74), end: day(44), kwh: 268, cost: 96.4 }],
-      daily, hourly: [],
-      live: { t: reads[95].t, kw: 0.62, today_kwh: 4.8, reads },
+      bill: { start: day(0), end: day(-31), as_of: day(-1), kwh_so_far: 0, cost_so_far: null, kwh_forecast: null, cost_forecast: null, typical_kwh: 422, typical_cost: null },
+      last_bill: { start: day(60), end: day(30), kwh: 222, cost: 97.08 },
+      bills: [{ start: day(60), end: day(30), kwh: 222, cost: 97.08 }, { start: day(365), end: day(332), kwh: 464, cost: 182.06 }],
+      daily, hourly: [], live: null,
     },
   } as Device;
 }

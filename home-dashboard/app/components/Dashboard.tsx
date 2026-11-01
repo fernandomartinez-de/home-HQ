@@ -316,12 +316,33 @@ function ConEdSummary({ meter, onConnect, onDisconnect }: { meter: Meter | undef
   const s = meter.state;
   const b = s?.bill;
   const today = nyToday();
-  const daily = s?.daily ?? [];
+  const daily = (s?.daily ?? []).filter((d) => d.kwh != null);
+  const dayMs = 86400_000;
+  const span = (a: string, z: string) => Math.round((Date.parse(z) - Date.parse(a)) / dayMs);
+  // Con Edison only prices whole bills, so estimates use the last bill's rate per kWh.
+  const last = s?.last_bill;
+  const rate = last?.cost && last.kwh ? last.cost / last.kwh : null;
+  const est = (kwh: number | null | undefined) => (kwh != null && rate ? kwh * rate : null);
+  const kwhBetween = (a: string, z: string) => daily.filter((d) => d.d >= a && d.d < z).reduce((t, d) => t + (d.kwh ?? 0), 0);
+  const recent = daily.slice(-14);
+  const avgDay = recent.length ? recent.reduce((t, d) => t + (d.kwh ?? 0), 0) / recent.length : null;
+
+  const days = b ? span(b.start, b.end) : null;
+  const dayOf = b ? Math.max(1, span(b.start, today) + 1) : null;
+  const soFarKwh = b ? (b.kwh_so_far || kwhBetween(b.start, today)) : null;
+  const soFar = b?.cost_so_far ?? est(soFarKwh);
+  const soFarIsEst = b?.cost_so_far == null && soFar != null;
+  const projected = b?.cost_forecast ?? (b && avgDay != null && days ? est(Math.max(soFarKwh ?? 0, 0) + avgDay * Math.max(days - (dayOf ?? 1) + 1, 0)) : null);
+  const projIsEst = b?.cost_forecast == null && projected != null;
+  // Same cycle last year, for comparison.
+  const lastYear = b ? (s?.bills ?? []).find((x) => Math.abs(span(x.start, b.start) - 365) <= 12) : undefined;
+  const vsLastYear = projected != null && lastYear?.cost ? Math.round(((projected - lastYear.cost) / lastYear.cost) * 100) : null;
+  // A finished cycle whose bill hasn't posted yet (between the last bill and the current cycle).
+  const pending = b && last && last.end < b.start && span(last.end, b.start) >= 20 ? { start: last.end, end: b.start, kwh: kwhBetween(last.end, b.start) } : null;
+  const pendingCost = pending ? est(pending.kwh) : null;
+
+  const lastDay = [...daily].reverse().find((d) => d.d < today);
   const todayKwh = s?.live?.today_kwh ?? daily.find((d) => d.d === today)?.kwh ?? null;
-  const lastDay = [...daily].reverse().find((d) => d.d !== today && d.kwh != null);
-  const dayOf = b ? Math.max(1, Math.round((Date.parse(today) - Date.parse(b.start)) / 86400_000) + 1) : null;
-  const days = b ? Math.round((Date.parse(b.end) - Date.parse(b.start)) / 86400_000) + 1 : null;
-  const vsTypical = b?.cost_forecast != null && b.typical_cost ? Math.round(((b.cost_forecast - b.typical_cost) / b.typical_cost) * 100) : null;
   const stale = meter.recorded_at ? Date.now() - Date.parse(meter.recorded_at) > 6 * 3600_000 : false;
 
   return (
@@ -335,14 +356,24 @@ function ConEdSummary({ meter, onConnect, onDisconnect }: { meter: Meter | undef
         )}
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="BILL SO FAR" value={money(b?.cost_so_far)} sub={dayOf && days ? `Day ${Math.min(dayOf, days)} of ${days}` : kwhText(b?.kwh_so_far)} tone="text-emerald-300" />
-        <Stat label="PROJECTED" value={money(b?.cost_forecast)}
-          sub={vsTypical != null ? `${vsTypical > 0 ? "+" : ""}${vsTypical}% vs last year` : b?.kwh_forecast != null ? kwhText(b.kwh_forecast) : undefined} />
-        <Stat label={todayKwh != null ? "TODAY" : "YESTERDAY"} value={kwhText(todayKwh ?? lastDay?.kwh)}
-          sub={todayKwh != null && lastDay?.kwh != null ? `Yesterday ${lastDay.kwh < 10 ? lastDay.kwh.toFixed(1) : Math.round(lastDay.kwh)}` : lastDay?.cost != null ? money(lastDay.cost) : undefined} />
+        <Stat label={soFarIsEst ? "SO FAR (EST.)" : "BILL SO FAR"} value={money(soFar)}
+          sub={dayOf && days ? `Day ${Math.min(dayOf, days)} of ${days}` : kwhText(soFarKwh)} tone="text-emerald-300" />
+        <Stat label={projIsEst ? "EST. TOTAL" : "PROJECTED"} value={money(projected)}
+          sub={vsLastYear != null ? `${vsLastYear > 0 ? "+" : ""}${vsLastYear}% vs last year` : lastYear?.cost ? `Last year ${money(lastYear.cost)}` : undefined} />
+        {todayKwh != null ? (
+          <Stat label="TODAY" value={kwhText(todayKwh)} sub={lastDay?.kwh != null ? `Yesterday ${lastDay.kwh < 10 ? lastDay.kwh.toFixed(1) : Math.round(lastDay.kwh)}` : undefined} />
+        ) : (
+          <Stat label={lastDay?.d === new Date(Date.parse(today) - dayMs).toISOString().slice(0, 10) ? "YESTERDAY" : lastDay ? billDay(lastDay.d).toUpperCase() : "LATEST DAY"}
+            value={kwhText(lastDay?.kwh)} sub={avgDay != null ? `Avg ${avgDay.toFixed(1)} a day` : undefined} />
+        )}
       </div>
       <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500">
-        <span className="truncate">{s?.last_bill ? <>Last bill <span className="text-slate-300 font-mono">{money(s.last_bill.cost)}</span> • {billDay(s.last_bill.start)} to {billDay(s.last_bill.end)}</> : s?.errors?.length ? "Some Con Edison data is unavailable" : "No past bills yet"}</span>
+        <span className="truncate">
+          {pending && pendingCost != null
+            ? <>Next bill <span className="text-slate-300 font-mono">≈{money(pendingCost)}</span> • {billDay(pending.start)} to {billDay(pending.end)}, not posted</>
+            : last ? <>Last bill <span className="text-slate-300 font-mono">{money(last.cost)}</span> • {billDay(last.start)} to {billDay(last.end)}</>
+            : "No past bills yet"}
+        </span>
         <button onClick={() => (confirm ? onDisconnect() : setConfirm(true))} className={`shrink-0 px-2 py-1 rounded-md ${confirm ? "text-rose-300 bg-rose-500/10 border border-rose-500/30" : "text-slate-500"}`}>
           {confirm ? "Tap to disconnect" : "Disconnect"}
         </button>
