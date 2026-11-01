@@ -642,64 +642,69 @@ const toUnit = (f: number, u: Unit) => (u === "C" ? Math.round((f - 32) * (5 / 9
 
 // ---------- lights ----------
 
-function LightCard({ light, label, onOpen, big }: { light: Light; label: string; onOpen: () => void; big?: boolean }) {
-  const s = light.state;
-  const offline = s?.online === false;
-  const on = !!s?.power && !offline;
-  const hex = lightHex(light);
-  return (
-    <button onClick={onOpen} disabled={offline}
-      className={`relative w-full text-left ${big ? "h-32 p-4" : "h-[84px] p-3"} rounded-2xl border transition-all duration-300 flex flex-col justify-between select-none overflow-hidden ${offline
-        ? "bg-[#1e1916]/40 border-white/5 opacity-40"
-        : on ? "bg-gradient-to-b from-[#2a211a] to-[#1c1511] border-amber-500/40 shadow-lg shadow-amber-950/40" : "bg-[#1e1916]/60 border-white/5"}`}>
-      {on && <span className="absolute inset-x-0 bottom-0 h-2/3 opacity-35 pointer-events-none" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
-      <span className="relative z-10 flex items-center justify-between gap-1 w-full">
-        <span className={`${big ? "text-base" : "text-[13px]"} font-semibold text-white tracking-tight truncate`}>{label}</span>
-        {on && <span className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: hex }} />}
-      </span>
-      <span className={`relative z-10 ${big ? "text-sm" : "text-[11px]"} font-medium ${offline ? "text-rose-400/90" : on ? "text-amber-200/90" : "text-slate-500"}`}>
-        {offline ? "Offline" : on ? `On, ${s?.brightness ?? 100}%` : "Off"}
-      </span>
-    </button>
-  );
-}
-
-// Several bulbs wired as one circuit: one card, one power button, one color and brightness sheet.
-function CircuitCard({ lights, label, onOpen, onPower }: { lights: Light[]; label: string; onOpen: () => void; onPower: (on: boolean) => void }) {
+// One light button for a single bulb or several bulbs on one circuit: tap the name to open the color
+// menu, the power button switches it, and the slider along the bottom dims it.
+function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
+  lights: Light[]; label: string; onOpen: () => void; onPower: (on: boolean) => void; onBright: (v: number) => void; big?: boolean;
+}) {
   const reachable = lights.filter((l) => l.state?.online !== false);
   const onLights = reachable.filter((l) => l.state?.power);
   const on = onLights.length > 0;
-  const hex = onLights[0] ? lightHex(onLights[0]) : "#f59e0b";
-  const bright = onLights[0]?.state?.brightness ?? 100;
-  const status = !reachable.length ? "Offline"
+  const offline = reachable.length === 0;
+  const lead = onLights[0] ?? reachable[0] ?? lights[0];
+  const hex = lead ? lightHex(lead) : "#f59e0b";
+  const range = lead?.capabilities.brightness ?? null;
+  const bright = lead?.state?.brightness ?? 100;
+  const [b, setB] = useState(bright);
+  const dragging = useRef(false);
+  const sent = useRef<number | null>(null);
+  useEffect(() => { if (!dragging.current) setB(bright); }, [bright]);
+  const commit = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (sent.current !== b || !on) { sent.current = b; onBright(b); }
+  };
+  const many = lights.length > 1;
+  const status = offline ? "Offline"
     : !on ? "Off"
-    : onLights.length === lights.length ? `On, ${bright}%`
-    : `${onLights.length} of ${lights.length} on`;
+    : many && onLights.length < lights.length ? `${onLights.length} of ${lights.length} on, ${b}%`
+    : `On, ${b}%`;
+  const pct = range ? ((b - range.min) / Math.max(1, range.max - range.min)) * 100 : 0;
   return (
-    <div className={`relative w-full h-32 rounded-2xl border transition-all duration-300 flex items-center overflow-hidden ${!reachable.length
+    <div className={`relative w-full ${big ? "h-40" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
       ? "bg-[#1e1916]/40 border-white/5 opacity-40"
       : on ? "bg-gradient-to-b from-[#2a211a] to-[#1c1511] border-amber-500/40 shadow-lg shadow-amber-950/40" : "bg-[#1e1916]/60 border-white/5"}`}>
       {on && <span className="absolute inset-x-0 bottom-0 h-2/3 opacity-35 pointer-events-none" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
-      <button onClick={onOpen} disabled={!reachable.length} className="relative z-10 flex-1 min-w-0 h-full p-4 text-left flex flex-col justify-between select-none">
-        <span className="flex items-center gap-2">
-          <span className="text-base font-semibold text-white tracking-tight truncate">{label}</span>
-          <span className="flex gap-1">
-            {lights.map((l) => (
-              <span key={l.id} className="w-2.5 h-2.5 rounded-full border border-white/25"
-                style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
-            ))}
+      <div className={`relative z-10 flex-1 min-h-0 flex items-start gap-2 ${big ? "p-4 pb-2" : "p-3 pb-1.5"}`}>
+        <button onClick={onOpen} disabled={offline} aria-label={`${label} color`} className="flex-1 min-w-0 h-full text-left flex flex-col justify-between">
+          <span className="flex items-center gap-2 min-w-0">
+            <span className={`${big ? "text-base" : "text-[13px]"} font-semibold text-white tracking-tight truncate`}>{label}</span>
+            {many ? (
+              <span className="flex gap-1 shrink-0">
+                {lights.map((l) => (
+                  <span key={l.id} className="w-2 h-2 rounded-full border border-white/25"
+                    style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
+                ))}
+              </span>
+            ) : on && <span className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: hex }} />}
           </span>
-        </span>
-        <span className="flex flex-col">
-          <span className={`text-sm font-medium ${on ? "text-amber-200/90" : "text-slate-500"}`}>{status}</span>
-          <span className="text-[11px] text-slate-500">{lights.length} bulbs, one circuit</span>
-        </span>
-      </button>
-      <button onClick={() => onPower(!on)} disabled={!reachable.length} aria-label={on ? `Turn off ${label}` : `Turn on ${label}`}
-        className={`relative z-10 shrink-0 mr-3 w-11 h-11 flex items-center justify-center rounded-xl border transition-all active:scale-95 ${on
-          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
-        <Power className="w-4 h-4" />
-      </button>
+          <span className={`${big ? "text-sm" : "text-[11px]"} font-medium ${offline ? "text-rose-400/90" : on ? "text-amber-200/90" : "text-slate-500"}`}>{status}</span>
+        </button>
+        <button onClick={() => onPower(!on)} disabled={offline} aria-label={on ? `Turn off ${label}` : `Turn on ${label}`} aria-pressed={on}
+          className={`shrink-0 ${big ? "w-11 h-11" : "w-10 h-10"} flex items-center justify-center rounded-xl border transition-all active:scale-95 ${on
+            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
+          <Power className="w-4 h-4" />
+        </button>
+      </div>
+      {range && (
+        <div className={`relative z-10 ${big ? "px-4 pb-4" : "px-3 pb-3"}`}>
+          <input type="range" className="tile-range" min={range.min} max={range.max} value={b} disabled={offline} aria-label={`${label} brightness`}
+            style={{ ["--pct" as string]: `${pct}%`, ["--glow" as string]: on ? hex : "#64748b" }}
+            onPointerDown={() => { dragging.current = true; }} onTouchStart={() => { dragging.current = true; }}
+            onChange={(e) => { dragging.current = true; setB(Number(e.target.value)); }}
+            onPointerUp={commit} onTouchEnd={commit} onKeyUp={() => { dragging.current = true; commit(); }} onBlur={commit} />
+        </div>
+      )}
     </div>
   );
 }
@@ -749,7 +754,6 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
   const s = light.state;
   const caps = light.capabilities;
   const on = !!s?.power;
-  const [bright, setBright] = useState(s?.brightness ?? 100);
   const [preview, setPreview] = useState<string | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
@@ -782,7 +786,6 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
     return hsvToHex(a / (2 * Math.PI), d / rad, 1);
   };
   const setColor = (c: string) => send(light, { action: "color", hex: c }, { color: c, color_temp_k: null, power: true });
-  const commitBright = () => send(light, { action: "brightness", value: bright }, { brightness: bright, power: true });
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -790,13 +793,9 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="w-4 h-4 rounded-full border border-white/30" style={{ backgroundColor: on ? hex : "transparent" }} />
-            <div><h3 className="text-sm font-bold text-white">{title ?? light.name}</h3><p className="text-[11px] text-slate-400">{sub ?? "Color and brightness"}</p></div>
+            <div><h3 className="text-sm font-bold text-white">{title ?? light.name}</h3><p className="text-[11px] text-slate-400">{sub ?? "Color"}</p></div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => send(light, { action: "power", on: !on }, { power: !on })} aria-label={on ? "Turn off" : "Turn on"}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl border ${on ? "bg-amber-500 text-slate-950 border-amber-400" : "bg-white/5 text-slate-400 border-white/10"}`}><Power className="w-4 h-4" /></button>
-            <button onClick={onClose} aria-label="Close" className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400"><X className="w-4 h-4" /></button>
-          </div>
+          <button onClick={onClose} aria-label="Close" className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400"><X className="w-4 h-4" /></button>
         </div>
 
         {caps.color && (
@@ -832,14 +831,6 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
           </div>
         )}
 
-        {caps.brightness && (
-          <div className="space-y-1 pt-1 border-t border-white/10">
-            <div className="flex justify-between text-[11px]"><span className="text-slate-300 font-medium">Brightness</span><span className="font-mono text-amber-400 font-bold">{bright}%</span></div>
-            <input type="range" min={caps.brightness.min} max={caps.brightness.max} value={bright} aria-label="Brightness"
-              onChange={(e) => setBright(Number(e.target.value))} onPointerUp={commitBright} onKeyUp={commitBright}
-              className="w-full accent-amber-500 h-8" />
-          </div>
-        )}
         {footer}
       </div>
     </div>
@@ -1059,6 +1050,21 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     .sort((a, b) => ["left", "middle", "right"].indexOf(shortName(a.name, "Kitchen").toLowerCase()) - ["left", "middle", "right"].indexOf(shortName(b.name, "Kitchen").toLowerCase())), [lights]);
   const circuitLead = circuit.find((l) => l.state?.power && l.state?.online !== false) ?? circuit.find((l) => l.state?.online !== false) ?? circuit[0];
   const sendCircuit: Send = (_d, c, patch) => { circuit.filter((l) => l.state?.online !== false).forEach((l) => send(l, c, patch)); };
+  // Light buttons: a single bulb, or the kitchen ceiling circuit as one button.
+  const powerAll = (ls: Light[], on: boolean) => ls.filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
+  const brightAll = (ls: Light[], v: number) => ls.filter((l) => l.state?.online !== false).forEach((l) => send(l, { action: "brightness", value: v }, { brightness: v, power: true }));
+  const unitsIn = (roomId: string) => {
+    const list = lightsIn(roomId);
+    const grouped = roomId === "kitchen" && circuit.length > 0;
+    return [
+      ...(grouped ? [{ key: CIRCUIT, label: "Ceiling lights", lights: circuit }] : []),
+      ...list.filter((l) => !grouped || !circuit.includes(l)).map((l) => ({ key: l.id, label: shortName(l.name, roomName(roomId)), lights: [l] })),
+    ];
+  };
+  const tile = (u: { key: string; label: string; lights: Light[] }, big?: boolean) => (
+    <LightTile key={u.key} lights={u.lights} label={u.label} big={big}
+      onOpen={() => setLightId(u.key)} onPower={(on) => powerAll(u.lights, on)} onBright={(v) => brightAll(u.lights, v)} />
+  );
   const setCircuit = (on: boolean) => circuit.filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
   const openLight = lights.find((l) => l.id === lightId) ?? null;
   const otherLights = lights.filter((l) => !ROOMS.some((r) => r.id === roomIdOf(l)));
@@ -1212,7 +1218,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <button onClick={() => setRoom(roomId, false)} className="px-3 py-1.5 rounded-full text-[11px] text-slate-400 bg-white/5 border border-white/10 active:scale-95 font-medium">Turn all off</button>
         </div>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {list.map((l) => <LightCard key={l.id} light={l} label={shortName(l.name, roomName(roomId))} onOpen={() => setLightId(l.id)} big={big} />)}
+          {unitsIn(roomId).map((u) => tile(u, big))}
         </div>
         {list.length === 0 && <p className="text-[11px] text-slate-500">No lights in this room yet.</p>}
       </div>
@@ -1278,7 +1284,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <PanelHead icon={Palette} tone={AMBER} title="Lighting Console" sub={`${lightsOn} on • tap a room for its lights`} />
         <div className="flex-1 min-h-0 flex flex-col gap-3">
           {ROOMS.map((r) => <RoomButton key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
-          {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => <LightCard key={l.id} light={l} label={l.name} onOpen={() => setLightId(l.id)} />)}</div>}
+          {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
         </div>
         <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
           <span className="flex items-center gap-1"><Sliders className="w-3 h-3 text-amber-500" /> Color and brightness inside each room</span>
@@ -1297,7 +1303,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       </div>
       <div className="lg:col-span-5 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 space-y-3`}>
-          <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a card for color and brightness" />
+          <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a light's name for colors" />
           {room === "living" ? <>{roomLights("living", 2)}{roomLights("kitchen", 2)}</> : roomLights("bedroom", 2)}
         </div>
         <div className={`flex-1 min-h-[150px] ${PANEL} p-4 flex flex-col gap-2`}>
@@ -1311,12 +1317,11 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const kitchenView = (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
       <div className={`lg:col-span-8 ${PANEL} p-5 flex flex-col gap-4`}>
-        <PanelHead icon={Palette} tone={AMBER} title="Kitchen Lights" sub={`${onIn("kitchen")} on • tap a card for color and brightness`}
+        <PanelHead icon={Palette} tone={AMBER} title="Kitchen Lights" sub={`${onIn("kitchen")} on • tap a light's name for colors`}
           right={<button onClick={() => setRoom("kitchen", !lightsIn("kitchen").some((l) => l.state?.power && l.state?.online !== false))}
             className="px-3 h-10 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium flex items-center gap-1.5"><Power className="w-3.5 h-3.5" />{onIn("kitchen") ? "All off" : "All on"}</button>} />
         <div className="grid grid-cols-2 gap-3">
-          {circuit.length > 0 && <CircuitCard lights={circuit} label="Ceiling lights" onOpen={() => setLightId(CIRCUIT)} onPower={setCircuit} />}
-          {lightsIn("kitchen").filter((l) => !circuit.includes(l)).map((l) => <LightCard key={l.id} light={l} label={shortName(l.name, "Kitchen")} onOpen={() => setLightId(l.id)} big />)}
+          {unitsIn("kitchen").map((u) => tile(u, true))}
         </div>
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3">
@@ -1565,7 +1570,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       {openLight && <LightSheet key={openLight.id} light={openLight} send={send} onClose={() => setLightId(null)} />}
       {lightId === CIRCUIT && circuitLead && (
         <LightSheet key={CIRCUIT} light={circuitLead} send={sendCircuit} onClose={() => setLightId(null)}
-          title="Kitchen ceiling lights" sub="Left, middle and right together"
+          title="Kitchen ceiling lights" sub="Color for left, middle and right together"
           footer={
             <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
               <span className="text-[11px] text-slate-400 font-medium">Each bulb</span>
