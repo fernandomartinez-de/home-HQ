@@ -392,6 +392,46 @@ function LightCard({ light, label, onOpen, big }: { light: Light; label: string;
   );
 }
 
+// Several bulbs wired as one circuit: one card, one power button, one color and brightness sheet.
+function CircuitCard({ lights, label, onOpen, onPower }: { lights: Light[]; label: string; onOpen: () => void; onPower: (on: boolean) => void }) {
+  const reachable = lights.filter((l) => l.state?.online !== false);
+  const onLights = reachable.filter((l) => l.state?.power);
+  const on = onLights.length > 0;
+  const hex = onLights[0] ? lightHex(onLights[0]) : "#f59e0b";
+  const bright = onLights[0]?.state?.brightness ?? 100;
+  const status = !reachable.length ? "Offline"
+    : !on ? "Off"
+    : onLights.length === lights.length ? `On, ${bright}%`
+    : `${onLights.length} of ${lights.length} on`;
+  return (
+    <div className={`relative w-full h-32 rounded-2xl border transition-all duration-300 flex items-center overflow-hidden ${!reachable.length
+      ? "bg-[#1e1916]/40 border-white/5 opacity-40"
+      : on ? "bg-gradient-to-b from-[#2a211a] to-[#1c1511] border-amber-500/40 shadow-lg shadow-amber-950/40" : "bg-[#1e1916]/60 border-white/5"}`}>
+      {on && <span className="absolute inset-x-0 bottom-0 h-2/3 opacity-35 pointer-events-none" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
+      <button onClick={onOpen} disabled={!reachable.length} className="relative z-10 flex-1 min-w-0 h-full p-4 text-left flex flex-col justify-between select-none">
+        <span className="flex items-center gap-2">
+          <span className="text-base font-semibold text-white tracking-tight truncate">{label}</span>
+          <span className="flex gap-1">
+            {lights.map((l) => (
+              <span key={l.id} className="w-2.5 h-2.5 rounded-full border border-white/25"
+                style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
+            ))}
+          </span>
+        </span>
+        <span className="flex flex-col">
+          <span className={`text-sm font-medium ${on ? "text-amber-200/90" : "text-slate-500"}`}>{status}</span>
+          <span className="text-[11px] text-slate-500">{lights.length} bulbs as one circuit • tap for color and brightness</span>
+        </span>
+      </button>
+      <button onClick={() => onPower(!on)} disabled={!reachable.length} aria-label={on ? `Turn off ${label}` : `Turn on ${label}`}
+        className={`relative z-10 shrink-0 mr-4 w-14 h-14 flex items-center justify-center rounded-2xl border transition-all active:scale-95 ${on
+          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
+        <Power className="w-5 h-5" />
+      </button>
+    </div>
+  );
+}
+
 function RoomButton({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]; lights: Light[]; onOpen: () => void; onAll: (on: boolean) => void }) {
   const Icon = room.icon;
   const reachable = lights.filter((l) => l.state?.online !== false);
@@ -433,7 +473,7 @@ function RoomButton({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[numb
 const PRESETS = ["#f59e0b", "#60a5fa", "#f43f5e", "#a855f7", "#10b981", "#06b6d4"];
 const WHITES = [2700, 4000, 6500];
 
-function LightSheet({ light, send, onClose }: { light: Light; send: Send; onClose: () => void }) {
+function LightSheet({ light, send, onClose, title, sub }: { light: Light; send: Send; onClose: () => void; title?: string; sub?: string }) {
   const s = light.state;
   const caps = light.capabilities;
   const on = !!s?.power;
@@ -478,7 +518,7 @@ function LightSheet({ light, send, onClose }: { light: Light; send: Send; onClos
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="w-4 h-4 rounded-full border border-white/30" style={{ backgroundColor: on ? hex : "transparent" }} />
-            <div><h3 className="text-sm font-bold text-white">{light.name}</h3><p className="text-[11px] text-slate-400">Color and brightness</p></div>
+            <div><h3 className="text-sm font-bold text-white">{title ?? light.name}</h3><p className="text-[11px] text-slate-400">{sub ?? "Color and brightness"}</p></div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => send(light, { action: "power", on: !on }, { power: !on })} aria-label={on ? "Turn off" : "Turn on"}
@@ -637,6 +677,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const [scene, setScene] = useState<string | null>(null);
   const [lightId, setLightId] = useState<string | null>(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [eachBulb, setEachBulb] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const holdUntil = useRef(0); // ignore stale polls right after a command
@@ -737,6 +778,13 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const { seen: tvSeen, on: tvOn } = tvStatus(tv);
   const lightsIn = useCallback((roomId: string) => lights.filter((l) => roomIdOf(l) === roomId).sort((a, b) => a.name.localeCompare(b.name)), [lights]);
   const roomName = (id: string) => ROOMS.find((r) => r.id === id)?.name ?? "Other";
+  // The kitchen's left, middle and right bulbs work as one circuit.
+  const CIRCUIT = "kitchen-circuit";
+  const circuit = useMemo(() => lights.filter((l) => roomIdOf(l) === "kitchen" && ["left", "middle", "right"].includes(shortName(l.name, "Kitchen").toLowerCase()))
+    .sort((a, b) => ["left", "middle", "right"].indexOf(shortName(a.name, "Kitchen").toLowerCase()) - ["left", "middle", "right"].indexOf(shortName(b.name, "Kitchen").toLowerCase())), [lights]);
+  const circuitLead = circuit.find((l) => l.state?.power && l.state?.online !== false) ?? circuit.find((l) => l.state?.online !== false) ?? circuit[0];
+  const sendCircuit: Send = (_d, c, patch) => { circuit.filter((l) => l.state?.online !== false).forEach((l) => send(l, c, patch)); };
+  const setCircuit = (on: boolean) => circuit.filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
   const openLight = lights.find((l) => l.id === lightId) ?? null;
   const otherLights = lights.filter((l) => !ROOMS.some((r) => r.id === roomIdOf(l)));
 
@@ -978,8 +1026,22 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <PanelHead icon={Palette} tone={AMBER} title="Kitchen Lights" sub={`${onIn("kitchen")} on • tap a card for color and brightness`}
           right={<button onClick={() => setRoom("kitchen", !lightsIn("kitchen").some((l) => l.state?.power && l.state?.online !== false))}
             className="px-3 h-10 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium flex items-center gap-1.5"><Power className="w-3.5 h-3.5" />{onIn("kitchen") ? "All off" : "All on"}</button>} />
+        {circuit.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <CircuitCard lights={circuit} label="Ceiling lights" onOpen={() => setLightId(CIRCUIT)} onPower={setCircuit} />
+            <button onClick={() => setEachBulb((v) => !v)} aria-expanded={eachBulb}
+              className="self-start flex items-center gap-1 px-2 h-8 rounded-lg text-[12px] text-slate-400 active:scale-95">
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${eachBulb ? "rotate-90" : ""}`} />{eachBulb ? "Hide each bulb" : "Control each bulb"}
+            </button>
+            {eachBulb && (
+              <div className="grid grid-cols-3 gap-3">
+                {circuit.map((l) => <LightCard key={l.id} light={l} label={shortName(l.name, "Kitchen")} onOpen={() => setLightId(l.id)} />)}
+              </div>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
-          {lightsIn("kitchen").map((l) => <LightCard key={l.id} light={l} label={shortName(l.name, "Kitchen")} onOpen={() => setLightId(l.id)} big />)}
+          {lightsIn("kitchen").filter((l) => !circuit.includes(l)).map((l) => <LightCard key={l.id} light={l} label={shortName(l.name, "Kitchen")} onOpen={() => setLightId(l.id)} big />)}
         </div>
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3">
@@ -1166,6 +1228,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       </Fragment>
 
       {openLight && <LightSheet key={openLight.id} light={openLight} send={send} onClose={() => setLightId(null)} />}
+      {lightId === CIRCUIT && circuitLead && (
+        <LightSheet key={CIRCUIT} light={circuitLead} send={sendCircuit} onClose={() => setLightId(null)}
+          title="Kitchen ceiling lights" sub={`Left, middle and right together`} />
+      )}
       {editingSchedule && heater && schedule && (
         <ScheduleEditor heater={heater} schedule={schedule} notify={setToast}
           onClose={() => setEditingSchedule(false)} onSaved={(s) => { setSchedule(s); setEditingSchedule(false); setToast("Schedule saved."); }} />
