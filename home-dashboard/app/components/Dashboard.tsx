@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, ChartColumn, Lightbulb, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
+  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, Cell, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
@@ -286,41 +286,16 @@ const billDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString([],
 const nyToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
 const nyDayOf = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
 
-function Stat({ label, value, sub, tone = "text-slate-100" }: { label: string; value: string; sub?: string; tone?: string }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-black/30 border border-white/5 px-2.5 py-2">
-      <div className="text-[9px] font-mono tracking-widest text-slate-500">{label}</div>
-      <div className={`text-[17px] leading-tight font-bold font-mono tabular-nums ${tone}`}>{value}</div>
-      {sub && <div className="text-[10px] text-slate-500 truncate">{sub}</div>}
-    </div>
-  );
-}
 
-/** Bill so far, projected bill and today's usage from Con Edison's smart meter, under the appliance chart. */
-function ConEdSummary({ meter, onConnect, onDisconnect }: { meter: Meter | undefined; onConnect: () => void; onDisconnect: () => void }) {
-  const [confirm, setConfirm] = useState(false);
-  useEffect(() => { if (!confirm) return; const t = setTimeout(() => setConfirm(false), 4000); return () => clearTimeout(t); }, [confirm]);
-
-  if (!meter) {
-    return (
-      <div className="shrink-0 flex items-center justify-between gap-2 rounded-xl bg-black/30 border border-white/5 px-3 py-2.5">
-        <span className="flex items-center gap-2 min-w-0">
-          <Plug className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="min-w-0"><span className="block text-[12px] font-semibold text-slate-200">Con Edison bill and usage</span>
-            <span className="block text-[10px] text-slate-500 truncate">Bill so far, projected bill, daily kWh</span></span>
-        </span>
-        <button onClick={onConnect} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 active:scale-95 shrink-0">Connect</button>
-      </div>
-    );
-  }
-
+// Bill math shared by the overview tile, the bill summary and the energy report. Con Edison only prices
+// whole bills, so estimates use the last bill's rate per kWh.
+function meterMath(meter: Meter) {
   const s = meter.state;
   const b = s?.bill;
   const today = nyToday();
   const daily = (s?.daily ?? []).filter((d) => d.kwh != null);
   const dayMs = 86400_000;
   const span = (a: string, z: string) => Math.round((Date.parse(z) - Date.parse(a)) / dayMs);
-  // Con Edison only prices whole bills, so estimates use the last bill's rate per kWh.
   const last = s?.last_bill;
   const rate = last?.cost && last.kwh ? last.cost / last.kwh : null;
   const est = (kwh: number | null | undefined) => (kwh != null && rate ? kwh * rate : null);
@@ -346,41 +321,7 @@ function ConEdSummary({ meter, onConnect, onDisconnect }: { meter: Meter | undef
   const todayKwh = s?.live?.today_kwh ?? daily.find((d) => d.d === today)?.kwh ?? null;
   const stale = meter.recorded_at ? Date.now() - Date.parse(meter.recorded_at) > 6 * 3600_000 : false;
 
-  return (
-    <div className="shrink-0 flex flex-col gap-2 pt-2 border-t border-white/5">
-      <div className="flex items-center justify-between gap-2 text-[10px]">
-        <span className="font-mono tracking-widest text-slate-400">CON EDISON <span className={stale ? "text-amber-400" : "text-slate-600"}>• {meter.recorded_at ? `${ago(meter.recorded_at)} ago` : "waiting for data"}</span></span>
-        {s?.live?.kw != null && (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-emerald-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{s.live.kw.toFixed(2)} kW
-          </span>
-        )}
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <Stat label={soFarIsEst ? "SO FAR (EST.)" : "BILL SO FAR"} value={money(soFar)}
-          sub={dayOf && days ? `Day ${Math.min(dayOf, days)} of ${days}` : kwhText(soFarKwh)} tone="text-emerald-300" />
-        <Stat label={projIsEst ? "EST. TOTAL" : "PROJECTED"} value={money(projected)}
-          sub={vsLastYear != null ? `${vsLastYear > 0 ? "+" : ""}${vsLastYear}% vs last year` : lastYear?.cost ? `Last year ${money(lastYear.cost)}` : undefined} />
-        {todayKwh != null ? (
-          <Stat label="TODAY" value={kwhText(todayKwh)} sub={lastDay?.kwh != null ? `Yesterday ${lastDay.kwh < 10 ? lastDay.kwh.toFixed(1) : Math.round(lastDay.kwh)}` : undefined} />
-        ) : (
-          <Stat label={lastDay?.d === new Date(Date.parse(today) - dayMs).toISOString().slice(0, 10) ? "YESTERDAY" : lastDay ? billDay(lastDay.d).toUpperCase() : "LATEST DAY"}
-            value={kwhText(lastDay?.kwh)} sub={avgDay != null ? `Avg ${avgDay.toFixed(1)} a day` : undefined} />
-        )}
-      </div>
-      <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500">
-        <span className="truncate">
-          {pending && pendingCost != null
-            ? <>Next bill <span className="text-slate-300 font-mono">≈{money(pendingCost)}</span> • {billDay(pending.start)} to {billDay(pending.end)}, not posted</>
-            : last ? <>Last bill <span className="text-slate-300 font-mono">{money(last.cost)}</span> • {billDay(last.start)} to {billDay(last.end)}</>
-            : "No past bills yet"}
-        </span>
-        <button onClick={() => (confirm ? onDisconnect() : setConfirm(true))} className={`shrink-0 px-2 py-1 rounded-md ${confirm ? "text-rose-300 bg-rose-500/10 border border-rose-500/30" : "text-slate-500"}`}>
-          {confirm ? "Tap to disconnect" : "Disconnect"}
-        </button>
-      </div>
-    </div>
-  );
+  return { s, b, today, daily, dayMs, span, last, rate, est, kwhBetween, avgDay, days, dayOf, soFarKwh, soFar, soFarIsEst, projected, projIsEst, lastYear, vsLastYear, pending, pendingCost, lastDay, todayKwh, stale };
 }
 
 // ---------- History ----------
@@ -631,6 +572,247 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
         </div>
       </div>
     </main>
+  );
+}
+
+// ---------- Power & Energy: overview tile and full report ----------
+
+/** The small overview tile: the three numbers that matter, tap for the full report. */
+function EnergyTile({ meter, onOpen, onConnect }: { meter: Meter | undefined; onOpen: () => void; onConnect: () => void }) {
+  if (!meter) {
+    return (
+      <div className={`${PANEL} p-3 flex items-center gap-3 shrink-0`}>
+        <div className={`p-2 rounded-xl border shrink-0 ${GREEN}`}><Zap className="w-4 h-4" /></div>
+        <div className="flex-1 min-w-0"><h2 className="text-[13px] font-bold text-white">Power & Energy</h2><p className="text-[11px] text-slate-400 truncate">Connect Con Edison for your bill and usage</p></div>
+        <button onClick={onConnect} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 active:scale-95 shrink-0">Connect</button>
+      </div>
+    );
+  }
+  const m = meterMath(meter);
+  const yesterday = m.todayKwh ?? m.lastDay?.kwh ?? null;
+  return (
+    <button onClick={onOpen} aria-label="Open Power & Energy details" className={`${PANEL} p-3 flex flex-col gap-2 shrink-0 text-left active:scale-[0.99] transition-transform`}>
+      <div className="flex items-center gap-2.5 w-full">
+        <div className={`p-2 rounded-xl border shrink-0 ${GREEN}`}><Zap className="w-4 h-4" /></div>
+        <div className="flex-1 min-w-0"><h2 className="text-[13px] font-bold text-white">Power & Energy</h2><p className="text-[11px] text-slate-400 truncate">Con Edison • tap for the full report</p></div>
+        <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
+      </div>
+      <div className="grid grid-cols-3 gap-2 w-full">
+        {[
+          [m.soFarIsEst ? "SO FAR (EST.)" : "BILL SO FAR", money(m.soFar), "text-emerald-300"],
+          [m.projIsEst ? "EST. TOTAL" : "PROJECTED", money(m.projected), "text-slate-100"],
+          [m.todayKwh != null ? "TODAY" : "YESTERDAY", kwhText(yesterday), "text-slate-100"],
+        ].map(([label, value, tone]) => (
+          <span key={label} className="min-w-0 rounded-lg bg-black/30 border border-white/5 px-2 py-1.5">
+            <span className="block text-[8px] font-mono tracking-widest text-slate-500 truncate">{label}</span>
+            <span className={`block text-[14px] font-bold font-mono tabular-nums ${tone}`}>{value}</span>
+          </span>
+        ))}
+      </div>
+    </button>
+  );
+}
+
+const hourLabel = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", timeZone: "America/New_York" });
+const monthLabel = (ym: string) => atNoon(`${ym}-15`).toLocaleDateString([], { month: "short", timeZone: "UTC" });
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** The full Power & Energy report, opened from the overview tile. */
+function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose: () => void; onDisconnect: () => void }) {
+  const [energy, setEnergy] = useState<Analytics["energy"] | null>(null);
+  useEffect(() => {
+    fetch("/api/history?days=7", { cache: "no-store" }).then((r) => r.json()).then((j) => setEnergy(Array.isArray(j.energy) ? j.energy : [])).catch(() => setEnergy([]));
+  }, []);
+  const m = meterMath(meter);
+  const s = m.s;
+  const daily = (energy && energy.length ? energy : s?.daily ?? []).filter((e) => e.kwh != null) as { d: string; kwh: number }[];
+
+  // Cycle progress.
+  const pct = m.days && m.dayOf ? Math.min(100, (Math.min(m.dayOf, m.days) / m.days) * 100) : 0;
+  const perDay = m.avgDay != null ? m.est(m.avgDay) : null;
+
+  // Last 12 months by calendar month (the current month so far is marked).
+  const byMonth = new Map<string, number>();
+  for (const e of daily) byMonth.set(e.d.slice(0, 7), (byMonth.get(e.d.slice(0, 7)) ?? 0) + e.kwh);
+  const months = [...byMonth.keys()].sort().slice(-12);
+  const thisMonth = m.today.slice(0, 7);
+  const topMonth = months.filter((k) => k !== thisMonth).reduce<string | null>((t, k) => (!t || (byMonth.get(k) ?? 0) > (byMonth.get(t) ?? 0) ? k : t), null);
+  const monthData = months.map((k) => ({ k, label: monthLabel(k), kwh: Math.round(byMonth.get(k) ?? 0), partial: k === thisMonth, top: k === topMonth }));
+
+  // Day of week, last 12 weeks.
+  const recent = daily.slice(-84);
+  const dow = DOW.map((name, i) => {
+    const xs = recent.filter((e) => atNoon(e.d).getUTCDay() === i).map((e) => e.kwh);
+    return { name, kwh: xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0, weekend: i === 0 || i === 6 };
+  });
+  const wkAvg = (we: boolean) => { const xs = dow.filter((d) => d.weekend === we && d.kwh); return xs.length ? xs.reduce((t, d) => t + d.kwh, 0) / xs.length : null; };
+  const weekendVs = wkAvg(true) && wkAvg(false) ? Math.round(((wkAvg(true)! - wkAvg(false)!) / wkAvg(false)!) * 100) : null;
+
+  // Hour by hour for the latest full day, and the always on (standby) load.
+  const hourly = (s?.hourly ?? []).filter((h) => h.kwh != null) as { t: string; kwh: number }[];
+  const lastFullDay = hourly.length ? nyDayOf(hourly[hourly.length - 1].t) : null;
+  const dayHours = hourly.filter((h) => nyDayOf(h.t) === lastFullDay);
+  const hourData = dayHours.map((h) => ({ t: h.t, label: hourLabel(h.t), kwh: h.kwh }));
+  const peak = dayHours.reduce<{ t: string; kwh: number } | null>((p, h) => (!p || h.kwh > p.kwh ? h : p), null);
+  const sorted = hourly.map((h) => h.kwh).sort((x, y) => x - y);
+  const base = sorted.length >= 12 ? sorted[Math.floor(sorted.length * 0.1)] : null; // kWh in an hour = average kW
+  const baseMonthCost = base != null ? m.est(base * 24 * 30) : null;
+
+  // Last 30 days against the same days a year earlier.
+  const last30 = daily.slice(-30);
+  const map = new Map(daily.map((e) => [e.d, e.kwh]));
+  const prior = last30.map((e) => map.get(shiftDay(e.d, -364))).filter((x): x is number => x != null);
+  const t30 = last30.reduce((t, e) => t + e.kwh, 0);
+  const vs30 = prior.length >= 24 ? Math.round(((t30 - prior.reduce((t, x) => t + x, 0) * (last30.length / prior.length)) / (prior.reduce((t, x) => t + x, 0) * (last30.length / prior.length))) * 100) : null;
+
+  const bills = [...(s?.bills ?? [])].reverse().slice(-12);
+  const billData = bills.map((b) => ({ label: monthLabel(b.start.slice(0, 7)), cost: b.cost, kwh: b.kwh, range: `${billDay(b.start)} to ${billDay(b.end)}` }));
+  const rates = bills.filter((b) => b.cost && b.kwh).map((b) => b.cost! / b.kwh!);
+
+  type Insight = { icon: LucideIcon; tone: string; text: ReactNode };
+  const insights: Insight[] = [];
+  if (vs30 != null) insights.push({ icon: Activity, tone: vs30 > 0 ? "text-amber-300" : "text-emerald-300", text: <>Last 30 days used <b>{Math.abs(vs30)}% {vs30 > 0 ? "more" : "less"}</b> than the same days last year.</> });
+  if (base != null) insights.push({ icon: Plug, tone: "text-cyan-300", text: <>Always on load is about <b>{Math.round(base * 1000)} W</b>{baseMonthCost != null ? <>, roughly <b>{money(baseMonthCost)}</b> a month</> : null}. Fridge, router and standby devices.</> });
+  if (m.vsLastYear != null) insights.push({ icon: Zap, tone: m.vsLastYear > 0 ? "text-amber-300" : "text-emerald-300", text: <>{m.projIsEst ? "The estimate for this bill is" : "This bill is"} tracking <b>{Math.abs(m.vsLastYear)}% {m.vsLastYear > 0 ? "above" : "below"}</b> the same cycle last year ({money(m.lastYear?.cost)}).</> });
+  if (weekendVs != null && Math.abs(weekendVs) >= 5) insights.push({ icon: CalendarIcon, tone: "text-slate-300", text: <>Weekends use <b>{Math.abs(weekendVs)}% {weekendVs > 0 ? "more" : "less"}</b> than weekdays.</> });
+  if (peak) insights.push({ icon: Sun, tone: "text-slate-300", text: <>Busiest hour on {weekday(lastFullDay!)} was <b>{hourLabel(peak.t)}</b> ({peak.kwh.toFixed(2)} kWh).</> });
+  if (topMonth) insights.push({ icon: Flame, tone: "text-amber-300", text: <>Highest month was <b>{monthLabel(topMonth)}</b> with {Math.round(byMonth.get(topMonth)!)} kWh, {m.avgDay ? `about ${Math.round((byMonth.get(topMonth)! / 30) / m.avgDay * 10) / 10}x` : ""} your current daily pace.</> });
+
+  const tile = "min-w-0 rounded-xl bg-black/30 border border-white/5 px-3 py-2";
+  return (
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md p-4 flex" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="flex-1 min-h-0 bg-[#171310] border border-white/15 rounded-3xl shadow-2xl p-4 flex flex-col gap-3 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className={`p-2 rounded-xl border ${GREEN}`}><Zap className="w-4 h-4" /></div>
+            <div><h2 className="text-[15px] font-bold text-white">Power & Energy</h2><p className="text-[11px] text-slate-400">Con Edison • updated {meter.recorded_at ? `${ago(meter.recorded_at)} ago` : "soon"} • usage runs about a day behind</p></div>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="grid grid-cols-12 gap-3 shrink-0">
+          <div className="col-span-8 flex flex-col gap-2.5">
+            <div className="grid grid-cols-4 gap-2 shrink-0">
+              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.soFarIsEst ? "SO FAR (EST.)" : "BILL SO FAR"}</div><div className="text-[20px] font-bold font-mono text-emerald-300">{money(m.soFar)}</div><div className="text-[10px] text-slate-500">{m.dayOf && m.days ? `Day ${Math.min(m.dayOf, m.days)} of ${m.days}` : ""}</div></div>
+              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.projIsEst ? "EST. TOTAL" : "PROJECTED"}</div><div className="text-[20px] font-bold font-mono">{money(m.projected)}</div><div className="text-[10px] text-slate-500">{m.lastYear?.cost ? `Last year ${money(m.lastYear.cost)}` : ""}</div></div>
+              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.pending ? "NEXT BILL (EST.)" : "LAST BILL"}</div><div className="text-[20px] font-bold font-mono">{m.pending ? `≈${money(m.pendingCost)}` : money(m.last?.cost)}</div><div className="text-[10px] text-slate-500 truncate">{m.pending ? `${billDay(m.pending.start)} to ${billDay(m.pending.end)}, not posted` : m.last ? `${billDay(m.last.start)} to ${billDay(m.last.end)}` : ""}</div></div>
+              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">RATE</div><div className="text-[20px] font-bold font-mono">{m.rate ? `$${m.rate.toFixed(3)}` : "--"}</div><div className="text-[10px] text-slate-500">per kWh, all in{rates.length > 1 ? ` • ${Math.round(((rates[rates.length - 1] - rates[0]) / rates[0]) * 100)}% in a year` : ""}</div></div>
+            </div>
+            {m.b && (
+              <div className={`${tile} flex-1 flex flex-col justify-center gap-2`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-mono tracking-widest text-slate-500 shrink-0">BILL CYCLE</span>
+                  <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} /></div>
+                  <span className="text-[11px] text-slate-300 shrink-0">{billDay(m.b.start)} to {billDay(m.b.end)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-[11px] text-slate-400">
+                  <span>Used <b className="font-mono text-slate-200">{kwhText(m.soFarKwh)}</b> so far</span>
+                  <span>Pace <b className="font-mono text-slate-200">{kwhText(m.avgDay)}</b> a day{perDay != null ? <> ≈ <b className="font-mono text-slate-200">{money(perDay)}</b></> : null}</span>
+                  {m.lastYear && <span>Same cycle last year <b className="font-mono text-slate-200">{kwhText(m.lastYear.kwh)}</b></span>}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className={`col-span-4 row-span-2 ${tile} !py-2.5 flex flex-col gap-1.5`}>
+            <div className="text-[10px] font-mono tracking-widest text-slate-500">INSIGHTS</div>
+            {insights.slice(0, 4).map((i, n) => (
+              <div key={n} className="flex items-start gap-2 text-[11.5px] leading-snug text-slate-300"><i.icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${i.tone}`} /><span>{i.text}</span></div>
+            ))}
+            {!insights.length && <p className="text-[11px] text-slate-500">Insights appear as more data comes in.</p>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-12 gap-3 flex-1 min-h-0">
+          <div className={`col-span-8 ${tile} !p-3 flex flex-col gap-1 min-h-0`}>
+            <div className="flex items-center justify-between text-[10px] font-mono tracking-widest text-slate-500"><span>LAST 12 MONTHS • kWh</span><span>{insights[5] ? "" : ""}{topMonth ? `PEAK ${monthLabel(topMonth).toUpperCase()}` : ""}</span></div>
+            <div className="relative flex-1 min-h-[100px]">
+              {energy === null ? <span className="absolute inset-0 flex items-center justify-center text-[12px] text-slate-500">Loading</span> : (
+                <Sized>{(w, h) => (
+                  <BarChart width={w} height={h} data={monthData} margin={{ top: 6, right: 4, left: -14, bottom: 0 }}>
+                    <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
+                    <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                    <Tooltip {...TIP} formatter={(v, _n, p) => [`${v} kWh${(p.payload as { partial: boolean }).partial ? " so far" : ""}`, "Used"]} />
+                    <Bar dataKey="kwh" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                      {monthData.map((x) => <Cell key={x.k} fill={x.top ? "#f59e0b" : "#10b981"} fillOpacity={x.partial ? 0.35 : 0.85} />)}
+                    </Bar>
+                  </BarChart>
+                )}</Sized>
+              )}
+            </div>
+          </div>
+          <div className={`col-span-4 ${tile} !p-3 flex flex-col gap-1 min-h-0 relative`}>
+            <div className="text-[10px] font-mono tracking-widest text-slate-500">BY APPLIANCE • TODAY</div>
+            <div className="relative flex-1 min-h-0 flex flex-col">
+              <Preview className="flex-1 min-h-0 overflow-hidden" label="NOT CONNECTED"><PowerSample compact /></Preview>
+            </div>
+            <p className="text-[10px] text-slate-500">Fills in once the AC bridges and smart plugs are connected.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 shrink-0 h-[170px]">
+          <div className={`${tile} !p-3 flex flex-col gap-1 min-h-0`}>
+            <div className="flex justify-between text-[10px] font-mono tracking-widest text-slate-500"><span>BY HOUR • {lastFullDay ? weekday(lastFullDay).toUpperCase() : ""}</span><span>{dayHours.length ? kwhText(dayHours.reduce((t, h) => t + h.kwh, 0)) : ""}</span></div>
+            <div className="relative flex-1 min-h-0">
+              {hourData.length ? (
+                <Sized>{(w, h) => (
+                  <AreaChart width={w} height={h} data={hourData} margin={{ top: 4, right: 4, left: -26, bottom: 0 }}>
+                    <XAxis dataKey="label" stroke="#64748b" fontSize={9} tickLine={false} interval={5} />
+                    <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
+                    <Tooltip {...TIP} formatter={(v) => [`${Number(v).toFixed(2)} kWh`, "Used"]} />
+                    {base != null && <ReferenceLine y={base} stroke="#22d3ee" strokeDasharray="3 3" strokeOpacity={0.7} />}
+                    <Area type="monotone" dataKey="kwh" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} isAnimationActive={false} />
+                  </AreaChart>
+                )}</Sized>
+              ) : <span className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-500">No hourly data yet</span>}
+            </div>
+            <p className="text-[10px] text-slate-500">Dashed line: always on load</p>
+          </div>
+          <div className={`${tile} !p-3 flex flex-col gap-1 min-h-0`}>
+            <div className="flex justify-between text-[10px] font-mono tracking-widest text-slate-500"><span>BY DAY OF WEEK • 12 WEEKS</span><span>AVG kWh</span></div>
+            <div className="relative flex-1 min-h-0">
+              <Sized>{(w, h) => (
+                <BarChart width={w} height={h} data={dow} margin={{ top: 4, right: 4, left: -26, bottom: 0 }}>
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
+                  <Tooltip {...TIP} formatter={(v) => [`${Number(v).toFixed(1)} kWh`, "Average"]} />
+                  <Bar dataKey="kwh" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                    {dow.map((x) => <Cell key={x.name} fill={x.weekend ? "#6ee7b7" : "#10b981"} fillOpacity={x.weekend ? 0.55 : 0.85} />)}
+                  </Bar>
+                </BarChart>
+              )}</Sized>
+            </div>
+            <p className="text-[10px] text-slate-500">{weekendVs != null ? `Weekends ${weekendVs > 0 ? "+" : ""}${weekendVs}% vs weekdays` : "Weekends in lighter green"}</p>
+          </div>
+          <div className={`${tile} !p-3 flex flex-col gap-1 min-h-0`}>
+            <div className="flex justify-between text-[10px] font-mono tracking-widest text-slate-500"><span>BILLS • {bills.length}</span><span>{bills.length ? `AVG ${money(bills.reduce((t, b) => t + (b.cost ?? 0), 0) / bills.length)}` : ""}</span></div>
+            <div className="relative flex-1 min-h-0">
+              <Sized>{(w, h) => (
+                <BarChart width={w} height={h} data={billData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="label" stroke="#64748b" fontSize={9} tickLine={false} interval={1} />
+                  <YAxis stroke="#64748b" fontSize={9} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <Tooltip {...TIP} formatter={(v, _n, p) => [`$${Number(v).toFixed(2)} • ${(p.payload as { kwh: number }).kwh} kWh`, (p.payload as { range: string }).range]} />
+                  <Bar dataKey="cost" fill="#10b981" fillOpacity={0.85} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              )}</Sized>
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-slate-500">
+              <span>By month the bill starts</span>
+              <DisconnectLink onDisconnect={onDisconnect} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DisconnectLink({ onDisconnect }: { onDisconnect: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => { if (!confirm) return; const t = setTimeout(() => setConfirm(false), 4000); return () => clearTimeout(t); }, [confirm]);
+  return (
+    <button onClick={() => (confirm ? onDisconnect() : setConfirm(true))} className={`px-2 py-0.5 rounded-md ${confirm ? "text-rose-300 bg-rose-500/10 border border-rose-500/30" : "text-slate-500"}`}>
+      {confirm ? "Tap to disconnect" : "Disconnect Con Edison"}
+    </button>
   );
 }
 
@@ -1192,7 +1374,7 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
   const allOn = reachable.length > 0 && onLights.length === reachable.length;
   const glow = onLights[0] ? lightHex(onLights[0]) : null;
   return (
-    <div className="relative flex items-center h-[54px] overflow-hidden">
+    <div className="relative flex-1 min-h-[54px] flex items-center overflow-hidden">
       {glow && <span className="absolute inset-y-0 left-0 w-1/2 opacity-20 pointer-events-none" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
       <button onClick={onOpen} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-3 pl-3 pr-2 text-left active:bg-white/5 transition-colors">
         <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}>
@@ -1204,12 +1386,18 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
             <span className={onLights.length ? "text-amber-200/90" : ""}>{onLights.length} of {lights.length} on</span>
             {offline > 0 && <span className="text-rose-400/80"> • {offline} offline</span>}
           </span>
-        </span>
-        <span className="flex gap-1 shrink-0">
-          {lights.map((l) => (
-            <span key={l.id} className="w-2 h-2 rounded-full border border-white/20"
-              style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
-          ))}
+          {/* Each light as a chip, so the row shows which lights are on at a glance. */}
+          <span className="flex flex-wrap gap-1 mt-1.5">
+            {lights.map((l) => {
+              const lit = !!l.state?.power && l.state?.online !== false;
+              return (
+                <span key={l.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] ${lit ? "bg-white/10 border-white/15 text-slate-200" : "bg-black/20 border-white/5 text-slate-500"} ${l.state?.online === false ? "opacity-40 line-through" : ""}`}>
+                  <span className="w-1.5 h-1.5 rounded-full border border-white/20" style={{ backgroundColor: lit ? lightHex(l) : "transparent" }} />
+                  {shortName(l.name, room.name)}
+                </span>
+              );
+            })}
+          </span>
         </span>
       </button>
       <button onClick={() => onAll(!allOn)} disabled={!reachable.length} aria-label={allOn ? `Turn off ${room.name} lights` : `Turn on ${room.name} lights`}
@@ -1415,6 +1603,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const [scene, setScene] = useState<string | null>(null);
   const [lightId, setLightId] = useState<string | null>(null);
   const [conedOpen, setConedOpen] = useState(false);
+  const [energyOpen, setEnergyOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState(false);
@@ -1765,19 +1954,15 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       </div>
 
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
-        <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
+        <div className={`flex-1 min-h-0 ${PANEL} p-3.5 flex flex-col gap-2.5`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lighting Console" sub={`${lightsOn} on • tap a room for its lights`}
             right={<span className="text-[10px] font-mono text-slate-500">Govee Cloud</span>} />
-          <div className="rounded-2xl border border-white/5 bg-black/25 divide-y divide-white/5 overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-white/5 bg-black/25 divide-y divide-white/5 overflow-hidden">
             {ROOMS.map((r) => <RoomRow key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
           </div>
           {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
         </div>
-        <div className={`flex-1 min-h-[250px] ${PANEL} p-3.5 flex flex-col gap-2`}>
-          <PanelHead icon={Zap} tone={GREEN} title="Power & Energy" sub="By appliance today, then the whole home bill" />
-          <Preview className="flex-1 min-h-[92px] overflow-hidden" corner="tr" label={meter ? "BY APPLIANCE • NOT CONNECTED" : "NOT CONNECTED"}><PowerSample compact /></Preview>
-          <ConEdSummary meter={meter} onConnect={() => setConedOpen(true)} onDisconnect={disconnectConed} />
-        </div>
+        <EnergyTile meter={meter} onOpen={() => setEnergyOpen(true)} onConnect={() => setConedOpen(true)} />
       </div>
     </main>
   );
@@ -2098,6 +2283,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         {section === "history" && <HistoryView meter={meter} onConnectConed={() => setConedOpen(true)} />}
       </Fragment>
 
+      {energyOpen && meter && <EnergyDetail meter={meter} onClose={() => setEnergyOpen(false)} onDisconnect={() => { setEnergyOpen(false); disconnectConed(); }} />}
       {conedOpen && <ConEdConnect onClose={() => setConedOpen(false)} onConnected={() => { setConedOpen(false); setToast("Con Edison connected."); load(); }} />}
       {openLight && <LightSheet key={openLight.id} light={openLight} send={send} onClose={() => setLightId(null)} />}
       {lightId === CIRCUIT && circuitLead && (

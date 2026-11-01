@@ -56,6 +56,7 @@ Done
 - [x] Con Edison connected: bill so far, projected and unposted bill estimates in Power & Energy (2026-11-01)
 - [x] Overview layout: Climate and Water Heater (with 24 h tank chart) left, Security (camera and lock) and TV middle; Camera tab became Security (2026-11-01)
 - [x] History tab: a year of Con Edison daily usage and bills, room lit hours, hot water heating, TV, camera and activity (2026-11-01)
+- [x] Power & Energy: compact overview tile that opens a full report (cycle, 12 months, by hour, day of week, bills, always on load, insights) (2026-11-01)
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)

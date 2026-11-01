@@ -55,7 +55,14 @@ function mockMeter(): Device {
       bill: { start: day(0), end: day(-31), as_of: day(-1), kwh_so_far: 0, cost_so_far: null, kwh_forecast: null, cost_forecast: null, typical_kwh: 422, typical_cost: null },
       last_bill: { start: day(60), end: day(30), kwh: 222, cost: 97.08 },
       bills: [{ start: day(60), end: day(30), kwh: 222, cost: 97.08 }, { start: day(365), end: day(332), kwh: 464, cost: 182.06 }],
-      daily, hourly: [], live: null,
+      daily, live: null,
+      // Two full days of hourly reads ending last midnight: a standby floor, a morning bump and an evening peak.
+      hourly: Array.from({ length: 48 }, (_, i) => {
+        const end = new Date(); end.setHours(0, 0, 0, 0);
+        const t = new Date(end.getTime() - (48 - i) * 3600_000), h = t.getHours();
+        const kwh = 0.14 + (h >= 7 && h < 9 ? 0.25 : 0) + (h >= 18 && h < 23 ? 0.45 + 0.15 * Math.sin(h) : 0) + (h >= 12 && h < 16 ? 0.08 : 0);
+        return { t: t.toISOString(), kwh: Math.round(kwh * 1000) / 1000 };
+      }),
     },
   } as Device;
 }
