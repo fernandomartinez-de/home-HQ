@@ -19,6 +19,8 @@ import android.view.accessibility.AccessibilityEvent;
  * comes back to the dashboard. Fire OS hides this service from its menus; see docs/tv-setup.md
  * for turning it on and off over ADB. Apps cannot catch the Home key on Fire OS, so the
  * stock home appears briefly before the dashboard replaces it.
+ * Because Fire OS keeps this service running, it also hosts the remote control from the home
+ * dashboard (RemoteControl).
  */
 public class HomeService extends AccessibilityService {
     static final String AMAZON_HOME = "com.amazon.tv.launcher";
@@ -27,8 +29,16 @@ public class HomeService extends AccessibilityService {
 
     private final BroadcastReceiver screenOn = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context c, Intent i) { openDashboard(); }
+        public void onReceive(Context c, Intent i) {
+            openDashboard();
+            if (remote != null) remote.onScreen(true);
+        }
     };
+    private final BroadcastReceiver screenOff = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context c, Intent i) { if (remote != null) remote.onScreen(false); }
+    };
+    private RemoteControl remote;
 
     /** Called when the user picks the Fire TV tile: let Amazon's home stay up until they leave it. */
     static void allowAmazonHome() { amazonHomeAllowed = true; }
@@ -37,11 +47,16 @@ public class HomeService extends AccessibilityService {
     protected void onServiceConnected() {
         super.onServiceConnected();
         registerReceiver(screenOn, new IntentFilter(Intent.ACTION_SCREEN_ON));
+        registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+        remote = new RemoteControl(this, this::openDashboard);
+        remote.start();
     }
 
     @Override
     public void onDestroy() {
         try { unregisterReceiver(screenOn); } catch (Exception ignored) { }
+        try { unregisterReceiver(screenOff); } catch (Exception ignored) { }
+        if (remote != null) remote.stop();
         super.onDestroy();
     }
 
@@ -63,6 +78,7 @@ public class HomeService extends AccessibilityService {
         CharSequence pkg = ev.getPackageName();
         if (pkg == null) return;
         String p = pkg.toString();
+        if (remote != null) remote.onApp(p);
         CharSequence cls = ev.getClassName();
         boolean isHomeScreen = cls != null && cls.toString().contains("HomeActivity");
         if (AMAZON_HOME.equals(p) && isHomeScreen) {

@@ -14,6 +14,8 @@ android {
         versionName "1." + (System.getenv("VERSION_CODE") ?: "1")
         // The dashboard page. CI sets PAGE_URL from the repo (https://<owner>.github.io/<repo>/).
         buildConfigField "String", "PAGE_URL", "\"" + (System.getenv("PAGE_URL") ?: "http://localhost:8000/") + "\""
+        // The tv function the remote control polls (tv-dashboard/supabase/functions/tv). CI can override it.
+        buildConfigField "String", "TV_REMOTE_URL", "\"" + (System.getenv("TV_REMOTE_URL") ?: "https://uuvsvtpfcexhqojlrsxy.supabase.co/functions/v1/tv") + "\""
     }
 
     buildFeatures {

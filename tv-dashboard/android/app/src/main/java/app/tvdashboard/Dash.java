@@ -23,6 +23,11 @@ final class Dash {
         }
     }
 
+    /** The saved access key, or "" before it's set. Also used by the remote control. */
+    static String key(Context c) {
+        return prefs(c).getString(KEY, "");
+    }
+
     static String url(Context c) {
         String key = prefs(c).getString(KEY, "");
         return key.isEmpty() ? PAGE : PAGE + "#k=" + key;

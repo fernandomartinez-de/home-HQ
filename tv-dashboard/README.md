@@ -60,12 +60,20 @@ app asks for on first launch.
 ```
 web/                      the dashboard page (index.html), background player (bg.js), app icons (icons/)
 videos/                   background clips; compressed for the TV on publish
-supabase/functions/       tv-dashboard (data for the page), work-calendar-ingest (work calendar), tv-metrics-ingest (Gmail count)
+supabase/functions/       tv-dashboard (data for the page), tv (remote control from the home dashboard), work-calendar-ingest (work calendar), tv-metrics-ingest (Gmail count)
 android/                  the TV app: full screen WebView, app row bridge, Home redirect, screensaver
 docs/                     architecture, TV setup, data and config, Power Automate flow, debloat list
 ```
 
 The publish workflows live at the repo root in `.github/workflows/` (pages.yml publishes the site, app.yml builds and releases the APK).
+
+## Remote control from the home dashboard
+
+The Home service (always running on the TV) holds a long poll open on the `tv` function. The home
+dashboard queues commands there: open one of the row's apps, Home, Back, volume up/down/mute, and
+sleep. The TV runs them within about a second and reports which app is on screen and the volume.
+It can't wake the TV; once it's asleep, commands expire after a minute. It uses the same TV key as
+the page, so there's nothing extra to set up beyond installing the updated app.
 
 ## Common changes
 

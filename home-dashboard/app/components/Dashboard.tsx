@@ -4,10 +4,10 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, Footprints, type LucideIcon,
+  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
-import type { Activity as ActivityItem, Command, Device, Heater, HomeData, Light, Schedule } from "@/lib/types";
+import type { Activity as ActivityItem, Command, Device, Heater, HomeData, Light, Schedule, TV } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
 const POLL_MS = 30_000;
@@ -75,6 +75,11 @@ function describe(a: ActivityItem) {
     : c.action === "set_setpoint" ? `Set to ${c.value}°`
     : c.action === "set_mode" ? (c.mode === "off" ? "Off" : "On")
     : c.action === "set_state" ? (c.setpoint ? `Schedule ${c.setpoint}°` : "Schedule")
+    : c.action === "launch" ? `Open ${TV_APPS.find((x) => x.pkg === c.app)?.name ?? "app"}`
+    : c.action === "home" ? "Home"
+    : c.action === "back" ? "Back"
+    : c.action === "sleep" ? "Sleep"
+    : c.action === "volume" ? (c.dir === "mute" ? "Mute" : `Volume ${c.dir}`)
     : c.action ?? "Command";
   return `${a.device_name} • ${what}${a.status === "failed" ? " (failed)" : ""}`;
 }
@@ -295,9 +300,48 @@ function AcZoneSample() {
 }
 
 const TV_APPS = [
-  { name: "Netflix", color: "#e50914" }, { name: "YouTube", color: "#ff3b30" }, { name: "Prime Video", color: "#38bdf8" },
-  { name: "HBO Max", color: "#a78bfa" }, { name: "Disney+", color: "#60a5fa" }, { name: "Spotify", color: "#22c55e" },
+  { pkg: "com.netflix.ninja", name: "Netflix", color: "#e50914" }, { pkg: "com.amazon.firetv.youtube", name: "YouTube", color: "#ff3b30" },
+  { pkg: "com.amazon.firebat", name: "Prime Video", color: "#38bdf8" }, { pkg: "com.hbo.hbonow", name: "HBO Max", color: "#a78bfa" },
+  { pkg: "com.disney.disneyplus", name: "Disney+", color: "#60a5fa" }, { pkg: "com.spotify.tv.android", name: "Spotify", color: "#22c55e" },
 ];
+
+// The TV counts as reachable while it has reported recently with the screen on.
+const tvStatus = (tv: TV | undefined) => {
+  const s = tv?.state;
+  if (!tv || !s) return { seen: false, on: false };
+  const fresh = !!tv.recorded_at && Date.now() - new Date(tv.recorded_at).getTime() < 6 * 60_000;
+  return { seen: true, on: fresh && s.screen !== "off" };
+};
+
+function TvPanel({ tv, send }: { tv: TV; send: Send }) {
+  const s = tv.state;
+  const { on } = tvStatus(tv);
+  const apps = tv.capabilities.apps?.length ? tv.capabilities.apps : TV_APPS;
+  const key = "h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 active:scale-95 disabled:opacity-30 transition-transform";
+  const vol = s?.volume ?? 0, max = s?.max_volume ?? 30;
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-1.5">
+        {apps.map((a) => {
+          const active = on && s?.app === a.pkg;
+          return (
+            <button key={a.pkg} disabled={!on} aria-pressed={active} onClick={() => send(tv, { action: "launch", app: a.pkg }, { app: a.pkg, app_name: a.name })}
+              className={`h-9 rounded-xl border text-[11px] font-bold transition-all active:scale-95 disabled:opacity-40 ${active ? "bg-white/10 border-white/30 shadow-lg shadow-black/40" : "bg-black/30 border-white/5"}`}
+              style={{ color: TV_APPS.find((x) => x.pkg === a.pkg)?.color ?? "#e2e8f0" }}>{a.name}</button>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        <button aria-label="Put the TV to sleep" disabled={!on} onClick={() => send(tv, { action: "sleep" }, { screen: "off" })}
+          className={`${key} !bg-amber-500/20 !border-amber-500/40 !text-amber-300`}><Power className="w-4 h-4" /></button>
+        <button aria-label="Home" disabled={!on} onClick={() => send(tv, { action: "home" }, { app: "app.tvdashboard", app_name: "Dashboard" })} className={key}><HomeIcon className="w-4 h-4" /></button>
+        <button aria-label="Back" disabled={!on} onClick={() => send(tv, { action: "back" }, {})} className={key}><Undo2 className="w-4 h-4" /></button>
+        <button aria-label="Volume down" disabled={!on} onClick={() => send(tv, { action: "volume", dir: "down" }, { volume: Math.max(0, vol - 1), muted: false })} className={key}><Volume1 className="w-4 h-4" /></button>
+        <button aria-label="Volume up" disabled={!on} onClick={() => send(tv, { action: "volume", dir: "up" }, { volume: Math.min(max, vol + 1), muted: false })} className={key}><Volume2 className="w-4 h-4" /></button>
+      </div>
+    </>
+  );
+}
 
 function TvSample() {
   const key = "h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200";
@@ -688,7 +732,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
 
   const heater = data.devices.find((d): d is Heater => d.kind === "water_heater");
   const lights = useMemo(() => data.devices.filter((d): d is Light => d.kind === "light"), [data.devices]);
-  const acs = data.devices.filter((d) => d.kind === "ac");
+  const tv = data.devices.find((d): d is TV => d.kind === "tv");
+  const { seen: tvSeen, on: tvOn } = tvStatus(tv);
   const lightsIn = useCallback((roomId: string) => lights.filter((l) => roomIdOf(l) === roomId).sort((a, b) => a.name.localeCompare(b.name)), [lights]);
   const roomName = (id: string) => ROOMS.find((r) => r.id === id)?.name ?? "Other";
   const openLight = lights.find((l) => l.id === lightId) ?? null;
@@ -838,8 +883,14 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <Preview className="flex-1 min-h-0" corner="tr"><PowerSample /></Preview>
         </div>
         <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
-          <PanelHead icon={Tv} tone={CYAN} title="Living Room TV" sub="Fire TV • Netflix" />
-          <Preview corner="br"><TvSample /></Preview>
+          <PanelHead icon={Tv} tone={CYAN} title="Living Room TV"
+            sub={!tvSeen ? "Fire TV" : tvOn ? `Fire TV • ${tv?.state?.app_name ?? "On"}` : "Fire TV • asleep or off"}
+            right={tvOn && tv?.state?.volume != null ? (
+              <span className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-black/40 border border-white/10 text-[11px] font-mono text-cyan-300">
+                {tv.state.muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}{tv.state.muted ? "MUTED" : `VOL ${tv.state.volume}`}
+              </span>
+            ) : undefined} />
+          {tv && tvSeen ? <TvPanel tv={tv} send={send} /> : <Preview corner="br"><TvSample /></Preview>}
         </div>
       </div>
 

@@ -37,7 +37,19 @@ type Base = { id: string; name: string; provider: string; enabled: boolean; reco
 export type Light = Base & { kind: "light"; state: LightState | null; capabilities: LightCaps };
 export type Heater = Base & { kind: "water_heater"; state: HeaterState | null; capabilities: HeaterCaps };
 export type AC = Base & { kind: "ac"; state: Record<string, unknown> | null; capabilities: Record<string, unknown> };
-export type Device = Light | Heater | AC;
+export type TvState = {
+  online: boolean;
+  screen: "on" | "off";
+  app: string | null;
+  app_name: string | null;
+  volume: number | null;
+  max_volume: number | null;
+  muted: boolean | null;
+  version: string | null;
+};
+export type TvCaps = { apps: { pkg: string; name: string }[]; actions: string[] };
+export type TV = Base & { kind: "tv"; state: TvState | null; capabilities: TvCaps };
+export type Device = Light | Heater | AC | TV;
 
 // One command from the home_commands log, newest first.
 export type Activity = {
@@ -63,7 +75,12 @@ export type Command =
   | { action: "color"; hex: string }
   | { action: "color_temp"; kelvin: number }
   | { action: "set_setpoint"; value: number }
-  | { action: "set_mode"; mode: string };
+  | { action: "set_mode"; mode: string }
+  | { action: "launch"; app: string }
+  | { action: "home" }
+  | { action: "back" }
+  | { action: "sleep" }
+  | { action: "volume"; dir: "up" | "down" | "mute" };
 
 export type ScheduleBlock = {
   id?: number;
