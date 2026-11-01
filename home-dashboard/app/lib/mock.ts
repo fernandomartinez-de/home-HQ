@@ -28,6 +28,7 @@ let devices: Device[] = [
         { t: new Date(Date.now() - 410 * 60_000).toISOString(), kind: "on_demand", person: null },
       ] },
   } as Device]),
+  ...(process.env.HOME_MOCK_NO_CONED ? [] : [mockMeter()]),
   light("govee_floor", "Floor Lamp", { online: true, power: true, brightness: 70, color: "#ffb15e", color_temp_k: 2200 }, "Living room"),
   light("govee_strip", "Kitchen Strip Light", { online: true, power: false, brightness: 80, color: "#ff6804", color_temp_k: null }, "Kitchen"),
   light("govee_kl", "Kitchen Left", { online: true, power: true, brightness: 40, color: "#ffb969", color_temp_k: 3000 }, "Kitchen"),
@@ -36,6 +37,34 @@ let devices: Device[] = [
   light("govee_closet", "Closet", { online: false, power: true, brightness: 100, color: "#ff001c", color_temp_k: null }, "Bedroom"),
   light("govee_tv", "TV Backlight", { online: true, power: true, brightness: 55, color: "#5b6cff", color_temp_k: null }, "Living room"),
 ];
+
+// A sample Con Edison meter: a bill cycle 12 days in, 40 days of daily kWh and the last day of
+// 15 minute smart meter reads.
+function mockMeter(): Device {
+  const day = (n: number) => new Date(Date.now() - n * 86400_000).toISOString().slice(0, 10);
+  const daily = Array.from({ length: 35 }, (_, i) => {
+    const n = 35 - i, wd = new Date(Date.now() - n * 86400_000).getDay();
+    const kwh = Math.round((5.2 + 1.8 * Math.sin(i / 3) + (wd === 0 || wd === 6 ? 2.1 : 0)) * 100) / 100;
+    return { d: day(n), kwh, cost: Math.round(kwh * 0.34 * 100) / 100 };
+  });
+  const reads = Array.from({ length: 96 }, (_, i) => {
+    const h = (new Date().getHours() - 24 + i / 4 + 24) % 24;
+    const kwh = 0.06 + (h >= 7 && h < 9 ? 0.12 : 0) + (h >= 18 && h < 23 ? 0.16 : 0) + 0.02 * Math.sin(i);
+    return { t: new Date(Date.now() - (96 - i) * 15 * 60_000).toISOString(), kwh: Math.round(kwh * 1000) / 1000 };
+  });
+  return {
+    id: "coned_electric", kind: "meter", provider: "coned", name: "Con Edison", enabled: true, recorded_at: new Date(Date.now() - 40 * 60_000).toISOString(),
+    capabilities: { live: true, cost_by_day: true },
+    state: {
+      connected: true,
+      bill: { start: day(12), end: day(-18), as_of: day(1), kwh_so_far: 71.4, cost_so_far: 26.18, kwh_forecast: 186, cost_forecast: 68.4, typical_kwh: 201, typical_cost: 71.9 },
+      last_bill: { start: day(43), end: day(13), kwh: 192, cost: 70.12 },
+      bills: [{ start: day(43), end: day(13), kwh: 192, cost: 70.12 }, { start: day(74), end: day(44), kwh: 268, cost: 96.4 }],
+      daily, hourly: [],
+      live: { t: reads[95].t, kw: 0.62, today_kwh: 4.8, reads },
+    },
+  } as Device;
+}
 
 function light(id: string, name: string, state: any, room: string): Device {
   return {

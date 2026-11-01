@@ -86,6 +86,23 @@ export async function ringLogout() {
   return call("ring", { method: "POST", body: JSON.stringify({ action: "logout" }) });
 }
 
+// ---------- Con Edison ----------
+// The details are saved in Supabase Vault by the coned function, since Con Edison has no refresh token
+// and the scheduled poll has to sign in again.
+
+export async function conedConnect(email: string, password: string, totp?: string) {
+  if (useMock()) {
+    if (password === "wrong") throw new Error("Con Edison didn't accept that email and password.");
+    return { ok: true };
+  }
+  return call("coned", { method: "POST", body: JSON.stringify({ action: "connect", email, password, totp }) });
+}
+
+export async function conedDisconnect() {
+  if (useMock()) return { ok: true };
+  return call("coned", { method: "POST", body: JSON.stringify({ action: "disconnect" }) });
+}
+
 /** The latest snapshot: image bytes and when it was taken, or an error message. */
 export async function ringSnapshot(deviceId: string, force: boolean): Promise<{ image: ArrayBuffer; takenMs: number | null } | { error: string }> {
   if (useMock()) return mockSnapshot();

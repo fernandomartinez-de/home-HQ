@@ -62,7 +62,24 @@ export type CameraState = {
 };
 export type CameraCaps = { modes: string[]; battery: boolean };
 export type Camera = Base & { kind: "camera"; state: CameraState | null; capabilities: CameraCaps };
-export type Device = Light | Heater | AC | TV | Camera;
+export type MeterBill = { start: string; end: string; kwh: number | null; cost: number | null };
+export type MeterState = {
+  connected: boolean;
+  bill: {
+    start: string; end: string; as_of: string | null;
+    kwh_so_far: number | null; cost_so_far: number | null;
+    kwh_forecast: number | null; cost_forecast: number | null;
+    typical_kwh: number | null; typical_cost: number | null;
+  } | null;
+  last_bill: MeterBill | null;
+  bills: MeterBill[];
+  daily: { d: string; kwh: number | null; cost: number | null }[];
+  hourly: { t: string; kwh: number | null }[];
+  live: { t: string; kw: number | null; today_kwh: number | null; reads: { t: string; kwh: number | null }[] } | null;
+  errors?: string[];
+};
+export type Meter = Base & { kind: "meter"; state: MeterState | null; capabilities: { live?: boolean; cost_by_day?: boolean } };
+export type Device = Light | Heater | AC | TV | Camera | Meter;
 
 // One command from the home_commands log, newest first.
 export type Activity = {

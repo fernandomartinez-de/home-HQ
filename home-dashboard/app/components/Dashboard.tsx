@@ -7,7 +7,7 @@ import {
   AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
-import type { Activity as ActivityItem, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Schedule, TV } from "@/lib/types";
+import type { Activity as ActivityItem, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
 const POLL_MS = 30_000;
@@ -161,12 +161,12 @@ const CORNER: Record<Corner, string> = { tr: "top-2 right-2", br: "bottom-2 righ
 
 // The badge anchors to the panel (the nearest positioned box), sitting on its top edge like a tab,
 // so it never covers the preview's controls.
-function Preview({ children, className = "" }: { children: ReactNode; className?: string; corner?: Corner }) {
+function Preview({ children, className = "", label = "NOT CONNECTED" }: { children: ReactNode; className?: string; corner?: Corner; label?: string }) {
   return (
     <div className={`flex flex-col ${className}`}>
       <div aria-hidden="true" className="flex-1 min-h-0 flex flex-col gap-2.5 opacity-55 saturate-50 pointer-events-none select-none">{children}</div>
       <span className="absolute -top-2.5 right-6 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#110e0c] border border-white/15 text-[9px] font-mono tracking-wider text-slate-400">
-        <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />NOT CONNECTED
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />{label}
       </span>
     </div>
   );
@@ -225,7 +225,32 @@ const POWER_SAMPLE = (() => {
   };
 })();
 
-function PowerSample() {
+function PowerSample({ compact }: { compact?: boolean }) {
+  if (compact) {
+    // One line legend so the Con Edison numbers fit underneath.
+    return (
+      <>
+        <div className="relative flex-1 min-h-[64px]">
+          <div className="absolute inset-0">
+            <Sized>{(w, h) => (
+              <AreaChart width={w} height={h} data={POWER_SAMPLE.hourly} margin={{ top: 4, right: 4, left: -26, bottom: 0 }}>
+                <XAxis dataKey="time" stroke="#64748b" fontSize={9} tickLine={false} interval={5} />
+                <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
+                {POWER_SAMPLE.sources.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.2} strokeWidth={1.5} isAnimationActive={false} />)}
+              </AreaChart>
+            )}</Sized>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2 text-[10px]">
+          {POWER_SAMPLE.sources.map((s) => (
+            <span key={s.key} className="flex items-center gap-1 text-slate-400">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />{s.label}<span className="font-mono text-slate-200 font-bold">{s.share}%</span>
+            </span>
+          ))}
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="relative flex-1 min-h-[90px]">
@@ -249,6 +274,133 @@ function PowerSample() {
         ))}
       </div>
     </>
+  );
+}
+
+// ---------- Con Edison ----------
+
+const money = (v: number | null | undefined) => (v == null ? "--" : `$${v.toFixed(2)}`);
+const kwhText = (v: number | null | undefined) => (v == null ? "--" : `${v < 10 ? v.toFixed(1) : Math.round(v)} kWh`);
+// Bill dates are calendar days ("2026-10-19"); read and show them as such, whatever the iPad's zone.
+const billDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" });
+const nyToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+
+function Stat({ label, value, sub, tone = "text-slate-100" }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-black/30 border border-white/5 px-2.5 py-2">
+      <div className="text-[9px] font-mono tracking-widest text-slate-500">{label}</div>
+      <div className={`text-[17px] leading-tight font-bold font-mono tabular-nums ${tone}`}>{value}</div>
+      {sub && <div className="text-[10px] text-slate-500 truncate">{sub}</div>}
+    </div>
+  );
+}
+
+/** Bill so far, projected bill and today's usage from Con Edison's smart meter, under the appliance chart. */
+function ConEdSummary({ meter, onConnect, onDisconnect }: { meter: Meter | undefined; onConnect: () => void; onDisconnect: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => { if (!confirm) return; const t = setTimeout(() => setConfirm(false), 4000); return () => clearTimeout(t); }, [confirm]);
+
+  if (!meter) {
+    return (
+      <div className="shrink-0 flex items-center justify-between gap-2 rounded-xl bg-black/30 border border-white/5 px-3 py-2.5">
+        <span className="flex items-center gap-2 min-w-0">
+          <Plug className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="min-w-0"><span className="block text-[12px] font-semibold text-slate-200">Con Edison bill and usage</span>
+            <span className="block text-[10px] text-slate-500 truncate">Bill so far, projected bill, daily kWh</span></span>
+        </span>
+        <button onClick={onConnect} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 active:scale-95 shrink-0">Connect</button>
+      </div>
+    );
+  }
+
+  const s = meter.state;
+  const b = s?.bill;
+  const today = nyToday();
+  const daily = s?.daily ?? [];
+  const todayKwh = s?.live?.today_kwh ?? daily.find((d) => d.d === today)?.kwh ?? null;
+  const lastDay = [...daily].reverse().find((d) => d.d !== today && d.kwh != null);
+  const dayOf = b ? Math.max(1, Math.round((Date.parse(today) - Date.parse(b.start)) / 86400_000) + 1) : null;
+  const days = b ? Math.round((Date.parse(b.end) - Date.parse(b.start)) / 86400_000) + 1 : null;
+  const vsTypical = b?.cost_forecast != null && b.typical_cost ? Math.round(((b.cost_forecast - b.typical_cost) / b.typical_cost) * 100) : null;
+  const stale = meter.recorded_at ? Date.now() - Date.parse(meter.recorded_at) > 6 * 3600_000 : false;
+
+  return (
+    <div className="shrink-0 flex flex-col gap-2 pt-2 border-t border-white/5">
+      <div className="flex items-center justify-between gap-2 text-[10px]">
+        <span className="font-mono tracking-widest text-slate-400">CON EDISON <span className={stale ? "text-amber-400" : "text-slate-600"}>• {meter.recorded_at ? `${ago(meter.recorded_at)} ago` : "waiting for data"}</span></span>
+        {s?.live?.kw != null && (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-emerald-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{s.live.kw.toFixed(2)} kW
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Stat label="BILL SO FAR" value={money(b?.cost_so_far)} sub={dayOf && days ? `Day ${Math.min(dayOf, days)} of ${days}` : kwhText(b?.kwh_so_far)} tone="text-emerald-300" />
+        <Stat label="PROJECTED" value={money(b?.cost_forecast)}
+          sub={vsTypical != null ? `${vsTypical > 0 ? "+" : ""}${vsTypical}% vs last year` : b?.kwh_forecast != null ? kwhText(b.kwh_forecast) : undefined} />
+        <Stat label={todayKwh != null ? "TODAY" : "YESTERDAY"} value={kwhText(todayKwh ?? lastDay?.kwh)}
+          sub={todayKwh != null && lastDay?.kwh != null ? `Yesterday ${lastDay.kwh < 10 ? lastDay.kwh.toFixed(1) : Math.round(lastDay.kwh)}` : lastDay?.cost != null ? money(lastDay.cost) : undefined} />
+      </div>
+      <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500">
+        <span className="truncate">{s?.last_bill ? <>Last bill <span className="text-slate-300 font-mono">{money(s.last_bill.cost)}</span> • {billDay(s.last_bill.start)} to {billDay(s.last_bill.end)}</> : s?.errors?.length ? "Some Con Edison data is unavailable" : "No past bills yet"}</span>
+        <button onClick={() => (confirm ? onDisconnect() : setConfirm(true))} className={`shrink-0 px-2 py-1 rounded-md ${confirm ? "text-rose-300 bg-rose-500/10 border border-rose-500/30" : "text-slate-500"}`}>
+          {confirm ? "Tap to disconnect" : "Disconnect"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Con Edison sign in. The details are checked with Con Edison, then kept encrypted in Supabase. */
+function ConEdConnect({ onClose, onConnected }: { onClose: () => void; onConnected: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fetch("/api/coned", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, totp: totp || undefined }) });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+      setPassword("");
+      onConnected();
+    } catch (e2) {
+      setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const input = "w-full h-12 px-4 rounded-xl bg-black/40 border border-white/10 text-[15px] text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 select-text";
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && !busy && onClose()}>
+      <form onSubmit={submit} className="bg-[#1c1613] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className={`p-2 rounded-xl border ${GREEN}`}><Zap className="w-4 h-4" /></div>
+            <div><h3 className="text-sm font-bold text-white">Connect Con Edison</h3><p className="text-[11px] text-slate-400">Bill, projected bill and daily usage</p></div>
+          </div>
+          <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400"><X className="w-4 h-4" /></button>
+        </div>
+        <label className="sr-only" htmlFor="coned-email">Con Edison email</label>
+        <input id="coned-email" className={input} type="email" autoComplete="username" placeholder="Con Edison email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <label className="sr-only" htmlFor="coned-password">Con Edison password</label>
+        <input id="coned-password" className={input} type="password" autoComplete="current-password" placeholder="Con Edison password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <label className="sr-only" htmlFor="coned-totp">Authenticator setup key</label>
+        <input id="coned-totp" className={`${input} font-mono text-[13px]`} autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="Authenticator setup key" value={totp} onChange={(e) => setTotp(e.target.value)} />
+        <p className="text-[11px] text-slate-500 leading-snug">The setup key is the code shown under the QR code when you choose an authenticator app for Con Edison&apos;s 2FA. It lets the dashboard sign in on its own every 2 hours. Everything is saved encrypted in your Supabase, not on this iPad.</p>
+        {err && <p role="alert" className="text-[12px] text-rose-300 text-center">{err}</p>}
+        <button type="submit" disabled={busy} className="h-12 rounded-xl bg-emerald-500 text-slate-950 text-sm font-bold disabled:opacity-60 active:scale-[0.99]">
+          {busy ? "Signing in to Con Edison" : "Connect"}
+        </button>
+        {busy && <p className="text-[11px] text-slate-500 text-center -mt-1">The first sign in can take up to a minute.</p>}
+      </form>
+    </div>
   );
 }
 
@@ -714,7 +866,7 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
   );
 }
 
-function RoomButton({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]; lights: Light[]; onOpen: () => void; onAll: (on: boolean) => void }) {
+function RoomButton({ room, lights, onOpen, onAll, compact }: { room: (typeof ROOMS)[number]; lights: Light[]; onOpen: () => void; onAll: (on: boolean) => void; compact?: boolean }) {
   const Icon = room.icon;
   const reachable = lights.filter((l) => l.state?.online !== false);
   const onLights = reachable.filter((l) => l.state?.power);
@@ -722,11 +874,11 @@ function RoomButton({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[numb
   const allOn = reachable.length > 0 && onLights.length === reachable.length;
   const glow = onLights[0] ? lightHex(onLights[0]) : null;
   return (
-    <div className={`relative flex-1 min-h-[96px] rounded-2xl border flex items-center overflow-hidden transition-all ${onLights.length
+    <div className={`relative flex-1 ${compact ? "min-h-[68px]" : "min-h-[96px]"} rounded-2xl border flex items-center overflow-hidden transition-all ${onLights.length
       ? "bg-gradient-to-b from-[#2a211a] to-[#1c1511] border-amber-500/40 shadow-lg shadow-amber-950/40" : "bg-[#1e1916]/60 border-white/5"}`}>
       {glow && <span className="absolute inset-y-0 left-0 w-2/3 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
-      <button onClick={onOpen} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-4 p-4 text-left active:scale-[0.99] transition-transform">
-        <span className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center border ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}>
+      <button onClick={onOpen} className={`relative z-10 flex-1 min-w-0 h-full flex items-center ${compact ? "gap-3 px-3.5 py-2.5" : "gap-4 p-4"} text-left active:scale-[0.99] transition-transform`}>
+        <span className={`${compact ? "w-10 h-10" : "w-12 h-12"} shrink-0 rounded-2xl flex items-center justify-center border ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}>
           <Icon className="w-5 h-5" />
         </span>
         <span className="flex-1 min-w-0">
@@ -735,7 +887,7 @@ function RoomButton({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[numb
             <span className={onLights.length ? "text-amber-200/90" : ""}>{onLights.length} of {lights.length} on</span>
             {offline > 0 && <span className="text-rose-400/80"> • {offline} offline</span>}
           </span>
-          <span className="flex gap-1.5 mt-2">
+          <span className={`flex gap-1.5 ${compact ? "mt-1.5" : "mt-2"}`}>
             {lights.map((l) => (
               <span key={l.id} className="w-2.5 h-2.5 rounded-full border border-white/20"
                 style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
@@ -945,6 +1097,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const [unit, setUnit] = useState<Unit>("F");
   const [scene, setScene] = useState<string | null>(null);
   const [lightId, setLightId] = useState<string | null>(null);
+  const [conedOpen, setConedOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState(false);
@@ -1044,6 +1197,17 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const lights = useMemo(() => data.devices.filter((d): d is Light => d.kind === "light"), [data.devices]);
   const tv = data.devices.find((d): d is TV => d.kind === "tv");
   const cams = data.devices.filter((d): d is Camera => d.kind === "camera");
+  const meter = data.devices.find((d): d is Meter => d.kind === "meter");
+  const disconnectConed = async () => {
+    try {
+      const r = await fetch("/api/coned", { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+      setData((d) => ({ ...d, devices: d.devices.filter((x) => x.kind !== "meter") }));
+      setToast("Con Edison disconnected.");
+    } catch (e) {
+      setToast(`Couldn't disconnect Con Edison: ${(e as Error).message}`);
+    }
+  };
   const [camId, setCamId] = useState<string | null>(null);
   const cam = cams.find((c) => c.id === camId) ?? cams[0];
   const { seen: tvSeen, on: tvOn } = tvStatus(tv);
@@ -1187,8 +1351,9 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     if (heater && hs && !hs.connected) out.push({ id: "heater-off", level: "warn", icon: WifiOff, text: "Water heater offline" });
     if (hs?.alert_count) out.push({ id: "heater-alert", level: "warn", icon: AlertTriangle, text: `Water heater has ${hs.alert_count} alert${hs.alert_count > 1 ? "s" : ""} in the Rheem app` });
     if (hs && hs.power !== false && typeof hs.tank_pct === "number" && hs.tank_pct < 25) out.push({ id: "tank-low", level: "info", icon: Droplets, text: `Hot water low, ${hs.tank_pct}%` });
+    if (meter?.recorded_at && Date.now() - Date.parse(meter.recorded_at) > 6 * 3600_000) out.push({ id: "coned-stale", level: "info", icon: Zap, text: "Con Edison data hasn't updated", since: ago(meter.recorded_at) });
     return out;
-  }, [error, lights, heater, data.history]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [error, lights, heater, meter, data.history]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lightsOn = lights.filter((l) => l.state?.power && l.state?.online !== false).length;
   const onIn = (room: string) => lightsIn(room).filter((l) => l.state?.power && l.state?.online !== false).length;
@@ -1269,11 +1434,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             </>
           ) : <NotConnected icon={Flame} title="No water heater" text="It shows up here once the Rheem function reports it." />}
         </div>
-        <div className={`flex-1 min-h-[170px] ${PANEL} p-3.5 flex flex-col gap-2`}>
-          <PanelHead icon={Zap} tone={GREEN} title="Power & Energy" sub="Who is using power today" />
-          <Preview className="flex-1 min-h-0" corner="tr"><PowerSample /></Preview>
-        </div>
-        <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
+        <div className={`flex-1 min-h-0 ${PANEL} p-3.5 flex flex-col gap-2.5`}>
           <PanelHead icon={Tv} tone={CYAN} title="Living Room TV"
             sub={!tvSeen ? "Fire TV" : tvOn ? `Fire TV • ${tv?.state?.app_name ?? "On"}` : "Fire TV • asleep or off"}
             right={tvOn && tv?.state?.volume != null ? (
@@ -1285,15 +1446,19 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         </div>
       </div>
 
-      <div className={`lg:col-span-4 ${PANEL} p-4 flex flex-col gap-3 min-h-0`}>
-        <PanelHead icon={Palette} tone={AMBER} title="Lighting Console" sub={`${lightsOn} on • tap a room for its lights`} />
-        <div className="flex-1 min-h-0 flex flex-col gap-3">
-          {ROOMS.map((r) => <RoomButton key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
-          {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
+      <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
+        <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
+          <PanelHead icon={Palette} tone={AMBER} title="Lighting Console" sub={`${lightsOn} on • tap a room for its lights`}
+            right={<span className="text-[10px] font-mono text-slate-500">Govee Cloud</span>} />
+          <div className="flex flex-col gap-2">
+            {ROOMS.map((r) => <RoomButton key={r.id} compact room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
+            {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
+          </div>
         </div>
-        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
-          <span className="flex items-center gap-1"><Sliders className="w-3 h-3 text-amber-500" /> Color and brightness inside each room</span>
-          <span className="text-[10px] font-mono text-slate-500">Govee Cloud</span>
+        <div className={`flex-1 min-h-[250px] ${PANEL} p-3.5 flex flex-col gap-2`}>
+          <PanelHead icon={Zap} tone={GREEN} title="Power & Energy" sub="By appliance today, then the whole home bill" />
+          <Preview className="flex-1 min-h-[92px] overflow-hidden" corner="tr" label={meter ? "BY APPLIANCE • NOT CONNECTED" : "NOT CONNECTED"}><PowerSample compact /></Preview>
+          <ConEdSummary meter={meter} onConnect={() => setConedOpen(true)} onDisconnect={disconnectConed} />
         </div>
       </div>
     </main>
@@ -1606,6 +1771,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         {section === "camera" && cameraView}
       </Fragment>
 
+      {conedOpen && <ConEdConnect onClose={() => setConedOpen(false)} onConnected={() => { setConedOpen(false); setToast("Con Edison connected."); load(); }} />}
       {openLight && <LightSheet key={openLight.id} light={openLight} send={send} onClose={() => setLightId(null)} />}
       {lightId === CIRCUIT && circuitLead && (
         <LightSheet key={CIRCUIT} light={circuitLead} send={sendCircuit} onClose={() => setLightId(null)}
