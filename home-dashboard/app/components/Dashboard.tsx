@@ -930,7 +930,9 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
   );
 }
 
-function RoomButton({ room, lights, onOpen, onAll, compact }: { room: (typeof ROOMS)[number]; lights: Light[]; onOpen: () => void; onAll: (on: boolean) => void; compact?: boolean }) {
+// One slim row per room for the overview's Lighting Console: the rows sit together in one list so the
+// console takes little height.
+function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]; lights: Light[]; onOpen: () => void; onAll: (on: boolean) => void }) {
   const Icon = room.icon;
   const reachable = lights.filter((l) => l.state?.online !== false);
   const onLights = reachable.filter((l) => l.state?.power);
@@ -938,29 +940,28 @@ function RoomButton({ room, lights, onOpen, onAll, compact }: { room: (typeof RO
   const allOn = reachable.length > 0 && onLights.length === reachable.length;
   const glow = onLights[0] ? lightHex(onLights[0]) : null;
   return (
-    <div className={`relative flex-1 ${compact ? "min-h-[68px]" : "min-h-[96px]"} rounded-2xl border flex items-center overflow-hidden transition-all ${onLights.length
-      ? "bg-gradient-to-b from-[#2a211a] to-[#1c1511] border-amber-500/40 shadow-lg shadow-amber-950/40" : "bg-[#1e1916]/60 border-white/5"}`}>
-      {glow && <span className="absolute inset-y-0 left-0 w-2/3 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
-      <button onClick={onOpen} className={`relative z-10 flex-1 min-w-0 h-full flex items-center ${compact ? "gap-3 px-3.5 py-2.5" : "gap-4 p-4"} text-left active:scale-[0.99] transition-transform`}>
-        <span className={`${compact ? "w-10 h-10" : "w-12 h-12"} shrink-0 rounded-2xl flex items-center justify-center border ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}>
-          <Icon className="w-5 h-5" />
+    <div className="relative flex items-center h-[54px] overflow-hidden">
+      {glow && <span className="absolute inset-y-0 left-0 w-1/2 opacity-20 pointer-events-none" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
+      <button onClick={onOpen} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-3 pl-3 pr-2 text-left active:bg-white/5 transition-colors">
+        <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}>
+          <Icon className="w-4 h-4" />
         </span>
         <span className="flex-1 min-w-0">
-          <span className="flex items-center gap-1 text-[15px] font-semibold text-white">{room.name}<ChevronRight className="w-4 h-4 text-slate-500" /></span>
-          <span className="block text-[12px] text-slate-400 mt-0.5">
+          <span className="flex items-center gap-0.5 text-[14px] font-semibold text-white leading-tight">{room.name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
+          <span className="block text-[11px] text-slate-400 truncate">
             <span className={onLights.length ? "text-amber-200/90" : ""}>{onLights.length} of {lights.length} on</span>
             {offline > 0 && <span className="text-rose-400/80"> • {offline} offline</span>}
           </span>
-          <span className={`flex gap-1.5 ${compact ? "mt-1.5" : "mt-2"}`}>
-            {lights.map((l) => (
-              <span key={l.id} className="w-2.5 h-2.5 rounded-full border border-white/20"
-                style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
-            ))}
-          </span>
+        </span>
+        <span className="flex gap-1 shrink-0">
+          {lights.map((l) => (
+            <span key={l.id} className="w-2 h-2 rounded-full border border-white/20"
+              style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
+          ))}
         </span>
       </button>
       <button onClick={() => onAll(!allOn)} disabled={!reachable.length} aria-label={allOn ? `Turn off ${room.name} lights` : `Turn on ${room.name} lights`}
-        className={`relative z-10 shrink-0 mr-4 h-11 px-3 flex items-center gap-1.5 rounded-xl border text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-30 ${allOn
+        className={`relative z-10 shrink-0 mr-2.5 h-9 w-[76px] flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-30 ${allOn
           ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
         <Power className="w-3.5 h-3.5" />{allOn ? "All off" : "All on"}
       </button>
@@ -1514,10 +1515,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lighting Console" sub={`${lightsOn} on • tap a room for its lights`}
             right={<span className="text-[10px] font-mono text-slate-500">Govee Cloud</span>} />
-          <div className="flex flex-col gap-2">
-            {ROOMS.map((r) => <RoomButton key={r.id} compact room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
-            {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
+          <div className="rounded-2xl border border-white/5 bg-black/25 divide-y divide-white/5 overflow-hidden">
+            {ROOMS.map((r) => <RoomRow key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
           </div>
+          {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
         </div>
         <div className={`flex-1 min-h-[250px] ${PANEL} p-3.5 flex flex-col gap-2`}>
           <PanelHead icon={Zap} tone={GREEN} title="Power & Energy" sub="By appliance today, then the whole home bill" />
