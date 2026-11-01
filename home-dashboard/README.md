@@ -53,13 +53,14 @@ Done
 - [x] Fire TV remote control through the TV app (2026-10-31)
 - [x] Ring camera: sign in from the dashboard, snapshots, live view, events (2026-11-01)
 - [x] Light buttons with power and dim slider; kitchen ceiling as one circuit (2026-11-01)
-- [x] Con Edison function and Power & Energy bill summary under the Lighting Console (2026-11-01)
+- [x] Con Edison connected: bill so far, projected and unposted bill estimates in Power & Energy (2026-11-01)
+- [x] Overview layout: Climate and Water Heater (with 24 h tank chart) left, Security (camera and lock) and TV middle (2026-11-01)
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
 - [ ] Thermomix plug: Shelly Plug US Gen4 for on/off and power use in the Kitchen tab and Power & Energy (waiting on purchase)
 - [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
-- [ ] Con Edison: connect from the dashboard once 2FA is on an authenticator app (setup key needed)
+- [ ] Front door smart lock in the Security box (waiting on purchase)
 - [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, Thermomix plug)
 - [ ] History and analytics views
 - [ ] Home status tile on the TV dashboard

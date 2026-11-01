@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
+  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
@@ -704,7 +704,7 @@ function ModeChip({ cam, onClick }: { cam: Camera; onClick: () => void }) {
   const armed = m !== "disarmed";
   return (
     <button onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border active:scale-95 ${armed ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-rose-500/10 text-rose-400 border-rose-500/30"}`}>
+      className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border whitespace-nowrap shrink-0 active:scale-95 ${armed ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-rose-500/10 text-rose-400 border-rose-500/30"}`}>
       {armed ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}{armed ? `Armed • ${MODE_LABEL[m] ?? m}` : "Disarmed"}
     </button>
   );
@@ -778,7 +778,7 @@ function TvPanel({ tv, send, compact }: { tv: TV; send: Send; compact?: boolean 
   const s = tv.state;
   const { on } = tvStatus(tv);
   const apps = tv.capabilities.apps?.length ? tv.capabilities.apps : TV_APPS;
-  const key = "h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 active:scale-95 disabled:opacity-30 transition-transform";
+  const key = `h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 active:scale-95 disabled:opacity-30 transition-transform`;
   const vol = s?.volume ?? 0, max = s?.max_volume ?? 30;
   return (
     <>
@@ -801,6 +801,23 @@ function TvPanel({ tv, send, compact }: { tv: TV; send: Send; compact?: boolean 
         <button aria-label="Volume up" disabled={!on} onClick={() => send(tv, { action: "volume", dir: "up" }, { volume: Math.min(max, vol + 1), muted: false })} className={key}><Volume2 className="w-4 h-4" /></button>
       </div>
     </>
+  );
+}
+
+// Front door smart lock, shown as a preview until a lock is installed.
+function LockSample() {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-12 h-12 shrink-0 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center"><Lock className="w-5 h-5" /></span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[17px] font-bold text-white leading-tight">Locked</span>
+        <span className="block text-[11px] text-slate-400 truncate">Unlocked with keypad • 6:12 PM</span>
+      </span>
+      <span className="flex flex-col items-end gap-1.5 shrink-0">
+        <span className="text-[10px] font-mono text-slate-400">BATTERY 86%</span>
+        <span className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl bg-white/5 border border-white/10 text-[12px] font-semibold text-slate-200"><LockOpen className="w-4 h-4 text-amber-400" />Unlock</span>
+      </span>
+    </div>
   );
 }
 
@@ -1438,34 +1455,34 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             <SampleAcRow name="Bedroom" room={71} set={68} mode="Cool" />
           </Preview>
         </div>
-        <div className={`flex-1 min-h-[240px] ${PANEL} p-3.5 flex flex-col gap-2.5`}>
-          {cam ? (
-            <>
-              <PanelHead icon={Video} tone={AMBER} title={`${cam.name} Camera`} sub="Ring" right={<ModeChip cam={cam} onClick={() => setSection("camera")} />} />
-              <RingFeed key={cam.id} cam={cam} />
-            </>
-          ) : (
-            <>
-              <PanelHead icon={Video} tone={AMBER} title="Living Room Camera" sub="Ring"
-                right={<button onClick={() => setSection("camera")} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300">Connect</button>} />
-              <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
-        <div className={`${PANEL} p-3.5 flex flex-col gap-3 shrink-0`}>
+        <div className={`flex-1 min-h-[220px] ${PANEL} p-3.5 flex flex-col gap-3`}>
           {heater ? (
             <>
               <PanelHead icon={Flame} tone={AMBER} title="Water Heater"
                 sub={`${heater.state?.connected === false ? "Offline" : heater.state?.power === false ? "Off" : heater.state?.running ?? "Idle"} • schedule ${schedule?.enabled ? "on" : "off"}`}
                 right={<button onClick={() => setSection("water")} className="px-3 h-9 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-slate-300 flex items-center gap-1">Details<ChevronRight className="w-3.5 h-3.5" /></button>} />
               <HeaterPanel heater={heater} send={send} unit={unit} />
+              <div className="relative flex-1 min-h-[70px] flex flex-col">
+                <span className="text-[10px] font-mono tracking-widest text-slate-500 mb-1">HOT WATER • LAST 24 H</span>
+                <div className="relative flex-1 min-h-0 flex flex-col"><TankChart points={tankPoints} /></div>
+              </div>
             </>
           ) : <NotConnected icon={Flame} title="No water heater" text="It shows up here once the Rheem function reports it." />}
         </div>
-        <div className={`flex-1 min-h-0 ${PANEL} p-3.5 flex flex-col gap-2.5`}>
+      </div>
+
+      <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
+        <div className={`flex-1 min-h-[300px] ${PANEL} p-3.5 flex flex-col gap-2.5`}>
+          <PanelHead icon={ShieldCheck} tone={AMBER} title="Security" sub="Camera and front door"
+            right={cam ? <ModeChip cam={cam} onClick={() => setSection("camera")} />
+              : <button onClick={() => setSection("camera")} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300">Connect</button>} />
+          {cam ? <RingFeed key={cam.id} cam={cam} /> : <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>}
+          {/* The lock row is its own positioned box so its "not connected" tag sits on the row, not on the camera. */}
+          <div className="relative mt-1 pt-3 border-t border-white/10">
+            <Preview corner="tr" label="LOCK • NOT CONNECTED"><LockSample /></Preview>
+          </div>
+        </div>
+        <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
           <PanelHead icon={Tv} tone={CYAN} title="Living Room TV"
             sub={!tvSeen ? "Fire TV" : tvOn ? `Fire TV • ${tv?.state?.app_name ?? "On"}` : "Fire TV • asleep or off"}
             right={tvOn && tv?.state?.volume != null ? (
