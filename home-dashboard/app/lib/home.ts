@@ -1,6 +1,6 @@
 import "server-only";
-import type { Command, HomeData, Schedule, ScheduleBlock } from "./types";
-import { mockData, mockCommand, mockSchedule, mockSaveSchedule, mockEnableSchedule, mockSnapshot } from "./mock";
+import type { Analytics, Command, HomeData, Schedule, ScheduleBlock } from "./types";
+import { mockAnalytics, mockData, mockCommand, mockSchedule, mockSaveSchedule, mockEnableSchedule, mockSnapshot } from "./mock";
 
 const useMock = () => process.env.HOME_MOCK === "1" || !process.env.SUPABASE_URL || !process.env.HOME_API_KEY;
 
@@ -43,6 +43,11 @@ async function call(path: string, init?: RequestInit) {
 export async function getHome(historyHours = 24): Promise<HomeData> {
   if (useMock()) return mockData();
   return call(`home?history=${historyHours}`);
+}
+
+export async function getAnalytics(days = 14): Promise<Analytics> {
+  if (useMock()) return mockAnalytics(days);
+  return call(`home?analytics=${Math.min(90, Math.max(1, Math.round(days)))}`);
 }
 
 export async function refreshHome(): Promise<HomeData> {

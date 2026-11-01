@@ -395,9 +395,16 @@ async function poll() {
   if (e1) throw e1;
   const { error: e2 } = await db.from("home_readings").insert({ device_id: DEVICE, source: "poll", state });
   if (e2) throw e2;
+  // A year of daily usage for the History tab, fetched once (and again only if the stored history is short).
+  const { count: stored } = await db.from("home_energy_daily").select("day", { count: "exact", head: true }).eq("account", a.uuid);
+  if ((stored ?? 0) < 300) {
+    const year = await safe("year", reads(tok, a, "day", daysAgo(400), daysAgo(39)));
+    for (const r of year ?? []) days.push({ d: String(r.t).slice(0, 10), kwh: round(r.kwh, 2), cost: round(r.cost, 2) });
+  }
   if (days.length) {
+    const unique = [...new Map(days.map((d) => [d.d, d])).values()];
     const { error: e3 } = await db.from("home_energy_daily").upsert(
-      days.map((d) => ({ account: a.uuid, day: d.d, kwh: d.kwh, cost: d.cost, updated_at: new Date().toISOString() })),
+      unique.map((d) => ({ account: a.uuid, day: d.d, kwh: d.kwh, cost: d.cost, updated_at: new Date().toISOString() })),
     );
     if (e3) errors.push(`history: ${e3.message}`);
   }

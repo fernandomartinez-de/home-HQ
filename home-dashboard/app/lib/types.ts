@@ -92,6 +92,18 @@ export type Activity = {
   t: string;
 };
 
+// History tab data from home_analytics (days are calendar days in New York, "YYYY-MM-DD").
+export type Analytics = {
+  days: number;
+  energy: { d: string; kwh: number | null; cost: number | null }[];
+  lights: { d: string; room: string; hours: number }[];
+  heater: { d: string; tank_avg: number | null; tank_min: number | null; heating: number | null; element: number | null; off: number | null }[];
+  tv: { d: string; hours: number }[];
+  camera: { camera: string; t: string; kind: string | null; person: boolean | null }[];
+  activity: (Activity & { kind: string | null })[];
+  mock?: boolean;
+};
+
 export type HomeData = {
   devices: Device[];
   history?: Record<string, { t: string; state: any }[]>;

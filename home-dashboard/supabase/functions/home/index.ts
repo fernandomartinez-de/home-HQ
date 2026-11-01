@@ -4,6 +4,7 @@
 //
 //   GET  /home                         every device with its latest state
 //   GET  /home?history=24              ...plus readings and commands from the last N hours (max 168)
+//   GET  /home?analytics=14            History tab data for the last N days (max 90): see home_analytics
 //   POST /home {"action":"refresh"}    poll every appliance now, then return devices
 //
 // Commands go straight to the appliance functions (rheem, govee, ac).
@@ -85,6 +86,12 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
+    if (url.searchParams.has("analytics")) {
+      const days = Math.min(90, Math.max(1, Number(url.searchParams.get("analytics")) || 14));
+      const { data, error } = await db.rpc("home_analytics", { p_days: days });
+      if (error) throw error;
+      return json(data);
+    }
     const h = Math.min(168, Math.max(0, Number(url.searchParams.get("history") ?? 0) || 0));
     if (!h) return json({ devices: await devices() });
     // The activity list is a nice to have; if it fails, the dashboard still loads.

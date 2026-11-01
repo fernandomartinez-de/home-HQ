@@ -1,4 +1,4 @@
-import type { Command, Device, HomeData, Schedule, ScheduleBlock } from "./types";
+import type { Analytics, Command, Device, HomeData, Schedule, ScheduleBlock } from "./types";
 
 // Sample data shaped exactly like the home function's response, for local development.
 const now = () => new Date().toISOString();
@@ -149,4 +149,40 @@ export function mockSnapshot() {
 <rect x="51" y="230" width="538" height="80" rx="28" fill="#3a2e25" opacity=".85"/><rect x="90" y="200" width="100" height="50" rx="12" fill="#4a3a2e"/>
 <rect x="420" y="65" width="190" height="120" rx="6" fill="#000" opacity=".7"/></svg>`;
   return { image: new TextEncoder().encode(svg).buffer as ArrayBuffer, takenMs: Date.now() - 60_000, svg: true };
+}
+
+// Sample History tab data: a year of daily kWh with a summer peak, a week of lights, water heater and
+// TV, a few camera events and commands.
+export function mockAnalytics(days = 14): Analytics {
+  const day = (n: number) => new Date(Date.now() - n * 86400_000).toISOString().slice(0, 10);
+  const energy = Array.from({ length: 395 }, (_, i) => {
+    const n = 395 - i, dt = new Date(Date.now() - n * 86400_000);
+    const season = 1 + 0.9 * Math.max(0, Math.cos(((dt.getMonth() - 6.5) / 12) * 2 * Math.PI)) + 0.6 * Math.max(0, Math.cos(((dt.getMonth() - 0.5) / 12) * 2 * Math.PI));
+    const weekend = dt.getDay() === 0 || dt.getDay() === 6 ? 1.6 : 0;
+    return { d: day(n), kwh: Math.round((5.4 * season + weekend + 1.2 * Math.sin(i / 2.3)) * 100) / 100, cost: null };
+  });
+  const span = Math.min(days, 14);
+  const lights = Array.from({ length: span }, (_, i) => day(span - 1 - i)).flatMap((d, i) => [
+    { d, room: "Kitchen", hours: Math.round((4 + 2.5 * Math.abs(Math.sin(i))) * 100) / 100 },
+    { d, room: "Living room", hours: Math.round((4.5 + 2 * Math.abs(Math.cos(i))) * 100) / 100 },
+    { d, room: "Bedroom", hours: Math.round((0.3 + 0.4 * Math.abs(Math.sin(i * 2))) * 100) / 100 },
+  ]);
+  const heater = Array.from({ length: span }, (_, i) => ({ d: day(span - 1 - i), tank_avg: 88 + (i % 3) * 4, tank_min: 62 + (i % 4) * 6, heating: Math.round((1.2 + Math.abs(Math.sin(i)) * 1.3) * 100) / 100, element: 0.25 + (i % 2) * 0.1, off: 18 }));
+  const tv = Array.from({ length: span }, (_, i) => ({ d: day(span - 1 - i), hours: Math.round((1.5 + 3 * Math.abs(Math.sin(i * 1.7))) * 100) / 100 }));
+  const at = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+  const camera = [22, 135, 410, 900, 1600, 2300, 3100].map((m, i) => ({ camera: "Living Room", t: at(m), kind: i === 2 ? "on_demand" : "motion", person: i % 3 === 0 ? true : null }));
+  const act = (id: number, min: number, device_id: string, device_name: string, kind: string, command: Record<string, unknown>, source = "ui") =>
+    ({ id, device_id, device_name, kind, command, source, status: "done", t: at(min) });
+  const activity = [
+    act(20, 30, "tv", "Living Room TV", "tv", { action: "volume", dir: "down" }), act(19, 30.1, "tv", "Living Room TV", "tv", { action: "volume", dir: "down" }),
+    act(18, 30.2, "tv", "Living Room TV", "tv", { action: "volume", dir: "down" }),
+    act(17, 95, "govee_kl", "Kitchen Left", "light", { action: "power", on: false }), act(16, 95, "govee_km", "Kitchen Middle", "light", { action: "power", on: false }),
+    act(15, 95, "govee_kr", "Kitchen Right", "light", { action: "power", on: false }),
+    act(14, 240, "rheem_sample", "Heat Pump Water Heater", "water_heater", { action: "set_state", mode: "off" }, "schedule"),
+    act(13, 380, "tv", "Living Room TV", "tv", { action: "launch", app: "com.netflix.ninja" }),
+    act(12, 400, "govee_floor", "Floor Lamp", "light", { action: "brightness", value: 40 }),
+    act(11, 900, "rheem_sample", "Heat Pump Water Heater", "water_heater", { action: "set_state", mode: "energy_saver", setpoint: 135 }, "schedule"),
+    act(10, 1500, "govee_tv", "TV Backlight", "light", { action: "color", hex: "#5b6cff" }),
+  ];
+  return { days, energy, lights, heater, tv, camera, activity, mock: true };
 }

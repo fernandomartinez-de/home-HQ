@@ -4,10 +4,10 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Sparkles, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
+  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, ChartColumn, Lightbulb, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
-import type { Activity as ActivityItem, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
+import { AreaChart, Area, BarChart, Bar, Cell, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
+import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
 const POLL_MS = 30_000;
@@ -75,7 +75,7 @@ function describe(a: ActivityItem) {
     : c.action === "scene" ? `${c.name} scene`
     : c.action === "set_setpoint" ? `Set to ${c.value}°`
     : c.action === "set_mode" ? (c.mode === "off" ? "Off" : "On")
-    : c.action === "set_state" ? (c.setpoint ? `Schedule ${c.setpoint}°` : "Schedule")
+    : c.action === "set_state" ? (c.mode === "off" ? "Schedule off" : c.setpoint ? `Schedule ${c.setpoint}°` : "Schedule")
     : c.action === "launch" ? `Open ${TV_APPS.find((x) => x.pkg === c.app)?.name ?? "app"}`
     : c.action === "home" ? "Home"
     : c.action === "back" ? "Back"
@@ -284,6 +284,7 @@ const kwhText = (v: number | null | undefined) => (v == null ? "--" : `${v < 10 
 // Bill dates are calendar days ("2026-10-19"); read and show them as such, whatever the iPad's zone.
 const billDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" });
 const nyToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+const nyDayOf = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
 
 function Stat({ label, value, sub, tone = "text-slate-100" }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
@@ -379,6 +380,257 @@ function ConEdSummary({ meter, onConnect, onDisconnect }: { meter: Meter | undef
         </button>
       </div>
     </div>
+  );
+}
+
+// ---------- History ----------
+
+const ROOM_COLOR: Record<string, string> = { Kitchen: "#f59e0b", "Living room": "#a78bfa", Bedroom: "#22d3ee", Other: "#94a3b8" };
+const atNoon = (d: string) => new Date(`${d}T12:00:00Z`);
+const weekday = (d: string) => atNoon(d).toLocaleDateString([], { weekday: "short", timeZone: "UTC" });
+const isWeekend = (d: string) => [0, 6].includes(atNoon(d).getUTCDay());
+const shiftDay = (d: string, n: number) => new Date(atNoon(d).getTime() + n * 86400_000).toISOString().slice(0, 10);
+const hoursText = (h: number | null | undefined) => (h == null ? "--" : h >= 10 ? `${Math.round(h)} h` : `${h.toFixed(1)} h`);
+const sum = (xs: (number | null | undefined)[]) => xs.reduce<number>((t, x) => t + (x ?? 0), 0);
+
+const TIP = { contentStyle: { background: "#1c1613", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, fontSize: 11 }, labelStyle: { color: "#e2e8f0" }, cursor: { fill: "rgba(255,255,255,0.04)" } };
+
+// Commands as people think of them: four kitchen bulbs switched off together is one entry, and a run of
+// volume taps on the TV is one entry with a count.
+type ActGroup = { item: Analytics["activity"][number]; count: number; names: string[]; t: string };
+function groupActivity(list: Analytics["activity"]): ActGroup[] {
+  const out: ActGroup[] = [];
+  for (const a of list) {
+    const last = out[out.length - 1];
+    const same = last && last.item.command?.action === a.command?.action && last.item.command?.on === a.command?.on
+      && last.item.command?.dir === a.command?.dir && last.item.source === a.source && last.item.kind === a.kind;
+    const gap = last ? Math.abs(Date.parse(last.t) - Date.parse(a.t)) : Infinity;
+    if (same && ((a.kind === "light" && gap < 8000) || (last.item.device_id === a.device_id && gap < 90_000))) {
+      last.t = a.t;
+      if (!last.names.includes(a.device_name)) last.names.push(a.device_name);
+      last.count++;
+      continue;
+    }
+    out.push({ item: a, count: 1, names: [a.device_name], t: a.t });
+  }
+  return out;
+}
+
+function groupText(g: ActGroup) {
+  const what = describe(g.item).split(" • ").slice(1).join(" • ");
+  if (g.names.length > 1) return `${g.names.length} lights • ${what}`;
+  const name = g.item.kind === "water_heater" ? "Water heater" : g.item.device_name;
+  return `${name} • ${what}${g.count > 1 ? ` ×${g.count}` : ""}`;
+}
+
+function MiniStat({ label, value, sub, tone = "text-slate-100" }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-black/30 border border-white/5 px-3 py-2">
+      <div className="text-[9px] font-mono tracking-widest text-slate-500 truncate">{label}</div>
+      <div className={`text-[18px] leading-tight font-bold font-mono tabular-nums truncate ${tone}`}>{value}</div>
+      {sub && <div className="text-[10px] text-slate-500 truncate">{sub}</div>}
+    </div>
+  );
+}
+
+/** The History tab: electricity by day or by bill, lights, hot water, and what happened this week. */
+function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed: () => void }) {
+  const [a, setA] = useState<Analytics | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [mode, setMode] = useState<"daily" | "bills">("daily");
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/history?days=7", { cache: "no-store" });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+        if (alive) { setA(body); setErr(null); }
+      } catch (e) {
+        if (alive) setErr((e as Error).message);
+      }
+    };
+    load();
+    const t = setInterval(() => document.visibilityState === "visible" && load(), 5 * 60_000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  if (!a) {
+    return (
+      <main className={`flex-1 ${PANEL} z-10 flex items-center justify-center text-[13px] ${err ? "text-rose-300" : "text-slate-500"}`}>
+        {err ? `Couldn't load history: ${err}` : "Loading history"}
+      </main>
+    );
+  }
+
+  // Electricity, last 30 days with data (Con Edison runs about a day behind).
+  const energy = a.energy.filter((e) => e.kwh != null);
+  const last30 = energy.slice(-30);
+  const total30 = sum(last30.map((e) => e.kwh));
+  const avg30 = last30.length ? total30 / last30.length : null;
+  const top = last30.reduce<typeof last30[number] | null>((m, e) => (!m || (e.kwh ?? 0) > (m.kwh ?? 0) ? e : m), null);
+  const byDay = new Map(energy.map((e) => [e.d, e.kwh ?? 0]));
+  const lastYear = last30.length ? last30.map((e) => byDay.get(shiftDay(e.d, -364))).filter((x): x is number => x != null) : [];
+  const vsYear = lastYear.length >= last30.length * 0.8 && sum(lastYear) > 0 ? Math.round(((total30 - sum(lastYear) * (last30.length / lastYear.length)) / (sum(lastYear) * (last30.length / lastYear.length))) * 100) : null;
+  const dailyData = last30.map((e) => ({ d: e.d, label: billDay(e.d), kwh: e.kwh, weekend: isWeekend(e.d) }));
+
+  const bills = [...(meter?.state?.bills ?? [])].reverse().slice(-12);
+  const billData = bills.map((b) => ({ label: atNoon(b.start).toLocaleDateString([], { month: "short", timeZone: "UTC" }), cost: b.cost, kwh: b.kwh, range: `${billDay(b.start)} to ${billDay(b.end)}` }));
+  const billTotal = sum(bills.map((b) => b.cost));
+  const topBill = bills.reduce<typeof bills[number] | null>((m, b) => (!m || (b.cost ?? 0) > (m.cost ?? 0) ? b : m), null);
+
+  // The last 7 days for everything else.
+  const week = Array.from({ length: 7 }, (_, i) => shiftDay(nyToday(), i - 6));
+  const rooms = [...new Set(a.lights.map((l) => l.room))].sort((x, y) => Object.keys(ROOM_COLOR).indexOf(x) - Object.keys(ROOM_COLOR).indexOf(y));
+  const lightData = week.map((d) => ({ d, label: weekday(d), ...Object.fromEntries(rooms.map((r) => [r, a.lights.find((l) => l.d === d && l.room === r)?.hours ?? 0])) }));
+  const roomAvg = (r: string) => sum(a.lights.filter((l) => l.room === r && week.includes(l.d)).map((l) => l.hours)) / 7;
+  const heatData = week.map((d) => {
+    const h = a.heater.find((x) => x.d === d);
+    return { d, label: weekday(d), pump: Math.max(0, (h?.heating ?? 0) - (h?.element ?? 0)), element: h?.element ?? 0 };
+  });
+  const heatDays = a.heater.filter((h) => week.includes(h.d));
+  const heatAvg = heatDays.length ? sum(heatDays.map((h) => h.heating)) / heatDays.length : null;
+  const offAvg = heatDays.length ? sum(heatDays.map((h) => h.off)) / heatDays.length : null;
+  const tankLow = heatDays.reduce<number | null>((m, h) => (h.tank_min == null ? m : m == null ? h.tank_min : Math.min(m, h.tank_min)), null);
+
+  const tvToday = a.tv.find((t) => t.d === nyToday())?.hours ?? 0;
+  const tvDays = a.tv.filter((t) => week.includes(t.d));
+  const tvAvg = tvDays.length ? sum(tvDays.map((t) => t.hours)) / tvDays.length : null;
+  const people = a.camera.filter((c) => c.person).length;
+  const groups = groupActivity(a.activity);
+  const bySchedule = a.activity.filter((x) => x.source === "schedule").length;
+  const brightest = rooms.length ? rooms.reduce((m, r) => (roomAvg(r) > roomAvg(m) ? r : m)) : null;
+
+  const toggle = (
+    <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/10">
+      {([["daily", "30 days"], ["bills", "Bills"]] as const).map(([id, label]) => (
+        <button key={id} onClick={() => setMode(id)} aria-pressed={mode === id}
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${mode === id ? "bg-emerald-500 text-slate-950" : "text-slate-400"}`}>{label}</button>
+      ))}
+    </div>
+  );
+
+  return (
+    <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
+      <div className="lg:col-span-8 flex flex-col gap-3 min-h-0">
+        <div className={`flex-1 min-h-[280px] ${PANEL} p-4 flex flex-col gap-3`}>
+          <PanelHead icon={Zap} tone={GREEN} title="Electricity" sub={mode === "daily" ? "Whole home, Con Edison smart meter" : "Con Edison bills, last 12"} right={toggle} />
+          {!energy.length && !bills.length ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
+              <p className="text-[12px] text-slate-400">Connect Con Edison to see your usage and bills here.</p>
+              <button onClick={onConnectConed} className="px-4 h-10 rounded-xl text-[12px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">Connect Con Edison</button>
+            </div>
+          ) : mode === "daily" ? (
+            <>
+              <div className="grid grid-cols-4 gap-2">
+                <MiniStat label="LAST 30 DAYS" value={kwhText(total30)} sub={last30.length ? `${billDay(last30[0].d)} to ${billDay(last30[last30.length - 1].d)}` : undefined} tone="text-emerald-300" />
+                <MiniStat label="AVERAGE A DAY" value={kwhText(avg30)} sub="Weekends in lighter green" />
+                <MiniStat label="VS LAST YEAR" value={vsYear == null ? "--" : `${vsYear > 0 ? "+" : ""}${vsYear}%`} sub="Same 30 days" tone={vsYear == null ? "text-slate-100" : vsYear > 0 ? "text-amber-300" : "text-emerald-300"} />
+                <MiniStat label="HIGHEST DAY" value={kwhText(top?.kwh)} sub={top ? `${weekday(top.d)} ${billDay(top.d)}` : undefined} />
+              </div>
+              <div className="relative flex-1 min-h-[120px]">
+                <Sized>{(w, h) => (
+                  <BarChart width={w} height={h} data={dailyData} margin={{ top: 6, right: 4, left: -18, bottom: 0 }}>
+                    <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} interval={4} />
+                    <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                    <Tooltip {...TIP} formatter={(v) => [`${Number(v).toFixed(1)} kWh`, "Used"]} />
+                    {avg30 != null && <ReferenceLine y={avg30} stroke="#94a3b8" strokeDasharray="4 4" strokeOpacity={0.6} />}
+                    <Bar dataKey="kwh" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                      {dailyData.map((x) => <Cell key={x.d} fill={x.weekend ? "#6ee7b7" : "#10b981"} fillOpacity={x.weekend ? 0.55 : 0.85} />)}
+                    </Bar>
+                  </BarChart>
+                )}</Sized>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-4 gap-2">
+                <MiniStat label="LAST BILL" value={money(bills[bills.length - 1]?.cost)} sub={bills.length ? kwhText(bills[bills.length - 1].kwh) : undefined} tone="text-emerald-300" />
+                <MiniStat label="AVERAGE BILL" value={money(bills.length ? billTotal / bills.length : null)} sub={`Over ${bills.length} bills`} />
+                <MiniStat label="HIGHEST" value={money(topBill?.cost)} sub={topBill ? `${billDay(topBill.start)} to ${billDay(topBill.end)}` : undefined} tone="text-amber-300" />
+                <MiniStat label={`${bills.length} BILLS TOTAL`} value={`$${Math.round(billTotal).toLocaleString()}`} sub={`${Math.round(sum(bills.map((b) => b.kwh))).toLocaleString()} kWh`} />
+              </div>
+              <div className="relative flex-1 min-h-[120px]">
+                <Sized>{(w, h) => (
+                  <BarChart width={w} height={h} data={billData} margin={{ top: 6, right: 4, left: -12, bottom: 0 }}>
+                    <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
+                    <YAxis stroke="#64748b" fontSize={10} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                    <Tooltip {...TIP} formatter={(v, _n, p) => [`$${Number(v).toFixed(2)} • ${(p.payload as { kwh: number }).kwh} kWh`, (p.payload as { range: string }).range]} />
+                    <Bar dataKey="cost" fill="#10b981" fillOpacity={0.85} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  </BarChart>
+                )}</Sized>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 shrink-0 h-[248px]">
+          <div className={`${PANEL} p-4 flex flex-col gap-2 min-h-0`}>
+            <PanelHead icon={Lightbulb} tone={AMBER} title="Lights" sub="Hours each room was lit, last 7 days" />
+            <div className="relative flex-1 min-h-0">
+              <Sized>{(w, h) => (
+                <BarChart width={w} height={h} data={lightData} margin={{ top: 6, right: 4, left: -24, bottom: 0 }}>
+                  <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} allowDecimals={false} />
+                  <Tooltip {...TIP} formatter={(v, n) => [hoursText(Number(v)), String(n)]} />
+                  {rooms.map((r, i) => <Bar key={r} dataKey={r} stackId="rooms" fill={ROOM_COLOR[r] ?? ROOM_COLOR.Other} fillOpacity={0.8} radius={i === rooms.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />)}
+                </BarChart>
+              )}</Sized>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-[10px]">
+              {rooms.map((r) => (
+                <span key={r} className="flex items-center gap-1 text-slate-400"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: ROOM_COLOR[r] ?? ROOM_COLOR.Other }} />{r}<span className="font-mono text-slate-200 font-bold">{hoursText(roomAvg(r))}</span></span>
+              ))}
+            </div>
+          </div>
+          <div className={`${PANEL} p-4 flex flex-col gap-2 min-h-0`}>
+            <PanelHead icon={Flame} tone={AMBER} title="Hot Water" sub="Hours heating a day, last 7 days" />
+            <div className="relative flex-1 min-h-0">
+              <Sized>{(w, h) => (
+                <BarChart width={w} height={h} data={heatData} margin={{ top: 6, right: 4, left: -24, bottom: 0 }}>
+                  <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} allowDecimals={false} />
+                  <Tooltip {...TIP} formatter={(v, n) => [hoursText(Number(v)), n === "pump" ? "Heat pump" : "Electric element"]} />
+                  <Bar dataKey="pump" stackId="h" fill="#f59e0b" fillOpacity={0.8} isAnimationActive={false} />
+                  <Bar dataKey="element" stackId="h" fill="#f43f5e" fillOpacity={0.8} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              )}</Sized>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-[10px] text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />Heat pump<span className="w-2 h-2 rounded-full bg-rose-500 ml-2" />Element</span>
+              <span>Avg <span className="font-mono text-slate-200 font-bold">{hoursText(heatAvg)}</span> • off <span className="font-mono text-slate-200 font-bold">{hoursText(offAvg)}</span>{tankLow != null && <> • low <span className="font-mono text-slate-200 font-bold">{tankLow}%</span></>}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
+        <div className="grid grid-cols-2 gap-2 shrink-0">
+          <MiniStat label="TV TODAY" value={hoursText(tvToday)} sub={tvAvg != null ? `Avg ${hoursText(tvAvg)} a day` : "Collecting"} tone="text-cyan-300" />
+          <MiniStat label="CAMERA EVENTS" value={String(a.camera.length)} sub={`${people} with a person • 7 days`} tone="text-amber-300" />
+          <MiniStat label="MOST LIT ROOM" value={brightest ?? "--"} sub={brightest ? `${hoursText(roomAvg(brightest))} a day` : undefined} />
+          <MiniStat label="COMMANDS" value={String(a.activity.length >= 200 ? "200+" : a.activity.length)} sub={`${bySchedule} by schedule • 7 days`} />
+        </div>
+        <div className={`flex-1 min-h-[200px] ${PANEL} p-4 flex flex-col gap-2`}>
+          <PanelHead icon={ListChecks} tone={CYAN} title="Activity" sub="Dashboard and schedules, last 7 days" />
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none space-y-1.5">
+            {groups.slice(0, 60).map((g) => (
+              <div key={g.item.id} className="flex items-center gap-2.5 bg-black/30 px-2.5 py-2 rounded-xl border border-white/5">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${g.item.source === "schedule" ? "bg-cyan-400" : "bg-amber-400"}`} />
+                <span className="flex-1 min-w-0 text-[12px] text-slate-200 truncate">{groupText(g)}</span>
+                <span className="text-[10px] font-mono text-slate-500 shrink-0">{atNoon(nyDayOf(g.item.t)).toLocaleDateString([], { weekday: "short", timeZone: "UTC" })} {clockTime(g.item.t)}</span>
+              </div>
+            ))}
+            {!groups.length && <p className="text-[12px] text-slate-500 px-1">Nothing this week.</p>}
+          </div>
+          <div className="pt-1 flex items-center gap-3 text-[10px] text-slate-500">
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Dashboard</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />Schedule</span>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -1431,6 +1683,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     { id: "bedroom", label: "Bedroom", icon: BedDouble, meta: `${onIn("bedroom")} on` },
     { id: "water", label: "Water", icon: Flame, meta: heater?.state?.tank_pct != null ? `${heater.state.tank_pct}%` : undefined },
     { id: "security", label: "Security", icon: ShieldCheck, meta: cam?.state?.mode ? MODE_LABEL[cam.state.mode] : undefined },
+    { id: "history", label: "History", icon: ChartColumn },
   ];
 
   // ---------- pieces that need dashboard state ----------
@@ -1842,6 +2095,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         {section === "kitchen" && kitchenView}
         {section === "water" && waterView}
         {section === "security" && securityView}
+        {section === "history" && <HistoryView meter={meter} onConnectConed={() => setConedOpen(true)} />}
       </Fragment>
 
       {conedOpen && <ConEdConnect onClose={() => setConedOpen(false)} onConnected={() => { setConedOpen(false); setToast("Con Edison connected."); load(); }} />}

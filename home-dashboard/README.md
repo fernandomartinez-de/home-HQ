@@ -55,6 +55,7 @@ Done
 - [x] Light buttons with power and dim slider; kitchen ceiling as one circuit (2026-11-01)
 - [x] Con Edison connected: bill so far, projected and unposted bill estimates in Power & Energy (2026-11-01)
 - [x] Overview layout: Climate and Water Heater (with 24 h tank chart) left, Security (camera and lock) and TV middle; Camera tab became Security (2026-11-01)
+- [x] History tab: a year of Con Edison daily usage and bills, room lit hours, hot water heating, TV, camera and activity (2026-11-01)
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
@@ -62,7 +63,6 @@ Outstanding
 - [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
 - [ ] Front door smart lock in the Security box (waiting on purchase)
 - [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, Thermomix plug)
-- [ ] History and analytics views
 - [ ] Home status tile on the TV dashboard
 
 ## Updating the diagram
