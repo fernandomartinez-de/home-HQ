@@ -41,6 +41,7 @@ docs/                 architecture diagram
 
 ## Roadmap
 
+Done
 - [x] Shared Supabase schema
 - [x] Govee function, connected (7 lights)
 - [x] Rheem function, connected
@@ -48,12 +49,18 @@ docs/                 architecture diagram
 - [x] Schedules: weekly time blocks with start and stop, edited in the app, run every minute by Supabase
 - [x] Next.js app with live state and controls
 - [x] Deploy to Vercel
-- [ ] ESP32 bridge for the AC, then its function
-- [ ] History and analytics views
 - [x] Command center design: sections per room, alerts, scenes, Tailwind (2026-10-31)
-- [ ] Ring camera: snapshot, motion events and modes (unofficial ring-client-api)
+- [x] Fire TV remote control through the TV app (2026-10-31)
+- [x] Ring camera: sign in from the dashboard, snapshots, live view, events (2026-11-01)
+- [x] Light buttons with power and dim slider; kitchen ceiling as one circuit (2026-11-01)
+
+Outstanding
+- [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
+- [ ] Thermomix plug: Shelly Plug US Gen4 for on/off and power use in the Kitchen tab and Power & Energy (waiting on purchase)
+- [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
 - [ ] Con Edison usage and bill (Opower), daily job
-- [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights)
+- [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, Thermomix plug)
+- [ ] History and analytics views
 - [ ] Home status tile on the TV dashboard
 
 ## Updating the diagram
