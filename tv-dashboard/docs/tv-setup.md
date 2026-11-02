@@ -51,6 +51,13 @@ Optional, use the dashboard as the screensaver too:
 adb -s $tv shell settings put secure screensaver_components "$app/.DashboardDream"
 ```
 
+Optional, let the TV stand in for a SwitchBot Hub (presses a Bot with no hub over Bluetooth;
+see [switchbot/README.md](../../switchbot/README.md)). Bluetooth scanning on Fire OS needs location access:
+
+```powershell
+adb -s $tv shell pm grant $app android.permission.ACCESS_FINE_LOCATION
+```
+
 ## Troubleshooting
 
 | Symptom | Fix |
