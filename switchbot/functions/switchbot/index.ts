@@ -75,6 +75,10 @@ const devices = async (): Promise<Dev[]> =>
 
 const deviceId = (d: Dev) => `switchbot_${d.deviceId.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`;
 const isBot = (d: Dev) => /^bot$/i.test(d.deviceType);
+// A Bluetooth device with no hub is listed but can't be reached from the cloud. Its device id is its
+// Bluetooth address, which is all the TV relay needs.
+const hubless = (d: Dev) => !d.hubDeviceId || /^0+$/.test(d.hubDeviceId);
+const macOf = (d: Dev) => d.deviceId.replace(/[^0-9A-Fa-f]/g, "").toUpperCase().match(/.{2}/g)?.join(":") ?? "";
 
 async function lastPower(id: string): Promise<boolean | null> {
   const { data } = await db.from("home_readings").select("state").eq("device_id", id)
@@ -114,6 +118,18 @@ async function poll() {
   const out = [];
   for (const d of await devices()) {
     const id = deviceId(d);
+    if (hubless(d)) {
+      // Hand it to the TV relay: same id the TV uses, its name from the SwitchBot app. The TV reports its state.
+      if (!isBot(d)) continue;
+      const { error } = await db.from("home_devices").upsert({
+        id, kind: "switch", provider: "switchbot", name: d.deviceName.trim() || "SwitchBot Bot",
+        provider_ref: { mac: macOf(d), via: "tv", type: "Bot", device: d.deviceId }, capabilities: capabilities(d),
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      out.push({ id, name: d.deviceName.trim(), via: "tv" });
+      continue;
+    }
     const { error: e1 } = await db.from("home_devices").upsert({
       id, kind: "switch", provider: "switchbot", name: d.deviceName,
       provider_ref: { device: d.deviceId, type: d.deviceType, hub: d.hubDeviceId ?? null }, capabilities: capabilities(d),
