@@ -62,10 +62,11 @@ Done
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
-- [ ] Thermomix plug: Shelly Plug US Gen4 for on/off and power use in the Kitchen tab and Power & Energy (waiting on purchase)
+- [ ] Espresso machine plug: Shelly Plug US Gen4 for on/off, a morning warm up schedule and power use (waiting on purchase)
+- [ ] Balcony light: Govee outdoor smart plug through the Govee function, with the other lights (waiting on purchase)
 - [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
 - [ ] Front door smart lock in the Security box (waiting on purchase)
-- [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, Thermomix plug)
+- [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, espresso plug)
 
 ## Updating the diagram
 
