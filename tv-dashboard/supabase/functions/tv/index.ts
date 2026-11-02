@@ -123,7 +123,9 @@ async function lastState(id: string) {
 }
 
 // A Bot the TV heard: add it the first time (named later in Supabase), then store its state. In
-// press mode the Bot can't know if the appliance is on, so power carries over from the last reading.
+// press mode the Bot can't know if the appliance is on, so power carries over from the last reading,
+// until the appliance's own timer would have turned it off (auto_off_min, carried in the readings;
+// the towel warmer shuts itself off after 2 hours).
 async function botHeard(b: any) {
   if (typeof b?.mac !== "string" || !/^[0-9A-Fa-f:]{17}$/.test(b.mac)) return;
   const id = botId(b.mac);
@@ -134,11 +136,17 @@ async function botHeard(b: any) {
   }, { onConflict: "id", ignoreDuplicates: true });
   const press = b.mode !== "switchMode";
   const last = await lastState(id);
+  const autoOff = Number(last.auto_off_min) || null;
+  const since = typeof last.on_since === "string" ? Date.parse(last.on_since) : NaN;
+  const timedOut = press && last.power === true && autoOff !== null && Date.now() - since > autoOff * 60_000;
+  const power = press ? (timedOut ? false : typeof last.power === "boolean" ? last.power : null) : !!b.on;
   await db.from("home_readings").insert({
     device_id: id, source: "device",
     state: {
       online: true,
-      power: press ? (typeof last.power === "boolean" ? last.power : null) : !!b.on,
+      power,
+      on_since: power ? last.on_since ?? null : null,
+      auto_off_min: autoOff,
       mode: press ? "pressMode" : "switchMode",
       battery: Number.isFinite(b.battery) ? b.battery : null,
       rssi: Number.isFinite(b.rssi) ? b.rssi : null,
@@ -160,7 +168,8 @@ async function report(body: any) {
     // A Bot that just tapped (press mode): the appliance is now what the dashboard asked for.
     if (r.ok && row?.command?.ble && typeof row.command.on === "boolean") {
       const last = await lastState(row.device_id);
-      await db.from("home_readings").insert({ device_id: row.device_id, source: "command", state: { ...last, online: true, power: row.command.on } });
+      await db.from("home_readings").insert({ device_id: row.device_id, source: "command",
+        state: { ...last, online: true, power: row.command.on, on_since: row.command.on ? new Date().toISOString() : null } });
     }
   }
   for (const b of Array.isArray(body.ble) ? body.ble.slice(0, 20) : []) await botHeard(b);

@@ -1696,14 +1696,17 @@ function ApplianceRow({ dev, send, notify, narrow }: { dev: Light; send: Send; n
       setBusy(false);
     }
   };
-  const s = dev.state as (Light["state"] & { battery?: number | null; mode?: string | null }) | null;
+  const s = dev.state as (Light["state"] & { battery?: number | null; mode?: string | null; on_since?: string | null; auto_off_min?: number | null }) | null;
   const towel = /towel/i.test(dev.name);
   const Icon = towel ? TowelRack : /espresso|coffee/i.test(dev.name) ? Coffee : Plug;
   const onWord = towel ? "Warming" : "On";
   const offline = s?.online === false;
   const on = !!s?.power && !offline;
   const days = schedule ? new Set(schedule.blocks.map((b) => b.day)).size : 0;
-  const plan = !schedule ? "Loading schedule" : !schedule.blocks.length ? "No schedule yet"
+  // An appliance with its own shutoff timer (the towel warmer, 2 hours): when it turns itself off.
+  const offAt = on && s?.on_since && s?.auto_off_min ? new Date(Date.parse(s.on_since) + s.auto_off_min * 60_000) : null;
+  const plan = offAt && offAt.getTime() > Date.now() ? `Turns itself off at ${offAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : !schedule ? "Loading schedule" : !schedule.blocks.length ? "No schedule yet"
     : !schedule.enabled ? `Schedule off • ${schedule.blocks.length} block${schedule.blocks.length > 1 ? "s" : ""} on ${days} day${days > 1 ? "s" : ""}`
     : schedule.active ? `On by schedule until ${clock12(schedule.active.stop)}`
     : schedule.next ? `Next on ${DAY_SHORT[schedule.next.day]} ${clock12(schedule.next.start)}` : "Schedule on";
