@@ -1344,8 +1344,8 @@ const toUnit = (f: number, u: Unit) => (u === "C" ? Math.round((f - 32) * (5 / 9
 
 // One light button for a single bulb or several bulbs on one circuit: tap the name to open the color
 // menu, the power button switches it, and the slider along the bottom dims it.
-function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
-  lights: Light[]; label: string; onOpen: () => void; onPower: (on: boolean) => void; onBright: (v: number) => void; big?: boolean;
+function LightTile({ lights, label, onOpen, onPower, onBright, big, dense }: {
+  lights: Light[]; label: string; onOpen: () => void; onPower: (on: boolean) => void; onBright: (v: number) => void; big?: boolean; dense?: boolean;
 }) {
   const reachable = lights.filter((l) => l.state?.online !== false);
   const onLights = reachable.filter((l) => l.state?.power);
@@ -1374,7 +1374,7 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
     : `On, ${b}%`;
   const pct = range ? ((b - range.min) / Math.max(1, range.max - range.min)) * 100 : 0;
   return (
-    <div className={`relative w-full ${big ? "h-40" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
+    <div className={`relative w-full ${big ? "h-40" : dense ? "h-[100px]" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
       ? "bg-[#1a191f]/40 border-white/5 opacity-40"
       : on ? "bg-gradient-to-b from-[#1e1c23] to-[#16151b] border-white/15 shadow-lg shadow-black/30" : "bg-[#1a191f]/60 border-white/5"}`}>
       {on && <span className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none breathe" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
@@ -1757,7 +1757,19 @@ function ApplianceRow({ dev, send, notify, narrow }: { dev: Light; send: Send; n
   );
 }
 // What the espresso machine row will look like once its plug is connected.
-function EspressoSample() {
+function EspressoSample({ wide }: { wide?: boolean }) {
+  if (wide) return (
+    <div className="rounded-2xl border border-white/5 bg-[#1a191f]/60 p-2.5 flex items-center gap-3">
+      <span className="w-10 h-10 shrink-0 rounded-xl border bg-white/5 border-white/10 text-slate-400 flex items-center justify-center"><Coffee className="w-5 h-5" /></span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2"><span className="text-[14px] font-semibold text-white truncate">Espresso Machine</span><span className="text-[11px] font-medium text-slate-500">Off</span></div>
+        <div className="text-[11px] text-slate-400 truncate">Warm up weekdays 6:30 AM</div>
+      </div>
+      <span className="relative shrink-0 w-[46px] h-7 rounded-full bg-violet-500/50"><span className="absolute top-1 left-1 w-5 h-5 rounded-full translate-x-[18px] bg-slate-950" /></span>
+      <span className="shrink-0 px-3 h-9 flex items-center rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Schedule</span>
+      <span className="shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border bg-white/5 text-slate-300 border-white/10"><Power className="w-4 h-4" /></span>
+    </div>
+  );
   return (
     <div className="rounded-2xl border border-white/5 bg-[#1a191f]/60 p-3 flex flex-col gap-2.5">
       <div className="flex items-center gap-3">
@@ -2024,7 +2036,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   // Sample screens can open on a section with ?s=water; the unit choice is remembered per device.
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("s");
-    if (s) setSection(s === "camera" ? "security" : s); // the Camera tab became Security
+    if (s) setSection(s === "camera" ? "security" : s === "kitchen" ? "living" : s); // Camera became Security; Kitchen joined Living
     try { const u = localStorage.getItem("hq-unit"); if (u === "C" || u === "F") setUnit(u); } catch {}
   }, []);
   const chooseUnit = (u: Unit) => { setUnit(u); try { localStorage.setItem("hq-unit", u); } catch {} };
@@ -2135,8 +2147,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       ...list.filter((l) => !grouped || !circuit.includes(l)).map((l) => ({ key: l.id, label: shortName(l.name, roomName(roomId)), lights: [l] })),
     ];
   };
-  const tile = (u: { key: string; label: string; lights: Light[] }, big?: boolean) => (
-    <LightTile key={u.key} lights={u.lights} label={u.label} big={big}
+  const tile = (u: { key: string; label: string; lights: Light[] }, big?: boolean, dense?: boolean) => (
+    <LightTile key={u.key} lights={u.lights} label={u.label} big={big} dense={dense}
       onOpen={() => setLightId(u.key)} onPower={(on) => powerAll(u.lights, on)} onBright={(v) => brightAll(u.lights, v)} />
   );
   const setCircuit = (on: boolean) => circuit.filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
@@ -2276,8 +2288,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
 
   const tabs: { id: string; label: string; icon: LucideIcon; meta?: string }[] = [
     { id: "overview", label: "Overview", icon: LayoutGrid },
-    { id: "living", label: "Living", icon: Sofa, meta: `${onIn("living")} on` },
-    { id: "kitchen", label: "Kitchen", icon: CookingPot, meta: `${onIn("kitchen")} on` },
+    { id: "living", label: "Living & Kitchen", icon: Sofa, meta: `${onIn("living") + onIn("kitchen")} on` },
     { id: "bedroom", label: "Bedroom", icon: BedDouble, meta: `${onIn("bedroom")} on` },
     { id: "water", label: "Bathroom", icon: Bath, meta: heater?.state?.tank_pct != null ? `${heater.state.tank_pct}%` : undefined },
     { id: "security", label: "Security", icon: ShieldCheck, meta: cam?.state?.mode ? MODE_LABEL[cam.state.mode] : undefined },
@@ -2295,16 +2306,16 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     </div>
   );
 
-  const roomLights = (roomId: string, cols: number, big?: boolean) => {
+  const roomLights = (roomId: string, cols: number, big?: boolean, dense?: boolean) => {
     const list = lightsIn(roomId);
     return (
       <div className="space-y-2" key={roomId}>
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-semibold text-slate-200 tracking-tight">{roomName(roomId)}</span>
-          <button onClick={() => setRoom(roomId, false)} className="px-3 py-1.5 rounded-full text-[11px] text-slate-400 bg-white/5 border border-white/10 active:scale-95 font-medium">Turn all off</button>
+          <button onClick={() => setRoom(roomId, false)} className="px-3 py-1 rounded-full text-[11px] text-slate-400 bg-white/5 border border-white/10 active:scale-95 font-medium">Turn all off</button>
         </div>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {unitsIn(roomId).map((u) => tile(u, big))}
+          {unitsIn(roomId).map((u) => tile(u, big, dense))}
         </div>
         {list.length === 0 && <p className="text-[11px] text-slate-500">No lights in this room yet.</p>}
       </div>
@@ -2377,7 +2388,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <PanelHead icon={Palette} tone={AMBER} title="Lighting Console" sub={`${lightsOn} on • tap a room for its lights`}
             right={<span className="text-[10px] font-mono text-slate-500">Cloud</span>} />
           <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-white/5 bg-black/25 divide-y divide-white/5 overflow-hidden">
-            {ROOMS.map((r) => <RoomRow key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
+            {ROOMS.map((r) => <RoomRow key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id === "kitchen" ? "living" : r.id)} onAll={(on) => setRoom(r.id, on)} />)}
             {otherRooms.map(({ name, lights: ls }) => (
               <RoomRow key={name} room={{ id: name, name, icon: roomIcon(name) }} lights={ls} onAll={(on) => powerAll(ls, on)} />
             ))}
@@ -2397,7 +2408,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     const roomCam = items.find((d): d is Camera => d.kind === "camera");
     return (
       <div className={`flex-1 min-h-[150px] ${PANEL} p-4 flex flex-col gap-3 overflow-hidden`}>
-        <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={items.length ? `${items.length} in the ${room === "living" ? "living room" : "bedroom"}` : "Nothing here yet"}
+        <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={room === "living" ? `${items.length + kitchenSwitches.length} in the living room and kitchen` : items.length ? `${items.length} in the bedroom` : "Nothing here yet"}
           right={roomCam ? (
             <button onClick={() => setSection("security")} aria-label={`Open the ${roomCam.name} camera`}
               className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border bg-violet-500/10 border-violet-500/25 text-violet-300 active:scale-95">
@@ -2418,8 +2429,11 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         {roomCam && !roomTv && (
           <p className="text-[12px] text-slate-400">{roomCam.name} camera: {roomCam.state?.online === false ? "offline" : "online"}. Tap Camera to watch.</p>
         )}
-        {!items.length && (
-          <p className="text-[12px] text-slate-500 leading-relaxed">No appliances or tech assigned to the {room === "living" ? "living room" : "bedroom"} yet. Devices you add to this room will show up here.</p>
+        {room === "living" && (kitchenSwitches.length
+          ? kitchenSwitches.map((d) => <ApplianceRow key={d.id} dev={d} send={send} notify={setToast} />)
+          : <div className="relative pt-1"><Preview label="NOT CONNECTED YET"><EspressoSample wide /></Preview></div>)}
+        {!items.length && room === "bedroom" && (
+          <p className="text-[12px] text-slate-500 leading-relaxed">No appliances or tech assigned to the bedroom yet. Devices you add to this room will show up here.</p>
         )}
       </div>
     );
@@ -2427,49 +2441,17 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
 
   const zoneView = (room: "living" | "bedroom") => (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
-      <div className={`${PANEL} lg:col-span-7 p-5 flex flex-col gap-4 min-h-0`}>
-        <PanelHead icon={Wind} tone={CYAN} title={`${room === "living" ? "Living Room" : "Bedroom"} AC`} sub="LG ducted unit"
+      <div className={`${PANEL} ${room === "living" ? "lg:col-span-5" : "lg:col-span-7"} p-5 flex flex-col gap-4 min-h-0`}>
+        <PanelHead icon={Wind} tone={CYAN} title={`${room === "living" ? "Living & Kitchen" : "Bedroom"} AC`} sub={room === "living" ? "LG ducted unit • one zone" : "LG ducted unit"}
           right={<div className="flex items-center gap-2">{unitToggle}<PowerBtn on={false} disabled label="AC power" /></div>} />
         <Preview className="flex-1 min-h-0"><AcZoneSample /></Preview>
       </div>
-      <div className="lg:col-span-5 flex flex-col gap-3 min-h-0">
+      <div className={`${room === "living" ? "lg:col-span-7" : "lg:col-span-5"} flex flex-col gap-3 min-h-0`}>
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a light's name for colors" />
-          {room === "living" ? roomLights("living", 2) : roomLights("bedroom", 2)}
+          {room === "living" ? <>{roomLights("living", 3, false, true)}{roomLights("kitchen", 3, false, true)}</> : roomLights("bedroom", 2)}
         </div>
         {techBox(room)}
-      </div>
-    </main>
-  );
-
-  const kitchenView = (
-    <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
-      <div className={`lg:col-span-8 ${PANEL} p-5 flex flex-col gap-4`}>
-        <PanelHead icon={Palette} tone={AMBER} title="Kitchen Lights" sub={`${onIn("kitchen")} on • tap a light's name for colors`}
-          right={<button onClick={() => setRoom("kitchen", !lightsIn("kitchen").some((l) => l.state?.power && l.state?.online !== false))}
-            className="px-3 h-10 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium flex items-center gap-1.5"><Power className="w-3.5 h-3.5" />{onIn("kitchen") ? "All off" : "All on"}</button>} />
-        <div className="grid grid-cols-2 gap-3">
-          {unitsIn("kitchen").map((u) => tile(u, true))}
-        </div>
-      </div>
-      <div className="lg:col-span-4 flex flex-col gap-3">
-        <div className={`${PANEL} p-4 flex flex-col gap-3`}>
-          <PanelHead icon={Wind} tone={CYAN} title="Shared AC" sub="Kitchen and living room are one zone" />
-          <Preview corner="br">
-            <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-              <span className="text-[11px] text-slate-400">Room 74°</span>
-              <span className="text-3xl font-bold font-mono">72°</span>
-              <span className="text-[11px] font-mono text-cyan-400">COOL</span>
-            </div>
-          </Preview>
-          <button onClick={() => setSection("living")} className="py-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-sm font-semibold">Open living room</button>
-        </div>
-        <div className={`${PANEL} p-4 flex flex-col gap-3`}>
-          <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={kitchenSwitches.length ? `${kitchenSwitches.length} in the kitchen` : "Espresso machine smart plug"} />
-          {kitchenSwitches.length
-            ? kitchenSwitches.map((d) => <ApplianceRow key={d.id} dev={d} send={send} notify={setToast} narrow />)
-            : <Preview label="NOT CONNECTED YET"><EspressoSample /></Preview>}
-        </div>
       </div>
     </main>
   );
@@ -2762,7 +2744,6 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         {section === "overview" && overview}
         {section === "living" && zoneView("living")}
         {section === "bedroom" && zoneView("bedroom")}
-        {section === "kitchen" && kitchenView}
         {section === "water" && waterView}
         {section === "security" && securityView}
         {section === "history" && <HistoryView meter={meter} onConnectConed={() => setConedOpen(true)} />}

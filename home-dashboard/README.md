@@ -62,6 +62,8 @@ Done
 - [x] Balcony lights: Govee outdoor smart plug through the Govee function, as a tile in the Lighting Console (2026-11-02)
 - [x] LIFX (Coffee Station lamp, kitchen) and SwitchBot functions; Water tab became Bathroom with an Appliances & Tech box: towel warmer with power and its own weekly schedule, pressed over Bluetooth by the TV app since there is no hub (2026-11-02)
 
+- [x] Living and Kitchen tabs merged into one Living & Kitchen tab (shared AC, both rooms' lights, TV, camera and the espresso machine) (2026-11-02)
+
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
 - [ ] Espresso machine plug: Shelly Plug US Gen4 for on/off, a morning warm up schedule and power use (waiting on purchase)
