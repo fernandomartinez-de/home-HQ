@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useR
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, Sunset, Coffee, type LucideIcon,
+  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, Sunset, Coffee, CalendarClock, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, Cell, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
@@ -1417,7 +1417,7 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big, dense }: {
 // Rooms with lights but no tab of their own (the balcony): a row in the console that only switches.
 const roomIcon = (name: string): LucideIcon => /balcon|terrace|patio|outdoor/i.test(name) ? Sunset : Lightbulb;
 
-function RoomRow({ room, lights, onOpen, onAll }: { room: { id: string; name: string; icon: LucideIcon }; lights: Light[]; onOpen?: () => void; onAll: (on: boolean) => void }) {
+function RoomRow({ room, lights, onOpen, onAll, extra }: { room: { id: string; name: string; icon: LucideIcon }; lights: Light[]; onOpen?: () => void; onAll: (on: boolean) => void; extra?: ReactNode }) {
   const Icon = room.icon;
   const reachable = lights.filter((l) => l.state?.online !== false);
   const onLights = reachable.filter((l) => l.state?.power);
@@ -1452,6 +1452,7 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: { id: string; name: st
           </span>
         </span>
       </button>
+      {extra && <span className="relative z-10 shrink-0 mr-1.5">{extra}</span>}
       <button onClick={() => onAll(!allOn)} disabled={!reachable.length} aria-label={allOn ? `Turn off ${room.name} lights` : `Turn on ${room.name} lights`}
         className={`relative z-10 shrink-0 mr-2.5 h-9 w-[76px] flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-30 ${allOn
           ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-300 border-white/10"}`}>
@@ -1796,6 +1797,51 @@ function EspressoSample({ wide }: { wide?: boolean }) {
         <span className="shrink-0 px-3 h-9 flex items-center rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Schedule</span>
       </div>
     </div>
+  );
+}
+
+// A schedule for one device as a small button (the balcony lights): opens the weekly editor; saving
+// blocks turns the schedule on, saving none turns it off. Lit while the schedule is on.
+function ScheduleButton({ deviceId, name, notify }: { deviceId: string; name: string; notify: (m: string) => void }) {
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [editing, setEditing] = useState(false);
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/schedule?device_id=${encodeURIComponent(deviceId)}`, { cache: "no-store" });
+      const body = await r.json();
+      if (r.ok) setSchedule(body);
+    } catch { /* the button still opens once it loads */ }
+  }, [deviceId]);
+  useEffect(() => { load(); const t = setInterval(load, 60_000); return () => clearInterval(t); }, [load]);
+  const saved = async (x: Schedule) => {
+    setEditing(false);
+    try {
+      const want = x.blocks.length > 0;
+      if (x.enabled !== want) {
+        const r = await fetch("/api/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device_id: deviceId, enabled: want }) });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error);
+        x = body;
+      }
+      setSchedule(x);
+      notify(want ? `${name} schedule on.` : `${name} schedule off.`);
+    } catch (e) {
+      notify(`Couldn't turn the schedule on: ${(e as Error).message}`);
+    }
+  };
+  const on = !!schedule?.enabled && schedule.blocks.length > 0;
+  const next = on && schedule ? (schedule.active ? `on until ${clock12(schedule.active.stop)}` : schedule.next ? `next ${DAY_SHORT[schedule.next.day]} ${clock12(schedule.next.start)}` : "") : "";
+  return (
+    <>
+      <button onClick={() => setEditing(true)} disabled={!schedule} aria-label={`${name} schedule${next ? `, ${next}` : ""}`} title={next || "Schedule"}
+        className={`h-9 w-9 flex items-center justify-center rounded-lg border transition-all active:scale-95 ${on ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-400 border-white/10"}`}>
+        <CalendarClock className="w-4 h-4" />
+      </button>
+      {editing && schedule && (
+        <ScheduleEditor deviceId={deviceId} title={`${name} schedule`} noun={`The ${name.toLowerCase()}`} schedule={schedule} notify={notify}
+          onClose={() => setEditing(false)} onSaved={saved} />
+      )}
+    </>
   );
 }
 
@@ -2401,7 +2447,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-white/5 bg-black/25 divide-y divide-white/5 overflow-hidden">
             {ROOMS.map((r) => <RoomRow key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id === "kitchen" ? "living" : r.id)} onAll={(on) => setRoom(r.id, on)} />)}
             {otherRooms.map(({ name, lights: ls }) => (
-              <RoomRow key={name} room={{ id: name, name, icon: roomIcon(name) }} lights={ls} onAll={(on) => powerAll(ls, on)} />
+              <RoomRow key={name} room={{ id: name, name, icon: roomIcon(name) }} lights={ls} onAll={(on) => powerAll(ls, on)}
+                extra={ls.length === 1 ? <ScheduleButton deviceId={ls[0].id} name={ls[0].name} notify={setToast} /> : undefined} />
             ))}
           </div>
         </div>
