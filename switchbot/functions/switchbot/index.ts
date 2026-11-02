@@ -10,6 +10,7 @@
 //   POST /switchbot {"action":"command","device_id":"switchbot_<id>","command":{...}}
 //        commands: {"action":"power","on":true}
 //                  {"action":"press"}                         (Bot only)
+//   POST /switchbot {"action":"list"}   every device and remote on the account, supported or not
 //
 // A Bot in press mode only taps its button, so SwitchBot can't say whether the appliance is on.
 // For those, power is what the dashboard last asked for, carried from reading to reading.
@@ -168,6 +169,13 @@ Deno.serve(async (req) => {
     if (req.method === "GET") return json({ devices: await live() });
     const body = await req.json().catch(() => ({}));
     if (body.action === "poll") return json({ polled: await poll() });
+    if (body.action === "list") {
+      const all = await sb("/devices");
+      return json({
+        devices: (all.deviceList ?? []).map((d: Dev) => ({ name: d.deviceName, type: d.deviceType, hub: d.hubDeviceId ?? null, cloud: d.enableCloudService ?? null })),
+        remotes: (all.infraredRemoteList ?? []).map((r: any) => ({ name: r.deviceName, type: r.remoteType })),
+      });
+    }
     if (body.action === "command") return json(await command(body.device_id, body.command, body.source ?? "ui"));
     return json({ error: "use GET, or POST with action poll or command" }, 400);
   } catch (err) {
