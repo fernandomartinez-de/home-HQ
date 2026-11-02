@@ -137,13 +137,21 @@ export function mockCommand(id: string, c: Command) {
 
 // ---------- sample schedule ----------
 
-let blocks: ScheduleBlock[] = [0, 1, 2, 3, 4, 5, 6].flatMap((day) => [
+// One sample week per device: the water heater heats mornings and evenings; anything with a power
+// switch (the towel warmer) runs early on weekday mornings.
+const heaterWeek = (): ScheduleBlock[] => [0, 1, 2, 3, 4, 5, 6].flatMap((day) => [
   { day, slot: "Morning", start: "07:00", stop: "12:00", command: { action: "set_state", mode: "heat_pump", setpoint: day === 4 ? 140 : 135 } },
   { day, slot: "Evening", start: "18:00", stop: "23:00", command: { action: "set_state", mode: day === 0 ? "energy_saver" : "heat_pump", setpoint: day === 4 ? 140 : 135 } },
 ]);
-let scheduleOn = false;
+const powerWeek = (): ScheduleBlock[] => [1, 2, 3, 4, 5].map((day) => ({ day, slot: "Morning", start: "06:00", stop: "07:30", command: { action: "power", on: true } }));
+const schedules = new Map<string, { blocks: ScheduleBlock[]; on: boolean }>();
+const sched = (id: string) => {
+  if (!schedules.has(id)) schedules.set(id, { blocks: id.startsWith("rheem") ? heaterWeek() : powerWeek(), on: !id.startsWith("rheem") });
+  return schedules.get(id)!;
+};
 
 export function mockSchedule(deviceId: string): Schedule {
+  const { blocks, on } = sched(deviceId);
   const now = new Date();
   const nowW = now.getDay() * 1440 + now.getHours() * 60 + now.getMinutes();
   const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
@@ -152,16 +160,17 @@ export function mockSchedule(deviceId: string): Schedule {
   const dur = (b: ScheduleBlock) => (m(b.stop) > m(b.start) ? m(b.stop) - m(b.start) : m(b.stop) + 1440 - m(b.start));
   const active = blocks.find((b) => since(nowW, startW(b)) < dur(b)) ?? null;
   const next = [...blocks].sort((a, b) => since(startW(a), nowW) - since(startW(b), nowW)).find((b) => b !== active) ?? null;
-  return { device_id: deviceId, name: "Heat Pump Water Heater", enabled: scheduleOn, time_zone: "America/New_York", blocks, active, next, mock: true };
+  const name = deviceId.startsWith("rheem") ? "Heat Pump Water Heater" : "Towel Warmer";
+  return { device_id: deviceId, name, enabled: on, time_zone: "America/New_York", blocks, active, next, mock: true };
 }
 
 export function mockSaveSchedule(deviceId: string, next: ScheduleBlock[]) {
-  blocks = next;
+  sched(deviceId).blocks = next;
   return mockSchedule(deviceId);
 }
 
 export function mockEnableSchedule(deviceId: string, enabled: boolean) {
-  scheduleOn = enabled;
+  sched(deviceId).on = enabled;
   return mockSchedule(deviceId);
 }
 

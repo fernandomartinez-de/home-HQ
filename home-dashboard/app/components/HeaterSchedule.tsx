@@ -117,9 +117,14 @@ export default function HeaterSchedule({ heater, notify }: { heater: Heater; not
 
 // ---------- editor ----------
 
-export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
-  heater: Heater; schedule: Schedule; notify: (m: string) => void; onClose: () => void; onSaved: (s: Schedule) => void;
+// The weekly editor. With a heater, each block heats to a temperature; without one (deviceId and a
+// name, like the towel warmer), each block just turns the device on, and it's off the rest of the time.
+export function ScheduleEditor({ heater, deviceId, title, noun, schedule, notify, onClose, onSaved }: {
+  heater?: Heater; deviceId?: string; title?: string; noun?: string;
+  schedule: Schedule; notify: (m: string) => void; onClose: () => void; onSaved: (s: Schedule) => void;
 }) {
+  const id = heater?.id ?? deviceId ?? schedule.device_id;
+  const what = noun ?? (heater ? "The heater" : "It");
   const dialog = useRef<HTMLDialogElement>(null);
   const today = new Date().getDay();
   const [day, setDay] = useState(today);
@@ -128,8 +133,11 @@ export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   // Blocks always heat in Energy saver; only the times and temperature are editable.
-  const onMode = heater.capabilities.modes.includes("energy_saver") ? "energy_saver" : heater.capabilities.modes.find((m) => m !== "off") ?? "energy_saver";
-  const lo = heater.capabilities.setpoint_min_f ?? 110, hi = heater.capabilities.setpoint_max_f ?? 140;
+  const onMode = !heater ? null : heater.capabilities.modes.includes("energy_saver") ? "energy_saver" : heater.capabilities.modes.find((m) => m !== "off") ?? "energy_saver";
+  const lo = heater?.capabilities.setpoint_min_f ?? 110, hi = heater?.capabilities.setpoint_max_f ?? 140;
+  const onCommand = (b?: ScheduleBlock) => heater
+    ? { action: "set_state", mode: onMode, setpoint: b?.command.setpoint ?? Math.min(hi, Math.max(lo, 125)) }
+    : { action: "power", on: true };
 
   useEffect(() => { dialog.current?.showModal(); }, []);
 
@@ -160,10 +168,7 @@ export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
     if (startMin > 1200) startMin = last ? toMin(last.stop) : 420;
     const start = fromMin(startMin);
     const stop = fromMin(startMin + 120);
-    setBlocks((all) => [...all, {
-      day, start, stop,
-      command: { action: "set_state", mode: onMode, setpoint: last?.command.setpoint ?? Math.min(hi, Math.max(lo, 125)) },
-    }]);
+    setBlocks((all) => [...all, { day, start, stop, command: onCommand(last) }]);
     setDirty(true);
   };
 
@@ -181,12 +186,12 @@ export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
 
   const save = async () => {
     setSaving(true);
-    const toSave = blocks.map((b) => ({ ...b, command: { ...b.command, action: "set_state", mode: onMode } }));
+    const toSave = blocks.map((b) => ({ ...b, command: onCommand(b) }));
     try {
       const r = await fetch("/api/schedule", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: heater.id, blocks: toSave }),
+        body: JSON.stringify({ device_id: id, blocks: toSave }),
       });
       const body = await r.json();
       if (!r.ok) throw new Error(body.error);
@@ -211,7 +216,7 @@ export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
     <dialog ref={dialog} className="sheet sheet-wide" onClose={onClose} onCancel={(e) => { e.preventDefault(); close(); }}>
       <div className="sheet-inner">
         <div className="sheet-head">
-          <h2 className="panel-title">Hot water schedule</h2>
+          <h2 className="panel-title">{title ?? "Hot water schedule"}</h2>
           <button className="btn btn-quiet btn-small" onClick={close}>Cancel</button>
         </div>
 
@@ -225,7 +230,7 @@ export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
           ))}
         </div>
 
-        <p className="muted small">The heater runs during these blocks and is off the rest of {dayName(day)}.</p>
+        <p className="muted small">{what} runs during these blocks and is off the rest of {dayName(day)}.</p>
 
         <ol className="block-list">
           {dayBlocks.map(({ b, i }) => (
@@ -244,7 +249,7 @@ export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
                   <input type="time" value={b.stop} step={900} onChange={(e) => e.target.value && change(i, { stop: e.target.value })} />
                 </label>
               </div>
-              <div className="block-settings">
+              {heater && <div className="block-settings">
                 <span className="block-temp-label">Temperature</span>
                 <div className="slot-temp" aria-label="Temperature">
                   <button className="step step-small" disabled={(b.command.setpoint ?? lo) <= lo}
@@ -253,13 +258,13 @@ export function ScheduleEditor({ heater, schedule, notify, onClose, onSaved }: {
                   <button className="step step-small" disabled={(b.command.setpoint ?? lo) >= hi}
                     onClick={() => change(i, {}, { setpoint: (b.command.setpoint ?? lo) + 1 })} aria-label="Raise">+</button>
                 </div>
-              </div>
+              </div>}
               {toMin(b.stop) < toMin(b.start) && <p className="muted small">Runs past midnight into {dayName((b.day + 1) % 7)}.</p>}
               {b.start === b.stop && <p className="block-warn">Start and stop are the same time.</p>}
               {clashes.has(i) && <p className="block-warn">Overlaps another block. Adjust the times.</p>}
             </li>
           ))}
-          {dayBlocks.length === 0 && <li className="muted">No blocks. The heater stays off all of {dayName(day)}.</li>}
+          {dayBlocks.length === 0 && <li className="muted">No blocks. {what} stays off all of {dayName(day)}.</li>}
         </ol>
 
         {dayBlocks.length < MAX_BLOCKS && (

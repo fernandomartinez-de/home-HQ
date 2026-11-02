@@ -60,12 +60,12 @@ Done
 - [x] Water tab redesign: animated glass tank, setpoint dial, mode buttons, schedule timeline with now line, tank chart with heating bands (2026-11-01)
 - [x] Water tab tank insights (6/12/24 h, low point, cycles, schedule and heating lanes); violet theme to match the logo; animations throughout (2026-11-01)
 - [x] Balcony lights: Govee outdoor smart plug through the Govee function, as a tile in the Lighting Console (2026-11-02)
-- [x] LIFX and SwitchBot functions: wall washer lamp with the lights, towel warmer Bot as an on and off tile kept out of scenes (2026-11-02)
+- [x] LIFX (Coffee Station lamp, kitchen) and SwitchBot functions; Water tab became Bathroom with an Appliances & Tech box: towel warmer with power and its own weekly schedule, pressed over Bluetooth by the TV app since there is no hub (2026-11-02)
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
 - [ ] Espresso machine plug: Shelly Plug US Gen4 for on/off, a morning warm up schedule and power use (waiting on purchase)
-- [ ] LIFX and SwitchBot: add the secrets (LIFX_TOKEN, SWITCHBOT_TOKEN, SWITCHBOT_SECRET); polls start on their own
+- [ ] Towel warmer: install TV app build 18 so the TV can reach the Bot
 - [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
 - [ ] Front door smart lock in the Security box (waiting on purchase)
 - [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, espresso plug)
