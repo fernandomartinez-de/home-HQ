@@ -104,9 +104,9 @@ function Sized({ children }: { children: (w: number, h: number) => ReactNode }) 
   return <div ref={ref} className="absolute inset-0">{size && size.w > 0 && size.h > 0 ? children(size.w, size.h) : null}</div>;
 }
 
-const PANEL = "relative bg-[#15121c]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl panel-in";
+const PANEL = "relative bg-[#141318]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl panel-in";
 const CYAN = "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
-const AMBER = "bg-violet-500/10 text-violet-400 border-violet-500/20";
+const AMBER = "bg-white/5 text-slate-300 border-white/10";
 const GREEN = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
 // How each panel icon moves: a flickering flame, a crackling bolt, a beating shield, and so on.
@@ -172,7 +172,7 @@ function Preview({ children, className = "", label = "NOT CONNECTED" }: { childr
   return (
     <div className={`flex flex-col ${className}`}>
       <div aria-hidden="true" className="flex-1 min-h-0 flex flex-col gap-2.5 opacity-55 saturate-50 pointer-events-none select-none">{children}</div>
-      <span className="absolute -top-2.5 right-6 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#0e0c14] border border-white/15 text-[9px] font-mono tracking-wider text-slate-400">
+      <span className="absolute -top-2.5 right-6 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#0e0d12] border border-white/15 text-[9px] font-mono tracking-wider text-slate-400">
         <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />{label}
       </span>
     </div>
@@ -198,7 +198,7 @@ function CamStandIn({ big }: { big?: boolean }) {
   return (
     <>
       <div className="relative flex-1 min-h-[120px] rounded-2xl overflow-hidden border border-white/10 bg-black">
-        <div className="absolute inset-0" style={{ background: "radial-gradient(40% 55% at 22% 62%, rgba(245,158,11,0.55), transparent 70%), radial-gradient(30% 40% at 78% 70%, rgba(99,102,241,0.45), transparent 70%), linear-gradient(180deg, #251e30 0%, #17131f 55%, #0f0c0a 100%)" }}>
+        <div className="absolute inset-0" style={{ background: "radial-gradient(40% 55% at 22% 62%, rgba(245,158,11,0.55), transparent 70%), radial-gradient(30% 40% at 78% 70%, rgba(99,102,241,0.45), transparent 70%), linear-gradient(180deg, #211f28 0%, #16151b 55%, #0f0c0a 100%)" }}>
           <div className="absolute left-[8%] right-[8%] bottom-[14%] h-[22%] rounded-t-[28px] bg-[#3a2e25]/80" />
           <div className="absolute left-[14%] bottom-[30%] w-[16%] h-[14%] rounded-xl bg-[#4a3a2e]/80" />
           <div className="absolute right-[12%] top-[18%] w-[30%] h-[34%] rounded-md bg-black/70 border border-white/10" />
@@ -341,7 +341,7 @@ const shiftDay = (d: string, n: number) => new Date(atNoon(d).getTime() + n * 86
 const hoursText = (h: number | null | undefined) => (h == null ? "--" : h >= 10 ? `${Math.round(h)} h` : `${h.toFixed(1)} h`);
 const sum = (xs: (number | null | undefined)[]) => xs.reduce<number>((t, x) => t + (x ?? 0), 0);
 
-const TIP = { contentStyle: { background: "#1a1622", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, fontSize: 11 }, labelStyle: { color: "#e2e8f0" }, cursor: { fill: "rgba(255,255,255,0.04)" } };
+const TIP = { contentStyle: { background: "#19181e", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, fontSize: 11 }, labelStyle: { color: "#e2e8f0" }, cursor: { fill: "rgba(255,255,255,0.04)" } };
 
 // Commands as people think of them: four kitchen bulbs switched off together is one entry, and a run of
 // volume taps on the TV is one entry with a count.
@@ -479,7 +479,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
     <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/10">
       {([["daily", "30 days"], ["bills", "Bills"]] as const).map(([id, label]) => (
         <button key={id} onClick={() => setMode(id)} aria-pressed={mode === id}
-          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${mode === id ? "bg-violet-500 text-white" : "text-slate-400"}`}>{label}</button>
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${mode === id ? "bg-white/10 text-white" : "text-slate-400"}`}>{label}</button>
       ))}
     </div>
   );
@@ -714,7 +714,7 @@ function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose:
   const tile = "min-w-0 rounded-xl bg-black/30 border border-white/5 px-3 py-2";
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md p-4 flex" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="flex-1 min-h-0 bg-[#15121c] border border-white/15 rounded-3xl shadow-2xl p-4 flex flex-col gap-3 overflow-hidden">
+      <div className="flex-1 min-h-0 bg-[#141318] border border-white/15 rounded-3xl shadow-2xl p-4 flex flex-col gap-3 overflow-hidden">
         <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className={`p-2 rounded-xl border ${GREEN}`}><Zap className="w-4 h-4" /></div>
@@ -877,7 +877,7 @@ function ConEdConnect({ onClose, onConnected }: { onClose: () => void; onConnect
   const input = "w-full h-12 px-4 rounded-xl bg-black/40 border border-white/10 text-[15px] text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 select-text";
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <form onSubmit={submit} className="bg-[#1a1622] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-3">
+      <form onSubmit={submit} className="bg-[#19181e] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className={`p-2 rounded-xl border ${GREEN}`}><Zap className="w-4 h-4" /></div>
@@ -1236,7 +1236,7 @@ function RingConnect({ onConnected }: { onConnected: () => void }) {
         </>
       )}
       {err && <p role="alert" className="text-[12px] text-rose-300 text-center">{err}</p>}
-      <button type="submit" disabled={busy} className="h-12 rounded-xl bg-violet-500 text-white text-sm font-bold disabled:opacity-60 active:scale-[0.99]">
+      <button type="submit" disabled={busy} className="h-12 rounded-xl bg-violet-500/80 text-white text-sm font-bold disabled:opacity-60 active:scale-[0.99]">
         {busy ? "Connecting" : prompt ? "Verify and connect" : "Continue"}
       </button>
       {prompt && <button type="button" onClick={() => { setPrompt(null); setErr(null); }} className="text-[12px] text-slate-400 underline underline-offset-4">Start over</button>}
@@ -1372,8 +1372,8 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
   const pct = range ? ((b - range.min) / Math.max(1, range.max - range.min)) * 100 : 0;
   return (
     <div className={`relative w-full ${big ? "h-40" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
-      ? "bg-[#1b1723]/40 border-white/5 opacity-40"
-      : on ? "bg-gradient-to-b from-[#241c33] to-[#171223] border-violet-500/40 shadow-lg shadow-violet-950/40" : "bg-[#1b1723]/60 border-white/5"}`}>
+      ? "bg-[#1a191f]/40 border-white/5 opacity-40"
+      : on ? "bg-gradient-to-b from-[#1e1c23] to-[#16151b] border-white/15 shadow-lg shadow-black/30" : "bg-[#1a191f]/60 border-white/5"}`}>
       {on && <span className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none breathe" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
       <div className={`relative z-10 flex-1 min-h-0 flex items-start gap-2 ${big ? "p-4 pb-2" : "p-3 pb-1.5"}`}>
         <button onClick={onOpen} disabled={offline} aria-label={`${label} color`} className="flex-1 min-w-0 h-full text-left flex flex-col justify-between">
@@ -1388,11 +1388,11 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
               </span>
             ) : on && <span className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: hex }} />}
           </span>
-          <span className={`${big ? "text-sm" : "text-[11px]"} font-medium ${offline ? "text-rose-400/90" : on ? "text-violet-200/90" : "text-slate-500"}`}>{status}</span>
+          <span className={`${big ? "text-sm" : "text-[11px]"} font-medium ${offline ? "text-rose-400/90" : on ? "text-slate-200" : "text-slate-500"}`}>{status}</span>
         </button>
         <button onClick={() => onPower(!on)} disabled={offline} aria-label={on ? `Turn off ${label}` : `Turn on ${label}`} aria-pressed={on}
           className={`shrink-0 ${big ? "w-11 h-11" : "w-10 h-10"} flex items-center justify-center rounded-xl border transition-all active:scale-95 ${on
-            ? "bg-violet-500 text-white border-violet-400 shadow-md shadow-violet-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
+            ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-300 border-white/10"}`}>
           <Power className="w-4 h-4" />
         </button>
       </div>
@@ -1422,14 +1422,14 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
     <div className="relative flex-1 min-h-[54px] flex items-center overflow-hidden">
       {glow && <span className="absolute inset-y-0 left-0 w-1/2 pointer-events-none breathe" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
       <button onClick={onOpen} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-3 pl-3 pr-2 text-left active:bg-white/5 transition-colors">
-        <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border transition-shadow duration-700 ${onLights.length ? "bg-violet-500/15 border-violet-500/30 text-violet-300" : "bg-white/5 border-white/10 text-slate-500"}`}
+        <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border transition-shadow duration-700 ${onLights.length ? "bg-white/5 border-white/15 text-slate-100" : "bg-white/5 border-white/10 text-slate-500"}`}
           style={glow ? { boxShadow: `0 0 16px -2px ${glow}` } : undefined}>
           <Icon className="w-4 h-4" />
         </span>
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-0.5 text-[14px] font-semibold text-white leading-tight">{room.name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
           <span className="block text-[11px] text-slate-400 truncate">
-            <span className={onLights.length ? "text-violet-200/90" : ""}>{onLights.length} of {lights.length} on</span>
+            <span className={onLights.length ? "text-slate-200" : ""}>{onLights.length} of {lights.length} on</span>
             {offline > 0 && <span className="text-rose-400/80"> • {offline} offline</span>}
           </span>
           {/* Each light as a chip, so the row shows which lights are on at a glance. */}
@@ -1448,7 +1448,7 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
       </button>
       <button onClick={() => onAll(!allOn)} disabled={!reachable.length} aria-label={allOn ? `Turn off ${room.name} lights` : `Turn on ${room.name} lights`}
         className={`relative z-10 shrink-0 mr-2.5 h-9 w-[76px] flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-30 ${allOn
-          ? "bg-violet-500 text-white border-violet-400 shadow-md shadow-violet-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
+          ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-300 border-white/10"}`}>
         <Power className="w-3.5 h-3.5" />{allOn ? "All off" : "All on"}
       </button>
     </div>
@@ -1497,7 +1497,7 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-[#1a1622] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4">
+      <div className="bg-[#19181e] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="w-4 h-4 rounded-full border border-white/30" style={{ backgroundColor: on ? hex : "transparent" }} />
@@ -1686,7 +1686,7 @@ function WeekTimeline({ schedule }: { schedule: Schedule }) {
                 return (
                   <span key={i} title={`${b.start} to ${b.stop}${b.command.setpoint ? `, ${b.command.setpoint}°` : ""}`}
                     className={`absolute inset-y-0.5 rounded flex items-center justify-center text-[10px] font-mono font-bold overflow-hidden ${!schedule.enabled ? "bg-slate-600/60 text-slate-300"
-                      : offBlock ? "bg-slate-500/40 text-slate-300" : "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]"}`}
+                      : offBlock ? "bg-slate-500/40 text-slate-300" : "bg-violet-400/20 text-violet-100 border border-violet-300/25"}`}
                     style={{ left: `${(a / 1440) * 100}%`, width: `${((z - a) / 1440) * 100}%` }}>
                     {wide && (offBlock ? "OFF" : b.command.setpoint ? `${b.command.setpoint}°` : "")}
                   </span>
@@ -1786,7 +1786,7 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
           <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/10">
             {([6, 12, 24] as const).map((h) => (
               <button key={h} onClick={() => setHours(h)} aria-pressed={hours === h}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono transition-all ${hours === h ? "bg-violet-500 text-white" : "text-slate-400"}`}>{h}H</button>
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono transition-all ${hours === h ? "bg-white/10 text-white" : "text-slate-400"}`}>{h}H</button>
             ))}
           </div>
         } />
@@ -1822,16 +1822,16 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
                     label={{ value: "LOW", position: "insideTopLeft", fill: "#f43f5e", fontSize: 9, opacity: 0.7 }} />
                   <Tooltip {...TIP} labelFormatter={(v) => clockTime(new Date(Number(v)).toISOString())} formatter={(v) => [`${v}%`, "Hot water"]} />
                   <Area type="monotone" dataKey="tank" stroke="url(#tank-level-line)" fill="url(#tank-level-fill)" strokeWidth={3} filter="url(#tank-level-glow)"
-                    isAnimationActive animationDuration={1100} animationEasing="ease-out" dot={false} activeDot={{ r: 5, fill: "#fbbf24", stroke: "#0e0c14", strokeWidth: 2 }} />
+                    isAnimationActive animationDuration={1100} animationEasing="ease-out" dot={false} activeDot={{ r: 5, fill: "#fbbf24", stroke: "#0e0d12", strokeWidth: 2 }} />
                   {low && (
-                    <ReferenceDot x={low.ts} y={low.tank} r={4} fill="#0e0c14" stroke="#fbbf24" strokeWidth={2}
+                    <ReferenceDot x={low.ts} y={low.tank} r={4} fill="#0e0d12" stroke="#fbbf24" strokeWidth={2}
                       label={{ value: `LOW ${low.tank}%`, position: low.tank < 20 ? "top" : "bottom", fill: "#fbbf24", fontSize: 10, fontFamily: "ui-monospace, monospace" }} />
                   )}
                   {last && (
                     <ReferenceDot x={last.ts} y={last.tank} r={4} shape={(props: { cx?: number; cy?: number }) => (
                       <g>
                         <circle cx={props.cx} cy={props.cy} r={4} fill="#22d3ee" className="svg-ping" />
-                        <circle cx={props.cx} cy={props.cy} r={4.5} fill="#22d3ee" stroke="#0e0c14" strokeWidth={2} />
+                        <circle cx={props.cx} cy={props.cy} r={4.5} fill="#22d3ee" stroke="#0e0d12" strokeWidth={2} />
                       </g>
                     )} />
                   )}
@@ -1840,7 +1840,7 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
             }}</Sized>
           </div>
           <div className="flex flex-col gap-1 shrink-0">
-            {lane("PLAN", sched, "bg-gradient-to-r from-violet-500/70 to-fuchsia-500/70", (x) => range(x))}
+            {lane("PLAN", sched, "bg-violet-400/35", (x) => range(x))}
             {lane("HEAT", heat, "bg-amber-500/80", (x) => `Heating ${range(x)}`)}
             {lane("ELEM", element, "bg-rose-500/90 shadow-[0_0_6px_rgba(244,63,94,0.6)]", (x) => `Electric element ${range(x)}`)}
             {lane("OFF", off, "bg-slate-500/50", (x) => `Off ${range(x)}`)}
@@ -1891,8 +1891,8 @@ function TankChart({ points, legend }: { points: TankPoint[]; legend?: boolean }
             <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} />
             <Tooltip {...TIP} formatter={(v, _n, p) => [`${v}%${(p.payload as TankPoint).heating ? " • heating" : (p.payload as TankPoint).off ? " • off" : ""}`, "Hot water"]} />
             <Area type="monotone" dataKey="tank" stroke="url(#g-tank-line)" fill="url(#g-tank)" strokeWidth={2.5} filter="url(#tank-glow)" isAnimationActive animationDuration={900} animationEasing="ease-out"
-              dot={false} activeDot={{ r: 4, fill: "#fbbf24", stroke: "#0e0c14", strokeWidth: 2 }} />
-            <ReferenceDot x={last.time} y={last.tank} r={4} fill="#fbbf24" stroke="#0e0c14" strokeWidth={2} />
+              dot={false} activeDot={{ r: 4, fill: "#fbbf24", stroke: "#0e0d12", strokeWidth: 2 }} />
+            <ReferenceDot x={last.time} y={last.tank} r={4} fill="#fbbf24" stroke="#0e0d12" strokeWidth={2} />
           </AreaChart>
         )}</Sized>
       </div>
@@ -2436,7 +2436,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
                       const on = !off && hs?.mode === m;
                       return (
                         <button key={m} aria-pressed={on} onClick={() => !on && send(heater, { action: "set_mode", mode: m }, { mode: m, power: true })}
-                          className={`h-10 rounded-xl text-[11px] font-semibold border transition-all active:scale-95 ${on ? "bg-violet-500 text-white border-violet-400 shadow-md shadow-violet-500/20" : "bg-white/5 border-white/10 text-slate-300"} ${modes.length % 2 && m === modes[modes.length - 1] ? "col-span-2" : ""}`}>
+                          className={`h-10 rounded-xl text-[11px] font-semibold border transition-all active:scale-95 ${on ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 border-white/10 text-slate-300"} ${modes.length % 2 && m === modes[modes.length - 1] ? "col-span-2" : ""}`}>
                           {MODE_NAME[m] ?? m}
                         </button>
                       );
@@ -2446,7 +2446,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
                     <button onClick={() => off
                       ? send(heater, { action: "set_mode", mode: onMode }, { power: true, mode: onMode })
                       : send(heater, { action: "power", on: false }, { power: false, mode: "off" })}
-                      className={`h-11 rounded-xl border text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.99] ${off ? "bg-violet-500 text-white border-violet-400" : "bg-white/5 text-slate-200 border-white/10"}`}>
+                      className={`h-11 rounded-xl border text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.99] ${off ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-200 border-white/10"}`}>
                       <Power className="w-4 h-4" />{off ? "Turn on" : "Turn off"}
                     </button>
                   )}
@@ -2468,7 +2468,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             right={schedule && (
               <div className="flex items-center gap-2">
                 <button role="switch" aria-checked={schedule.enabled} aria-label="Follow schedule" onClick={toggleSchedule} disabled={!schedule.blocks.length}
-                  className={`relative w-[52px] h-8 rounded-full transition-colors ${schedule.enabled ? "bg-violet-500" : "bg-white/10"}`}>
+                  className={`relative w-[52px] h-8 rounded-full transition-colors ${schedule.enabled ? "bg-violet-500/50" : "bg-white/10"}`}>
                   <span className={`absolute top-1 left-1 w-6 h-6 rounded-full transition-transform ${schedule.enabled ? "translate-x-5 bg-slate-950" : "bg-slate-200"}`} />
                 </button>
                 <button onClick={() => setEditingSchedule(true)} className="px-3 h-9 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Edit</button>
@@ -2521,7 +2521,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <Preview className="flex-1 min-h-0" corner="tr">
             {[["Person detected", "10:02 PM", true], ["Motion", "08:15 PM", true], ["Motion", "01:22 PM", true]].map(([t, time]) => (
               <span key={`${t}${time}`} className="flex items-center gap-2.5 bg-black/30 p-2 rounded-xl border border-white/5">
-                <span className="w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center bg-[#241c33]"><Footprints className="w-3.5 h-3.5 text-violet-400" /></span>
+                <span className="w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center bg-[#201e27]"><Footprints className="w-3.5 h-3.5 text-violet-400" /></span>
                 <span className="flex-1 text-[12px] text-slate-200 truncate">{t as string}</span>
                 <span className="text-[10px] font-mono text-slate-500">{time as string}</span>
               </span>
@@ -2537,7 +2537,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           sub={`Ring • ${cam.state?.online === false ? "offline" : "tap Live for real time video"}`}
           right={cams.length > 1 ? (
             <div className="flex gap-1">{cams.map((c) => (
-              <button key={c.id} onClick={() => setCamId(c.id)} className={`px-3 h-9 rounded-xl text-[11px] font-medium border ${c.id === cam.id ? "bg-white/10 border-violet-500/40 text-white" : "bg-white/5 border-white/10 text-slate-400"}`}>{c.name}</button>
+              <button key={c.id} onClick={() => setCamId(c.id)} className={`px-3 h-9 rounded-xl text-[11px] font-medium border ${c.id === cam.id ? "bg-white/10 border-white/20 text-white" : "bg-white/5 border-white/10 text-slate-400"}`}>{c.name}</button>
             ))}</div>
           ) : undefined} />
         <RingFeed key={cam.id} cam={cam} big />
@@ -2568,7 +2568,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <div className="space-y-1.5 overflow-hidden">
             {(cam.state?.events ?? []).filter((e) => e.t).slice(0, 6).map((e, i) => (
               <div key={`${e.t}${i}`} className="flex items-center gap-2.5 bg-black/30 p-2 rounded-xl border border-white/5">
-                <span className={`w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center ${e.person ? "bg-violet-500/10" : "bg-[#241c33]"}`}>
+                <span className={`w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center ${e.person ? "bg-violet-500/10" : "bg-[#201e27]"}`}>
                   {e.kind === "ding" ? <BellRing className="w-3.5 h-3.5 text-violet-400" /> : e.person ? <UserRound className="w-3.5 h-3.5 text-violet-300" /> : e.kind === "on_demand" ? <Video className="w-3.5 h-3.5 text-cyan-400" /> : <Footprints className="w-3.5 h-3.5 text-violet-400" />}
                 </span>
                 <span className="flex-1 text-[12px] text-slate-200 truncate">{eventLabel(e)}</span>
@@ -2585,15 +2585,15 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const activity = data.activity ?? [];
 
   return (
-    <div className={`${fit ? "fixed top-0 left-0 overflow-hidden" : "min-h-[100dvh] w-full relative"} bg-[#0e0c14] text-slate-100 font-sans select-none flex flex-col gap-3 antialiased`}
+    <div className={`${fit ? "fixed top-0 left-0 overflow-hidden" : "min-h-[100dvh] w-full relative"} bg-[#0e0d12] text-slate-100 font-sans select-none flex flex-col gap-3 antialiased`}
       style={{
         padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
         ...(fit ? { width: DESIGN_WIDTH, height: `calc(100dvh / ${fit.z})`, transform: `scale(${fit.z})`, transformOrigin: "0 0" } : {}),
       }}>
-      <div className="fixed top-0 left-1/3 w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-[180px] pointer-events-none" />
+      <div className="fixed top-0 left-1/3 w-[600px] h-[600px] bg-violet-600/[0.05] rounded-full blur-[180px] pointer-events-none" />
       <div className="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[180px] pointer-events-none" />
 
-      <header className="min-h-14 bg-[#17131f]/80 backdrop-blur-2xl border border-white/10 rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xl relative z-30">
+      <header className="min-h-14 bg-[#16151b]/80 backdrop-blur-2xl border border-white/10 rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xl relative z-30">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2615,7 +2615,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
               <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${alertsOpen ? "rotate-180" : ""}`} />
             </button>
             {alertsOpen && (
-              <div className="absolute left-0 top-11 w-80 max-w-[calc(100vw-32px)] bg-[#1a1622] border border-white/15 rounded-2xl p-2 shadow-2xl z-40">
+              <div className="absolute left-0 top-11 w-80 max-w-[calc(100vw-32px)] bg-[#19181e] border border-white/15 rounded-2xl p-2 shadow-2xl z-40">
                 <p className="text-[10px] font-mono text-slate-500 tracking-wider px-2 py-1">ALERTS</p>
                 {alerts.length === 0 && <p className="px-2 py-2 text-[12px] text-slate-400">Nothing needs attention.</p>}
                 {alerts.map((a) => (
@@ -2647,7 +2647,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             const active = scene === id;
             return (
               <button key={id} onClick={() => applyScene(id)}
-                className={`flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-medium transition-all active:scale-95 ${active ? "bg-violet-500 text-white font-semibold shadow-lg shadow-violet-500/20" : "bg-white/5 text-slate-400 border border-white/5"}`}>
+                className={`flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-medium transition-all active:scale-95 ${active ? "bg-violet-400/15 text-violet-100 border border-violet-300/30 font-semibold" : "bg-white/5 text-slate-400 border border-white/5"}`}>
                 <Icon className={`w-3.5 h-3.5 ${active ? "text-white scene-run" : "text-slate-400"}`} />{id}
               </button>
             );
@@ -2655,14 +2655,14 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         </div>
       </header>
 
-      <nav className="bg-[#17131f]/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 flex gap-1.5 shrink-0 z-10 overflow-x-auto scrollbar-none" aria-label="Sections">
+      <nav className="bg-[#16151b]/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 flex gap-1.5 shrink-0 z-10 overflow-x-auto scrollbar-none" aria-label="Sections">
         {tabs.map(({ id, label, icon: Icon, meta }) => {
           const active = section === id;
           return (
             <button key={id} onClick={() => setSection(id)} aria-current={active ? "page" : undefined}
-              className={`flex-1 min-w-[96px] h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-all ${active ? "bg-white/10 text-white border border-violet-500/40 shadow-lg shadow-violet-950/30" : "text-slate-400 border border-transparent"}`}>
-              <Icon key={active ? `${id}-on` : id} className={`w-4 h-4 ${active ? "text-violet-400 icon-pop" : "text-slate-500"}`} />{label}
-              {meta && <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${active ? "bg-violet-500/15 text-violet-300" : "bg-white/5 text-slate-500"}`}>{meta}</span>}
+              className={`flex-1 min-w-[96px] h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-all ${active ? "bg-white/10 text-white border border-white/15 shadow-lg shadow-violet-950/30" : "text-slate-400 border border-transparent"}`}>
+              <Icon key={active ? `${id}-on` : id} className={`w-4 h-4 ${active ? "text-violet-300 icon-pop" : "text-slate-500"}`} />{label}
+              {meta && <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${active ? "bg-white/10 text-slate-200" : "bg-white/5 text-slate-500"}`}>{meta}</span>}
             </button>
           );
         })}
@@ -2709,7 +2709,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <ScheduleEditor heater={heater} schedule={schedule} notify={setToast}
           onClose={() => setEditingSchedule(false)} onSaved={(s) => { setSchedule(s); setEditingSchedule(false); setToast("Schedule saved."); }} />
       )}
-      {toast && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 max-w-[calc(100vw-32px)] px-4 py-3 rounded-2xl bg-[#1a1622] border border-white/15 text-[13px] text-slate-100 shadow-2xl">{toast}</div>}
+      {toast && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 max-w-[calc(100vw-32px)] px-4 py-3 rounded-2xl bg-[#19181e] border border-white/15 text-[13px] text-slate-100 shadow-2xl">{toast}</div>}
     </div>
   );
 }

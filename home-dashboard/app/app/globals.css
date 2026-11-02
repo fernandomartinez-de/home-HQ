@@ -24,12 +24,12 @@
    Tailwind utilities in the dashboard take precedence over them. */
 @layer base {
 :root {
-  --wall: #0e0c14;      /* violet graphite, the room */
-  --walnut: #221d2b;    /* surfaces */
-  --raised: #2e2839;    /* controls */
+  --wall: #0e0d12;      /* violet graphite, the room */
+  --walnut: #1f1d25;    /* surfaces */
+  --raised: #2a2832;    /* controls */
   --linen: #ece8f3;     /* text */
   --stone: #a59db4;     /* secondary text */
-  --brass: #a78bfa;     /* the one accent: active, primary */
+  --brass: #a397cf;     /* the one accent: active, primary */
   --brass-deep: #6d4fc4;
   --bad: #d9826b;
   --ok: #9cbf8a;
