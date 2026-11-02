@@ -31,7 +31,8 @@ import java.util.concurrent.TimeUnit;
  * with the results and what's on screen. It also reports when the app on screen changes, and
  * every few minutes so the dashboard knows the TV is on.
  *
- * Commands: launch (one of the dashboard's apps), home, back, volume up/down/mute, sleep.
+ * Commands: launch (one of the dashboard's apps), open (an installed app by name, like CBS News),
+ * home, back, volume up/down/mute, sleep, and wake (turns the screen on, for the morning routine).
  *
  * It also stands in for a SwitchBot Hub (BotRelay): commands carrying "ble" press a SwitchBot Bot
  * over Bluetooth, and a scan every few minutes reports each Bot it hears. While the screen is off
@@ -231,6 +232,35 @@ final class RemoteControl {
                 audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, adj, AudioManager.FLAG_SHOW_UI);
                 dirty = true;
                 return null;
+            }
+            case "wake": {
+                // Turn the screen on, the way an incoming call would on a phone. The screen on
+                // broadcast then opens the dashboard (HomeService).
+                android.os.PowerManager pm = (android.os.PowerManager) service.getSystemService(Context.POWER_SERVICE);
+                if (pm == null) return "can't reach the TV's power settings";
+                if (pm.isInteractive()) { openDashboard.run(); return null; }
+                @SuppressWarnings("deprecation")
+                android.os.PowerManager.WakeLock lock = pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                        | android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP | android.os.PowerManager.ON_AFTER_RELEASE, "tvdash:wake");
+                lock.acquire(10_000);
+                return null;
+            }
+            case "open": {
+                // An installed TV app whose name contains the text, like the CBS News app.
+                String want = cmd.optString("name").trim().toLowerCase(java.util.Locale.US);
+                if (want.length() < 2) return "open needs an app name";
+                PackageManager pm = service.getPackageManager();
+                Intent tvApps = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+                for (android.content.pm.ResolveInfo ri : pm.queryIntentActivities(tvApps, 0)) {
+                    String label = String.valueOf(ri.loadLabel(pm)).toLowerCase(java.util.Locale.US);
+                    if (!label.contains(want)) continue;
+                    Intent i = pm.getLeanbackLaunchIntentForPackage(ri.activityInfo.packageName);
+                    if (i == null) i = pm.getLaunchIntentForPackage(ri.activityInfo.packageName);
+                    if (i == null) continue;
+                    service.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    return null;
+                }
+                return "no app named " + cmd.optString("name") + " on the TV";
             }
             case "sleep":
                 if (Build.VERSION.SDK_INT < 28) return "this Fire OS version can't sleep from an app";

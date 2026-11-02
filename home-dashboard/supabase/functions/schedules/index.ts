@@ -11,7 +11,14 @@
 //                                        replace the device's whole schedule
 //   POST /schedules {"action":"enable","device_id","enabled":true,"apply_now":true}
 //                                        turn the schedule on or off; optionally apply what should be happening now
-//   POST /schedules {"action":"tick"}    run every start and stop that just came due (pg_cron, every minute)
+//   POST /schedules {"action":"tick"}    run every start and stop that just came due (pg_cron, every minute),
+//                                        and every routine that came due
+//   GET  /schedules?routines=1           the routines
+//   POST /schedules {"action":"routine","id":1}   run a routine now (to try it)
+//
+// Routines (home_routines) are lists of actions that run once at a time on chosen days, with no stop:
+// the weekday morning routine turns on the kitchen ceiling lights and wakes the TV to the news. Each
+// action is {device_id, command, wait_s}; they run in order, waiting wait_s seconds before each.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -187,6 +194,47 @@ async function setEnabled(deviceId: string, enabled: boolean, applyNow: boolean,
   return { ...(await getSchedule(deviceId)), applied };
 }
 
+// ---------- routines ----------
+
+type Routine = { id: number; name: string; days: number[]; at_time: string; time_zone: string; actions: any[]; enabled: boolean; last_run_at: string | null };
+
+async function runRoutine(r: Routine, key: string) {
+  const ids = [...new Set(r.actions.map((a) => a.device_id))];
+  const { data: devs } = await db.from("home_devices").select("id, provider").in("id", ids);
+  const providerOf = new Map((devs ?? []).map((d) => [d.id, d.provider]));
+  const results: unknown[] = [];
+  for (const a of r.actions) {
+    if (a.wait_s) await new Promise((res) => setTimeout(res, Math.min(60, Number(a.wait_s)) * 1000));
+    const provider = providerOf.get(a.device_id);
+    try {
+      if (!provider) throw new Error(`unknown device ${a.device_id}`);
+      await run(provider, a.device_id, a.command, key);
+      results.push({ device_id: a.device_id, ok: true });
+    } catch (err) {
+      results.push({ device_id: a.device_id, ok: false, error: String((err as Error).message ?? err) });
+    }
+  }
+  await db.from("home_routines").update({ last_result: { at: new Date().toISOString(), results } }).eq("id", r.id);
+  return results;
+}
+
+async function dueRoutines(key: string) {
+  const { data, error } = await db.from("home_routines").select("*").eq("enabled", true);
+  if (error) throw error;
+  const due: Routine[] = [];
+  for (const r of (data ?? []) as Routine[]) {
+    const now = nowInWeek(r.time_zone ?? DEFAULT_TZ);
+    const at = toMin(r.at_time.slice(0, 5));
+    const hit = r.days.some((d) => since(now, d * 1440 + at) < DUE_WINDOW_MIN);
+    if (!hit || (r.last_run_at && Date.now() - Date.parse(r.last_run_at) < RERUN_GUARD_MIN * 60_000)) continue;
+    await db.from("home_routines").update({ last_run_at: new Date().toISOString() }).eq("id", r.id);
+    due.push(r);
+  }
+  // A routine can take a while (the TV needs a few seconds to wake), so it finishes after the tick answers.
+  if (due.length) EdgeRuntime.waitUntil(Promise.all(due.map((r) => runRoutine(r, key))));
+  return due.map((r) => r.name);
+}
+
 async function tick(key: string) {
   const { data: devices, error } = await db.from("home_devices").select("id, provider").eq("schedule_enabled", true);
   if (error) throw error;
@@ -225,7 +273,7 @@ async function tick(key: string) {
       }
     }
   }
-  return { ran };
+  return { ran, routines: await dueRoutines(key) };
 }
 
 Deno.serve(async (req) => {
@@ -233,6 +281,11 @@ Deno.serve(async (req) => {
     const key = req.headers.get("x-home-key");
     if (!(await authorized(key))) return json({ error: "unauthorized" }, 401);
     if (req.method === "GET") {
+      if (new URL(req.url).searchParams.has("routines")) {
+        const { data, error } = await db.from("home_routines").select("*").order("at_time");
+        if (error) throw error;
+        return json({ routines: data ?? [] });
+      }
       const id = new URL(req.url).searchParams.get("device_id");
       if (!id) return json({ error: "device_id is required" }, 400);
       return json(await getSchedule(id));
@@ -241,6 +294,11 @@ Deno.serve(async (req) => {
     if (req.method === "PUT") return json(await saveSchedule(body.device_id, body.blocks));
     if (body.action === "enable") return json(await setEnabled(body.device_id, !!body.enabled, !!body.apply_now, key!));
     if (body.action === "tick") return json(await tick(key!));
+    if (body.action === "routine") {
+      const { data: r, error } = await db.from("home_routines").select("*").eq("id", Number(body.id)).single();
+      if (error || !r) return json({ error: "unknown routine" }, 404);
+      return json({ ran: r.name, results: await runRoutine(r as Routine, key!) });
+    }
     return json({ error: "use GET, PUT, or POST with action enable or tick" }, 400);
   } catch (err) {
     const msg = String((err as Error).message ?? err);

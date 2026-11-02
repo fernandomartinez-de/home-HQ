@@ -7,12 +7,14 @@
 //   POST /tv {"action":"command","device_id":"tv","command":{...}}   queue it, wait briefly for the result
 //        commands: {"action":"launch","app":"com.netflix.ninja"}    (one of the device's apps)
 //                  {"action":"home"} {"action":"back"} {"action":"sleep"}
+//                  {"action":"wake"}                            (turns the screen on; works while the TV sleeps)
+//                  {"action":"open","name":"CBS News"}         (an installed app whose name contains this)
 //                  {"action":"volume","dir":"up"|"down"|"mute"}
 //   POST /tv {"action":"poll"}                                        nothing to poll; the TV reports itself
 //
 // TV app (header x-tv-key, checked against tv_config.config.tv_key_sha256):
 //   GET  /tv                    waits up to 25 s for commands, returns {"commands":[{id, command}]}
-//   GET  /tv?screen=off         the same, but only SwitchBot Bot commands (nothing that wakes the TV)
+//   GET  /tv?screen=off         the same, but only wake and SwitchBot Bot commands
 //   POST /tv {"action":"report","state":{...},"results":[{"id":1,"ok":true,"error":null}],
 //             "ble":[{"mac":"..","mode":"pressMode","on":false,"battery":90,"rssi":-70}]}
 //
@@ -27,7 +29,7 @@ const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
 const DEVICE = "tv";
 const WAIT_MS = 25_000;     // how long the TV's request stays open when there's nothing to do
 const EXPIRE_S = 60;        // commands the TV hasn't picked up in this long are dropped (TV off)
-const ACTIONS = new Set(["launch", "home", "back", "volume", "sleep"]);
+const ACTIONS = new Set(["launch", "home", "back", "volume", "sleep", "wake", "open"]);
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -56,7 +58,8 @@ async function tvKeyOk(req: Request) {
 
 async function command(id: string, cmd: any, source = "ui") {
   if (id !== DEVICE) throw new Error("unknown TV");
-  if (!ACTIONS.has(cmd?.action)) throw new Error("unknown command; use launch, home, back, volume or sleep");
+  if (!ACTIONS.has(cmd?.action)) throw new Error("unknown command; use launch, open, home, back, volume, wake or sleep");
+  if (cmd.action === "open" && (typeof cmd.name !== "string" || cmd.name.trim().length < 2)) throw new Error("open needs an app name, like CBS News");
   if (cmd.action === "volume" && !["up", "down", "mute"].includes(cmd.dir)) throw new Error("volume needs dir up, down or mute");
   if (cmd.action === "launch") {
     const { data: dev } = await db.from("home_devices").select("capabilities").eq("id", DEVICE).single();
@@ -88,12 +91,15 @@ async function relayed(): Promise<string[]> {
 async function takeCommands(asleep: boolean) {
   const now = Date.now();
   const bots = await relayed();
-  const ids = asleep ? bots : [DEVICE, ...bots];
-  if (!ids.length) return [];
+  const ids = [DEVICE, ...bots];
   await db.from("home_commands").update({ status: "expired", completed_at: new Date(now).toISOString() })
     .in("device_id", [DEVICE, ...bots]).eq("status", "pending").lt("requested_at", new Date(now - EXPIRE_S * 1000).toISOString());
-  const { data, error } = await db.from("home_commands").select("id, command")
-    .in("device_id", ids).eq("status", "pending").order("requested_at", { ascending: true }).limit(10);
+  // Asleep: the Bots' commands, and a wake for the TV itself.
+  let q = db.from("home_commands").select("id, command").eq("status", "pending");
+  q = asleep
+    ? q.or(`device_id.in.(${bots.join(",") || "none"}),and(device_id.eq.${DEVICE},command->>action.eq.wake)`)
+    : q.in("device_id", ids);
+  const { data, error } = await q.order("requested_at", { ascending: true }).limit(10);
   if (error) throw error;
   if (!data?.length) return [];
   // Claim them; only rows still pending are returned, so two open polls never run the same command.
