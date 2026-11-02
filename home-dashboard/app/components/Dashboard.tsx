@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useR
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, Sunset, type LucideIcon,
+  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, Sunset, Coffee, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, Cell, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
@@ -1670,7 +1670,7 @@ function SetpointDial({ value, lo, hi, unit, off, mode, onNudge, small }: { valu
 /** The week as timelines, today highlighted, a line at the current time and each block's temperature. */
 // An appliance that only turns on and off (the towel warmer): power, status, and its own weekly
 // schedule, which turns it on during each block and off the rest of the time.
-function ApplianceRow({ dev, send, notify }: { dev: Light; send: Send; notify: (m: string) => void }) {
+function ApplianceRow({ dev, send, notify, narrow }: { dev: Light; send: Send; notify: (m: string) => void; narrow?: boolean }) {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1697,6 +1697,9 @@ function ApplianceRow({ dev, send, notify }: { dev: Light; send: Send; notify: (
     }
   };
   const s = dev.state as (Light["state"] & { battery?: number | null; mode?: string | null }) | null;
+  const towel = /towel/i.test(dev.name);
+  const Icon = towel ? TowelRack : /espresso|coffee/i.test(dev.name) ? Coffee : Plug;
+  const onWord = towel ? "Warming" : "On";
   const offline = s?.online === false;
   const on = !!s?.power && !offline;
   const days = schedule ? new Set(schedule.blocks.map((b) => b.day)).size : 0;
@@ -1707,30 +1710,45 @@ function ApplianceRow({ dev, send, notify }: { dev: Light; send: Send; notify: (
   return (
     <div className={`relative overflow-hidden rounded-2xl border transition-all ${on ? "bg-gradient-to-r from-[#22191a] to-[#16151b] border-rose-300/20" : "bg-[#1a191f]/60 border-white/5"} ${offline ? "opacity-50" : ""}`}>
       {on && <span className="absolute inset-y-0 left-0 w-1/2 pointer-events-none breathe" style={{ background: "radial-gradient(circle at left, rgba(251,113,133,.22), transparent 70%)" }} />}
-      <div className="relative flex items-center gap-3 p-3">
-        <span className={`w-11 h-11 shrink-0 rounded-xl border flex items-center justify-center ${on ? "bg-rose-500/15 border-rose-400/30 text-rose-200" : "bg-white/5 border-white/10 text-slate-400"}`}>
-          <TowelRack className={`w-5 h-5 ${on ? "heat-pulse" : ""}`} />
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[14px] font-semibold text-white truncate">{dev.name}</span>
-            <span className={`text-[11px] font-medium ${offline ? "text-rose-400" : on ? "text-rose-200" : "text-slate-500"}`}>{offline ? "Offline" : on ? "Warming" : "Off"}</span>
-            {s?.battery != null && <span className="text-[10px] font-mono text-slate-500">BOT {s.battery}%</span>}
-          </div>
-          <div className="text-[11px] text-slate-400 truncate">{plan}</div>
-        </div>
-        {schedule && (
+      {(() => {
+        const toggle = schedule && (
           <button role="switch" aria-checked={schedule.enabled} aria-label={`${dev.name} schedule`} onClick={toggleSchedule} disabled={busy || !schedule.blocks.length}
             className={`relative shrink-0 w-[46px] h-7 rounded-full transition-colors ${schedule.enabled ? "bg-violet-500/50" : "bg-white/10"}`}>
             <span className={`absolute top-1 left-1 w-5 h-5 rounded-full transition-transform ${schedule.enabled ? "translate-x-[18px] bg-slate-950" : "bg-slate-200"}`} />
           </button>
-        )}
-        <button onClick={() => setEditing(true)} disabled={!schedule} className="shrink-0 px-3 h-9 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Schedule</button>
-        <button onClick={() => send(dev, { action: "power", on: !on }, { power: !on })} disabled={offline} aria-pressed={on} aria-label={on ? `Turn off ${dev.name}` : `Turn on ${dev.name}`}
-          className={`shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border transition-all active:scale-95 ${on ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-300 border-white/10"}`}>
-          <Power className="w-4 h-4" />
-        </button>
-      </div>
+        );
+        const edit = <button onClick={() => setEditing(true)} disabled={!schedule} className="shrink-0 px-3 h-9 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Schedule</button>;
+        const power = (
+          <button onClick={() => send(dev, { action: "power", on: !on }, { power: !on })} disabled={offline} aria-pressed={on} aria-label={on ? `Turn off ${dev.name}` : `Turn on ${dev.name}`}
+            className={`shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border transition-all active:scale-95 ${on ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-300 border-white/10"}`}>
+            <Power className="w-4 h-4" />
+          </button>
+        );
+        const head = (
+          <>
+            <span className={`w-11 h-11 shrink-0 rounded-xl border flex items-center justify-center ${on ? "bg-rose-500/15 border-rose-400/30 text-rose-200" : "bg-white/5 border-white/10 text-slate-400"}`}>
+              <Icon className={`w-5 h-5 ${on ? "heat-pulse" : ""}`} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[14px] font-semibold text-white truncate">{dev.name}</span>
+                <span className={`text-[11px] font-medium ${offline ? "text-rose-400" : on ? "text-rose-200" : "text-slate-500"}`}>{offline ? "Offline" : on ? onWord : "Off"}</span>
+                {s?.battery != null && <span className="text-[10px] font-mono text-slate-500">BOT {s.battery}%</span>}
+              </div>
+              {!narrow && <div className="text-[11px] text-slate-400 truncate">{plan}</div>}
+            </div>
+          </>
+        );
+        // Narrow (the Kitchen tab's side column): power on the first line, schedule on the second.
+        return narrow ? (
+          <div className="relative p-3 flex flex-col gap-2.5">
+            <div className="flex items-center gap-3">{head}{power}</div>
+            <div className="flex items-center gap-2"><span className="flex-1 min-w-0 text-[11px] text-slate-400 truncate">{plan}</span>{toggle}{edit}</div>
+          </div>
+        ) : (
+          <div className="relative flex items-center gap-3 p-3">{head}{toggle}{edit}{power}</div>
+        );
+      })()}
       {editing && schedule && (
         <ScheduleEditor deviceId={dev.id} title={`${dev.name} schedule`} noun={`The ${dev.name.toLowerCase()}`} schedule={schedule} notify={notify}
           onClose={() => setEditing(false)} onSaved={(x) => { setSchedule(x); setEditing(false); notify("Schedule saved."); }} />
@@ -2056,8 +2074,11 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const heater = data.devices.find((d): d is Heater => d.kind === "water_heater");
   const setpoint = useSetpoint(heater, send);
   const lights = useMemo(() => data.devices.filter((d): d is Light => d.kind === "light"), [data.devices]);
-  // Plugs and switches (the towel warmer): on the Bathroom tab, kept out of scenes and room switches.
+  // Plugs and switches: each on its room's tab (the towel warmer in the bathroom, the espresso
+  // machine in the kitchen), kept out of the lights, scenes and room switches.
   const switches = useMemo(() => data.devices.filter((d) => d.kind === "switch") as unknown as Light[], [data.devices]);
+  const kitchenSwitches = switches.filter((d) => (d.room ?? "").toLowerCase().startsWith("kitchen"));
+  const bathSwitches = switches.filter((d) => !kitchenSwitches.includes(d));
   const tv = data.devices.find((d): d is TV => d.kind === "tv");
   const cams = data.devices.filter((d): d is Camera => d.kind === "camera");
   const meter = data.devices.find((d): d is Meter => d.kind === "meter");
@@ -2393,7 +2414,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       <div className="lg:col-span-5 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a light's name for colors" />
-          {room === "living" ? <>{roomLights("living", 2)}{roomLights("kitchen", 2)}</> : roomLights("bedroom", 2)}
+          {room === "living" ? roomLights("living", 2) : roomLights("bedroom", 2)}
         </div>
         {techBox(room)}
       </div>
@@ -2421,6 +2442,12 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             </div>
           </Preview>
           <button onClick={() => setSection("living")} className="py-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-sm font-semibold">Open living room</button>
+        </div>
+        <div className={`${PANEL} p-4 flex flex-col gap-3`}>
+          <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={kitchenSwitches.length ? `${kitchenSwitches.length} in the kitchen` : "Espresso machine plug"} />
+          {kitchenSwitches.length
+            ? kitchenSwitches.map((d) => <ApplianceRow key={d.id} dev={d} send={send} notify={setToast} narrow />)
+            : <p className="text-[12px] text-slate-500 leading-relaxed">The espresso machine shows up here once its smart plug is connected, with power and a morning warm up schedule.</p>}
         </div>
       </div>
     </main>
@@ -2510,12 +2537,12 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           {schedule && <WeekTimeline schedule={schedule} />}
         </div>
         <div className={`flex-1 min-h-[180px] ${PANEL} p-4 flex flex-col gap-2`}>
-          <TankInsights series={heaterSeries} schedule={schedule} compact={switches.length > 0} />
+          <TankInsights series={heaterSeries} schedule={schedule} compact={bathSwitches.length > 0} />
         </div>
         <div className={`${PANEL} p-3 flex flex-col gap-2 shrink-0`}>
           <div className="flex items-center gap-2 px-1 text-[10px] font-mono tracking-widest text-slate-500"><Plug className="w-3.5 h-3.5 text-cyan-400" />APPLIANCES & TECH</div>
-          {switches.length
-            ? switches.map((d) => <ApplianceRow key={d.id} dev={d} send={send} notify={setToast} />)
+          {bathSwitches.length
+            ? bathSwitches.map((d) => <ApplianceRow key={d.id} dev={d} send={send} notify={setToast} />)
             : <p className="text-[12px] text-slate-500">The towel warmer shows up here once the TV hears its SwitchBot Bot.</p>}
         </div>
       </div>
