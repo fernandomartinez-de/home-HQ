@@ -1374,7 +1374,7 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big, dense }: {
     : `On, ${b}%`;
   const pct = range ? ((b - range.min) / Math.max(1, range.max - range.min)) * 100 : 0;
   return (
-    <div className={`relative w-full ${big ? "h-40" : dense ? "h-[100px]" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
+    <div className={`relative w-full ${big ? "h-40" : dense ? "h-[92px]" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
       ? "bg-[#1a191f]/40 border-white/5 opacity-40"
       : on ? "bg-gradient-to-b from-[#1e1c23] to-[#16151b] border-white/15 shadow-lg shadow-black/30" : "bg-[#1a191f]/60 border-white/5"}`}>
       {on && <span className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none breathe" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
@@ -2407,7 +2407,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     const roomTv = items.find((d): d is TV => d.kind === "tv");
     const roomCam = items.find((d): d is Camera => d.kind === "camera");
     return (
-      <div className={`flex-1 min-h-[150px] ${PANEL} p-4 flex flex-col gap-3 overflow-hidden`}>
+      <div className={`${room === "living" ? "shrink-0" : "flex-1 min-h-[150px] overflow-hidden"} ${PANEL} p-4 flex flex-col gap-3`}>
         <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={room === "living" ? `${items.length + kitchenSwitches.length} in the living room and kitchen` : items.length ? `${items.length} in the bedroom` : "Nothing here yet"}
           right={roomCam ? (
             <button onClick={() => setSection("security")} aria-label={`Open the ${roomCam.name} camera`}
@@ -2447,10 +2447,18 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <Preview className="flex-1 min-h-0"><AcZoneSample /></Preview>
       </div>
       <div className={`${room === "living" ? "lg:col-span-7" : "lg:col-span-5"} flex flex-col gap-3 min-h-0`}>
+        {room === "living" ? (
+          // Short screens: the lights scroll inside their box so the appliances below are never cut off.
+          <div className={`${PANEL} p-4 space-y-2.5 min-h-0 overflow-y-auto`}>
+            <div className="flex items-center gap-2 px-1 text-[10px] font-mono tracking-widest text-slate-500"><Palette className="w-3.5 h-3.5 text-slate-400" />LIGHTS • TAP A NAME FOR COLORS</div>
+            {roomLights("living", 3, false, true)}{roomLights("kitchen", 3, false, true)}
+          </div>
+        ) : (
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a light's name for colors" />
-          {room === "living" ? <>{roomLights("living", 3, false, true)}{roomLights("kitchen", 3, false, true)}</> : roomLights("bedroom", 2)}
+          {roomLights("bedroom", 2)}
         </div>
+        )}
         {techBox(room)}
       </div>
     </main>
@@ -2470,7 +2478,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   }, [data.history, heater]);
   const waterView = (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
-      <div className={`lg:col-span-5 ${PANEL} p-5 flex flex-col gap-4 overflow-hidden`}>
+      <div className={`lg:col-span-5 ${PANEL} p-5 flex flex-col gap-4 overflow-y-auto`}>
         {heater ? (() => {
           const hs = heater.state;
           const off = hs?.power === false || hs?.mode === "off";
@@ -2490,7 +2498,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
                 {!!hs?.alert_count && <span className="px-2.5 h-7 flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300"><AlertTriangle className="w-3 h-3" />{hs.alert_count} alert{hs.alert_count > 1 ? "s" : ""}</span>}
                 {(hs?.away || hs?.vacation) && <span className="px-2.5 h-7 flex items-center rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-[11px] text-cyan-300">{hs.vacation ? "Vacation" : "Away"}</span>}
               </div>
-              <div className="flex-1 min-h-0 grid grid-cols-[150px_1fr] gap-4 items-stretch">
+              <div className="flex-1 shrink-0 grid grid-cols-[150px_1fr] gap-4 items-stretch">
                 <div className="min-h-0 relative py-1"><GlassTank pct={hs?.tank_pct ?? null} heating={heating} off={off} /></div>
                 <div className="min-w-0 flex flex-col justify-center gap-3">
                   <SetpointDial value={setpoint.value} lo={setpoint.lo} hi={setpoint.hi} unit={unit} off={off} mode={off ? "off" : hs?.mode ?? ""} onNudge={setpoint.nudge} />
@@ -2539,7 +2547,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             )} />
           {schedule && <WeekTimeline schedule={schedule} />}
         </div>
-        <div className={`flex-1 min-h-[180px] ${PANEL} p-4 flex flex-col gap-2`}>
+        <div className={`flex-1 ${bathSwitches.length ? "min-h-[120px]" : "min-h-[180px]"} ${PANEL} p-4 flex flex-col gap-2 overflow-hidden`}>
           <TankInsights series={heaterSeries} schedule={schedule} compact={bathSwitches.length > 0} />
         </div>
         <div className={`${PANEL} p-3 flex flex-col gap-2 shrink-0`}>
