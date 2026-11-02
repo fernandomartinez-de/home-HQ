@@ -56,7 +56,7 @@ export async function refreshHome(): Promise<HomeData> {
   return { devices: body.devices };
 }
 
-const PROVIDERS = new Set(["rheem", "govee", "ac", "tv", "ring"]);
+const PROVIDERS = new Set(["rheem", "govee", "ac", "tv", "ring", "lifx", "switchbot"]);
 
 export async function sendCommand(provider: string, deviceId: string, command: Command) {
   if (!PROVIDERS.has(provider)) throw new Error("unknown appliance");

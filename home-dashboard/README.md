@@ -10,7 +10,7 @@ with history and schedules. Works on iPad, phone, laptop and TV.
 * **UI:** Next.js on Vercel. It never talks to an appliance directly; it calls the appliance
   functions in Supabase.
 * **Appliance functions:** one Supabase Edge Function per appliance, living in that appliance's
-  folder ([rheem/](../rheem/), [ac/](../ac/), [govee/](../govee/)). Each one reads state and runs
+  folder ([rheem/](../rheem/), [ac/](../ac/), [govee/](../govee/), [lifx/](../lifx/), [switchbot/](../switchbot/)). Each one reads state and runs
   commands, and holds that appliance's credentials as function secrets.
 * **Always on:** Supabase scheduled jobs (pg_cron) poll every appliance every few minutes for
   history and run schedules. No server at home.
@@ -59,11 +59,13 @@ Done
 - [x] Power & Energy: compact overview tile that opens a full report (cycle, 12 months, by hour, day of week, bills, always on load, insights) (2026-11-01)
 - [x] Water tab redesign: animated glass tank, setpoint dial, mode buttons, schedule timeline with now line, tank chart with heating bands (2026-11-01)
 - [x] Water tab tank insights (6/12/24 h, low point, cycles, schedule and heating lanes); violet theme to match the logo; animations throughout (2026-11-01)
+- [x] Balcony lights: Govee outdoor smart plug through the Govee function, as a tile in the Lighting Console (2026-11-02)
+- [x] LIFX and SwitchBot functions: wall washer lamp with the lights, towel warmer Bot as an on and off tile kept out of scenes (2026-11-02)
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
 - [ ] Espresso machine plug: Shelly Plug US Gen4 for on/off, a morning warm up schedule and power use (waiting on purchase)
-- [ ] Balcony light: Govee outdoor smart plug through the Govee function, with the other lights (waiting on purchase)
+- [ ] LIFX and SwitchBot: add the secrets (LIFX_TOKEN, SWITCHBOT_TOKEN, SWITCHBOT_SECRET); polls start on their own
 - [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
 - [ ] Front door smart lock in the Security box (waiting on purchase)
 - [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, espresso plug)

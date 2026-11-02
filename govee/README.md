@@ -1,6 +1,6 @@
 # Govee lights
 
-Controls the lights through the official Govee developer API.
+Controls the lights and smart plugs (like the balcony lights plug) through the official Govee developer API.
 
 ## How it connects
 

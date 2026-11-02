@@ -1365,8 +1365,11 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
     if (sent.current !== b || !on) { sent.current = b; onBright(b); }
   };
   const many = lights.length > 1;
+  // A plug or switch has nothing to pick (no brightness, no color), so its name toggles it too.
+  const plain = !range && !lead?.capabilities.color;
   const status = offline ? "Offline"
     : !on ? "Off"
+    : plain ? "On"
     : many && onLights.length < lights.length ? `${onLights.length} of ${lights.length} on, ${b}%`
     : `On, ${b}%`;
   const pct = range ? ((b - range.min) / Math.max(1, range.max - range.min)) * 100 : 0;
@@ -1376,7 +1379,7 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
       : on ? "bg-gradient-to-b from-[#1e1c23] to-[#16151b] border-white/15 shadow-lg shadow-black/30" : "bg-[#1a191f]/60 border-white/5"}`}>
       {on && <span className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none breathe" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
       <div className={`relative z-10 flex-1 min-h-0 flex items-start gap-2 ${big ? "p-4 pb-2" : "p-3 pb-1.5"}`}>
-        <button onClick={onOpen} disabled={offline} aria-label={`${label} color`} className="flex-1 min-w-0 h-full text-left flex flex-col justify-between">
+        <button onClick={plain ? () => onPower(!on) : onOpen} disabled={offline} aria-label={plain ? `Toggle ${label}` : `${label} color`} className="flex-1 min-w-0 h-full text-left flex flex-col justify-between">
           <span className="flex items-center gap-2 min-w-0">
             <span className={`${big ? "text-base" : "text-[13px]"} font-semibold text-white tracking-tight truncate`}>{label}</span>
             {many ? (
@@ -1386,7 +1389,7 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
                     style={{ backgroundColor: l.state?.power && l.state?.online !== false ? lightHex(l) : "transparent", opacity: l.state?.online === false ? 0.35 : 1 }} />
                 ))}
               </span>
-            ) : on && <span className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: hex }} />}
+            ) : on && !plain && <span className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: hex }} />}
           </span>
           <span className={`${big ? "text-sm" : "text-[11px]"} font-medium ${offline ? "text-rose-400/90" : on ? "text-slate-200" : "text-slate-500"}`}>{status}</span>
         </button>
@@ -1977,6 +1980,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const heater = data.devices.find((d): d is Heater => d.kind === "water_heater");
   const setpoint = useSetpoint(heater, send);
   const lights = useMemo(() => data.devices.filter((d): d is Light => d.kind === "light"), [data.devices]);
+  // Plugs and switches (the towel warmer) sit with the lights but stay out of scenes and room switches.
+  const switches = useMemo(() => data.devices.filter((d) => d.kind === "switch") as unknown as Light[], [data.devices]);
   const tv = data.devices.find((d): d is TV => d.kind === "tv");
   const cams = data.devices.filter((d): d is Camera => d.kind === "camera");
   const meter = data.devices.find((d): d is Meter => d.kind === "meter");
@@ -2246,11 +2251,11 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`flex-1 min-h-0 ${PANEL} p-3.5 flex flex-col gap-2.5`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lighting Console" sub={`${lightsOn} on • tap a room for its lights`}
-            right={<span className="text-[10px] font-mono text-slate-500">Govee Cloud</span>} />
+            right={<span className="text-[10px] font-mono text-slate-500">Cloud</span>} />
           <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-white/5 bg-black/25 divide-y divide-white/5 overflow-hidden">
             {ROOMS.map((r) => <RoomRow key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
           </div>
-          {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
+          {otherLights.length + switches.length > 0 && <div className="grid grid-cols-2 gap-2">{[...otherLights, ...switches].map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
         </div>
         <EnergyTile meter={meter} onOpen={() => setEnergyOpen(true)} onConnect={() => setConedOpen(true)} />
       </div>

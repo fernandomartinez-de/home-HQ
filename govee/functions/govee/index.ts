@@ -1,4 +1,4 @@
-// govee: read and control Govee lights through the official Govee developer API.
+// govee: read and control Govee lights and smart plugs through the official Govee developer API.
 //
 // Auth: every request needs the header x-home-key (checked against home_config.api_key_sha256).
 // Secret: GOVEE_API_KEY (request it in the Govee Home app).
@@ -53,10 +53,11 @@ async function govee(path: string, body?: unknown) {
 type Cap = { type: string; instance: string; parameters?: any };
 type Device = { sku: string; device: string; deviceName?: string; type?: string; capabilities: Cap[] };
 
-// Lights only. Govee groups (sku like "SameModeGroup") have no state of their own, so skip them.
+// Lights and smart plugs. Govee groups (sku like "SameModeGroup") have no state of their own, so skip them.
+const TYPES = ["devices.types.light", "devices.types.socket"];
 const devices = async (): Promise<Device[]> =>
   ((await govee("/user/devices")).data ?? []).filter((d: Device) =>
-    (!d.type || d.type === "devices.types.light") && !/group/i.test(d.sku));
+    (!d.type || TYPES.includes(d.type)) && !/group/i.test(d.sku));
 
 const deviceId = (d: Device) => `govee_${d.device.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`;
 const cap = (d: Device, instance: string) => d.capabilities.find((c) => c.instance.toLowerCase() === instance.toLowerCase());
@@ -142,12 +143,15 @@ async function live() {
 
 async function poll() {
   const list = await devices();
+  // A plug powering lights is a light; a kind set by hand (like "plug" for an appliance) is kept.
+  const { data: known } = await db.from("home_devices").select("id, kind").eq("provider", "govee");
+  const kindOf = new Map((known ?? []).map((k) => [k.id, k.kind]));
   const out = [];
   for (const d of list) {
     const id = deviceId(d);
     const s = await state(d);
     const { error: e1 } = await db.from("home_devices").upsert({
-      id, kind: "light", provider: "govee", name: d.deviceName || d.sku,
+      id, kind: kindOf.get(id) ?? "light", provider: "govee", name: d.deviceName || d.sku,
       provider_ref: { sku: d.sku, device: d.device }, capabilities: capabilities(d),
       updated_at: new Date().toISOString(),
     });
@@ -168,7 +172,7 @@ async function command(id: string, cmd: any, source = "ui") {
 
   try {
     const d = (await devices()).find((x) => deviceId(x) === id);
-    if (!d) throw new Error(`light ${id} not found on the Govee account`);
+    if (!d) throw new Error(`device ${id} not found on the Govee account`);
     let res;
     if (cmd?.action === "power") {
       res = await control(d, "powerSwitch", cmd.on ? 1 : 0);

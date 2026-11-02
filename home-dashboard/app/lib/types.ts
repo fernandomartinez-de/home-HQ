@@ -79,7 +79,9 @@ export type MeterState = {
   errors?: string[];
 };
 export type Meter = Base & { kind: "meter"; state: MeterState | null; capabilities: { live?: boolean; cost_by_day?: boolean } };
-export type Device = Light | Heater | AC | TV | Camera | Meter;
+// A plug, relay or SwitchBot Bot: on and off only. Shaped like a light so it can share the light tile.
+export type Switch = Base & { kind: "switch"; state: (LightState & { mode?: string | null; battery?: number | null; watts?: number | null }) | null; capabilities: LightCaps & { press?: boolean; type?: string } };
+export type Device = Light | Heater | AC | TV | Camera | Meter | Switch;
 
 // One command from the home_commands log, newest first.
 export type Activity = {

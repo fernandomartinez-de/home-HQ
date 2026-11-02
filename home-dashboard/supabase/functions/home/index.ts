@@ -14,7 +14,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const URL_BASE = Deno.env.get("SUPABASE_URL")!;
 const db = createClient(URL_BASE, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const PROVIDERS = ["rheem", "govee", "ring"]; // add "ac" once the ESP32 bridge exists
+const PROVIDERS = ["rheem", "govee", "ring", "lifx", "switchbot"]; // add "ac" once the ESP32 bridge exists
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
