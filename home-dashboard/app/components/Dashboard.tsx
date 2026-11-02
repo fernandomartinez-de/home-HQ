@@ -1741,8 +1741,9 @@ function scheduleSpans(schedule: Schedule | null, a: number, z: number): (Span &
 const tickTime = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric" });
 
 /** The Water tab's tank panel: level over time with heating, schedule and off lanes underneath. */
-function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: Schedule | null }) {
+function TankInsights({ series, schedule, compact }: { series: HeaterPoint[]; schedule: Schedule | null; compact?: boolean }) {
   const [hours, setHours] = useState<6 | 12 | 24>(24);
+  const gid = useId().replace(/:/g, "");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
   const start = now - hours * 3600_000;
@@ -1769,11 +1770,12 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
   }
   const PLOT_L = 38, PLOT_R = 10; // chart plot inset, so the lanes line up with it
 
-  const lane = (label: string, spans: Span[], cls: string, title: (x: Span) => string) => (
-    <div className="flex items-center gap-0 h-3.5">
+  const lane = (label: string, spans: Span[], cls: string, title: (x: Span) => string, overlay?: { spans: Span[]; cls: string; title: (x: Span) => string }) => (
+    <div className={`flex items-center gap-0 ${compact ? "h-2.5" : "h-3.5"}`}>
       <span className="text-[9px] font-mono tracking-widest text-slate-500 shrink-0 text-right pr-2" style={{ width: PLOT_L }}>{label}</span>
       <div className="relative flex-1 h-full rounded-sm bg-white/[0.04] overflow-hidden" style={{ marginRight: PLOT_R }}>
         {spans.map((x, i) => <span key={i} title={title(x)} className={`absolute inset-y-0 rounded-sm ${cls}`} style={{ left: pctX(x.a), width: `calc(${pctX(x.z)} - ${pctX(x.a)})`, minWidth: 2 }} />)}
+        {overlay?.spans.map((x, i) => <span key={`o${i}`} title={overlay.title(x)} className={`absolute inset-y-0 rounded-sm ${overlay.cls}`} style={{ left: pctX(x.a), width: `calc(${pctX(x.z)} - ${pctX(x.a)})`, minWidth: 2 }} />)}
       </div>
     </div>
   );
@@ -1781,7 +1783,12 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
 
   return (
     <>
-      <PanelHead icon={Activity} tone={GREEN} title="Hot Water in Tank" sub="Level, heating and schedule"
+      {compact ? (
+        <div className="flex items-center justify-between text-[10px] font-mono tracking-widest text-slate-500 shrink-0">
+          <span>HOT WATER • LAST 24 H</span>
+          {low && <span>LOW <span className={low.tank < 25 ? "text-rose-300" : "text-amber-300"}>{low.tank}%</span> • HEATED <span className="text-slate-300">{hoursText(heatedH)}</span></span>}
+        </div>
+      ) : <PanelHead icon={Activity} tone={GREEN} title="Hot Water in Tank" sub="Level, heating and schedule"
         right={
           <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/10">
             {([6, 12, 24] as const).map((h) => (
@@ -1789,30 +1796,30 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono transition-all ${hours === h ? "bg-white/10 text-white" : "text-slate-400"}`}>{h}H</button>
             ))}
           </div>
-        } />
+        } />}
       {pts.length < 3 ? (
         <NotConnected icon={Activity} title="Collecting history" text="The tank chart fills in as readings arrive every 5 minutes." />
       ) : (
         <>
-          <div className="grid grid-cols-4 gap-2 shrink-0">
+          {!compact && <div className="grid grid-cols-4 gap-2 shrink-0">
             <MiniStat label="NOW" value={`${last?.tank ?? "--"}%`} sub={last?.heating ? "Heating" : last?.off ? "Heater off" : "Holding"} tone="text-cyan-300" />
             <MiniStat label={`LOW • ${hours}H`} value={low ? `${low.tank}%` : "--"} sub={low ? `at ${clockTime(new Date(low.ts).toISOString())}` : undefined} tone={low && low.tank < 25 ? "text-rose-300" : "text-amber-300"} />
             <MiniStat label="HEATING" value={hoursText(heatedH)} sub={elementH > 0.05 ? `${hoursText(elementH)} on the element` : "All heat pump"} tone="text-rose-300" />
             <MiniStat label="CYCLES" value={String(heat.length)} sub={avgCycle != null ? `About ${Math.round(avgCycle)} min each` : "None"} />
-          </div>
-          <div className="relative flex-1 min-h-[110px]">
+          </div>}
+          <div className={`relative flex-1 ${compact ? "min-h-[80px]" : "min-h-[110px]"}`}>
             <Sized>{(w, h) => {
               const top = 10, bottom = h - 22; // plot area, for a gradient that follows the level
               return (
                 <AreaChart width={w} height={h} data={data} margin={{ top, right: PLOT_R, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="tank-level-line" gradientUnits="userSpaceOnUse" x1="0" y1={top} x2="0" y2={bottom}>
+                    <linearGradient id={`tank-level-line-${gid}`} gradientUnits="userSpaceOnUse" x1="0" y1={top} x2="0" y2={bottom}>
                       <stop offset="0%" stopColor="#22d3ee" /><stop offset="45%" stopColor="#fbbf24" /><stop offset="80%" stopColor="#f97316" /><stop offset="100%" stopColor="#f43f5e" />
                     </linearGradient>
-                    <linearGradient id="tank-level-fill" gradientUnits="userSpaceOnUse" x1="0" y1={top} x2="0" y2={bottom}>
+                    <linearGradient id={`tank-level-fill-${gid}`} gradientUnits="userSpaceOnUse" x1="0" y1={top} x2="0" y2={bottom}>
                       <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.28} /><stop offset="50%" stopColor="#fbbf24" stopOpacity={0.14} /><stop offset="100%" stopColor="#f43f5e" stopOpacity={0.02} />
                     </linearGradient>
-                    <filter id="tank-level-glow" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+                    <filter id={`tank-level-glow-${gid}`} x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
                   </defs>
                   {heat.map((x, i) => <ReferenceArea key={`h${i}`} x1={x.a} x2={x.z} fill="#f43f5e" fillOpacity={0.09} strokeOpacity={0} />)}
                   <XAxis dataKey="ts" type="number" scale="time" domain={[start, now]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false}
@@ -1821,7 +1828,7 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
                   <ReferenceLine y={25} stroke="#f43f5e" strokeDasharray="4 4" strokeOpacity={0.5}
                     label={{ value: "LOW", position: "insideTopLeft", fill: "#f43f5e", fontSize: 9, opacity: 0.7 }} />
                   <Tooltip {...TIP} labelFormatter={(v) => clockTime(new Date(Number(v)).toISOString())} formatter={(v) => [`${v}%`, "Hot water"]} />
-                  <Area type="monotone" dataKey="tank" stroke="url(#tank-level-line)" fill="url(#tank-level-fill)" strokeWidth={3} filter="url(#tank-level-glow)"
+                  <Area type="monotone" dataKey="tank" stroke={`url(#tank-level-line-${gid})`} fill={`url(#tank-level-fill-${gid})`} strokeWidth={3} filter={`url(#tank-level-glow-${gid})`}
                     isAnimationActive animationDuration={1100} animationEasing="ease-out" dot={false} activeDot={{ r: 5, fill: "#fbbf24", stroke: "#0e0d12", strokeWidth: 2 }} />
                   {low && (
                     <ReferenceDot x={low.ts} y={low.tank} r={4} fill="#0e0d12" stroke="#fbbf24" strokeWidth={2}
@@ -1839,69 +1846,18 @@ function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: S
               );
             }}</Sized>
           </div>
-          <div className="flex flex-col gap-1 shrink-0">
+          {compact ? (
+            <div className="flex flex-col gap-1 shrink-0">
+              {lane("PLAN", sched, "bg-violet-400/35", (x) => range(x))}
+              {lane("HEAT", heat, "bg-amber-500/80", (x) => `Heating ${range(x)}`, { spans: element, cls: "bg-rose-500/90", title: (x) => `Electric element ${range(x)}` })}
+            </div>
+          ) : <div className="flex flex-col gap-1 shrink-0">
             {lane("PLAN", sched, "bg-violet-400/35", (x) => range(x))}
             {lane("HEAT", heat, "bg-amber-500/80", (x) => `Heating ${range(x)}`)}
             {lane("ELEM", element, "bg-rose-500/90 shadow-[0_0_6px_rgba(244,63,94,0.6)]", (x) => `Electric element ${range(x)}`)}
             {lane("OFF", off, "bg-slate-500/50", (x) => `Off ${range(x)}`)}
-          </div>
+          </div>}
         </>
-      )}
-    </>
-  );
-}
-
-type TankPoint = { time: string; t?: string; tank: number; heating?: boolean; off?: boolean };
-
-// Runs of consecutive points with a flag, as chart bands.
-function bands(points: TankPoint[], key: "heating" | "off") {
-  const out: { x1: string; x2: string }[] = [];
-  let start: string | null = null;
-  points.forEach((p, i) => {
-    if (p[key] && start === null) start = p.time;
-    if ((!p[key] || i === points.length - 1) && start !== null) { out.push({ x1: start, x2: p.time }); start = null; }
-  });
-  return out;
-}
-
-function TankChart({ points, legend }: { points: TankPoint[]; legend?: boolean }) {
-  if (points.length < 3) return <NotConnected icon={Activity} title="Collecting history" text="The tank chart fills in as readings arrive every 5 minutes." />;
-  const heat = bands(points, "heating"), off = bands(points, "off");
-  const last = points[points.length - 1];
-  return (
-    <>
-      <div className="relative flex-1 min-h-0">
-        <Sized>{(w, h) => (
-          <AreaChart width={w} height={h} data={points} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-            <defs>
-              <linearGradient id="g-tank" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.45} />
-                <stop offset="60%" stopColor="#f97316" stopOpacity={0.12} />
-                <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="g-tank-line" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#22d3ee" />
-                <stop offset="100%" stopColor="#fbbf24" />
-              </linearGradient>
-              <filter id="tank-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-            </defs>
-            {off.map((b, i) => <ReferenceArea key={`o${i}`} x1={b.x1} x2={b.x2} fill="#64748b" fillOpacity={0.08} strokeOpacity={0} />)}
-            {heat.map((b, i) => <ReferenceArea key={`h${i}`} x1={b.x1} x2={b.x2} fill="#f43f5e" fillOpacity={0.14} strokeOpacity={0} />)}
-            <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
-            <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} />
-            <Tooltip {...TIP} formatter={(v, _n, p) => [`${v}%${(p.payload as TankPoint).heating ? " • heating" : (p.payload as TankPoint).off ? " • off" : ""}`, "Hot water"]} />
-            <Area type="monotone" dataKey="tank" stroke="url(#g-tank-line)" fill="url(#g-tank)" strokeWidth={2.5} filter="url(#tank-glow)" isAnimationActive animationDuration={900} animationEasing="ease-out"
-              dot={false} activeDot={{ r: 4, fill: "#fbbf24", stroke: "#0e0d12", strokeWidth: 2 }} />
-            <ReferenceDot x={last.time} y={last.tank} r={4} fill="#fbbf24" stroke="#0e0d12" strokeWidth={2} />
-          </AreaChart>
-        )}</Sized>
-      </div>
-      {legend && (
-        <div className="flex items-center gap-4 text-[10px] text-slate-400">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded bg-gradient-to-r from-cyan-400 to-amber-400" />Hot water level</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm bg-rose-500/30" />Heating</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm bg-slate-500/25" />Off</span>
-        </div>
       )}
     </>
   );
@@ -2153,15 +2109,6 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     }
   };
 
-  const tankPoints = useMemo(() => {
-    const h = heater ? data.history?.[heater.id] ?? [] : [];
-    const pts = h.filter((x) => typeof x.state?.tank_pct === "number");
-    const step = Math.max(1, Math.ceil(pts.length / 96));
-    return pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map((x) => ({
-      time: clockTime(x.t), t: x.t, tank: x.state.tank_pct as number,
-      heating: !!x.state.running, off: x.state.mode === "off" || x.state.power === false,
-    }));
-  }, [data.history, heater]);
 
   // Every heater reading from the last 24 hours, for the Water tab's tank chart and timeline lanes.
   const heaterSeries = useMemo<HeaterPoint[]>(() => {
@@ -2266,10 +2213,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
                   </div>
                 );
               })()}
-              <div className="relative flex-1 min-h-[70px] flex flex-col">
-                <span className="text-[10px] font-mono tracking-widest text-slate-500 mb-1">HOT WATER • LAST 24 H</span>
-                <div className="relative flex-1 min-h-0 flex flex-col"><TankChart points={tankPoints} /></div>
-              </div>
+              <div className="relative flex-1 min-h-[120px] flex flex-col gap-1.5"><TankInsights compact series={heaterSeries} schedule={schedule} /></div>
             </>
           ) : <NotConnected icon={Flame} title="No water heater" text="It shows up here once the Rheem function reports it." />}
         </div>
