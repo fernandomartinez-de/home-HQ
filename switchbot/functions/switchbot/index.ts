@@ -150,7 +150,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function relay(id: string, mac: string, cmd: any, source: string) {
   const { data: last } = await db.from("home_readings").select("state").eq("device_id", id)
     .order("recorded_at", { ascending: false }).limit(1).maybeSingle();
-  const s = (last?.state ?? {}) as { mode?: string; power?: boolean | null };
+  const s = (last?.state ?? {}) as { mode?: string; power?: boolean | null; on_since?: string | null; auto_off_min?: number | null };
+  // The appliance's own timer (the towel warmer's 2 hours) may have turned it off already; then it's off,
+  // and a stop at the end of a schedule block must not tap it back on.
+  if (s.power === true && s.auto_off_min && s.on_since && Date.now() - Date.parse(s.on_since) >= (s.auto_off_min - 1) * 60_000) s.power = false;
   let op: string;
   if (cmd?.action === "press") op = "press";
   else if (cmd?.action === "power") {
