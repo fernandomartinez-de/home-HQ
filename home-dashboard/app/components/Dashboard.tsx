@@ -1756,6 +1756,27 @@ function ApplianceRow({ dev, send, notify, narrow }: { dev: Light; send: Send; n
     </div>
   );
 }
+// What the espresso machine row will look like once its plug is connected.
+function EspressoSample() {
+  return (
+    <div className="rounded-2xl border border-white/5 bg-[#1a191f]/60 p-3 flex flex-col gap-2.5">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 shrink-0 rounded-xl border bg-white/5 border-white/10 text-slate-400 flex items-center justify-center"><Coffee className="w-5 h-5" /></span>
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <span className="text-[14px] font-semibold text-white truncate">Espresso Machine</span>
+          <span className="text-[11px] font-medium text-slate-500">Off</span>
+        </div>
+        <span className="shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border bg-white/5 text-slate-300 border-white/10"><Power className="w-4 h-4" /></span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="flex-1 min-w-0 text-[11px] text-slate-400 truncate">Warm up weekdays 6:30 AM</span>
+        <span className="relative shrink-0 w-[46px] h-7 rounded-full bg-violet-500/50"><span className="absolute top-1 left-1 w-5 h-5 rounded-full translate-x-[18px] bg-slate-950" /></span>
+        <span className="shrink-0 px-3 h-9 flex items-center rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Schedule</span>
+      </div>
+    </div>
+  );
+}
+
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const clock12 = (t: string) => { const [h, m] = t.split(":").map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; };
 
@@ -2444,10 +2465,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <button onClick={() => setSection("living")} className="py-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-sm font-semibold">Open living room</button>
         </div>
         <div className={`${PANEL} p-4 flex flex-col gap-3`}>
-          <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={kitchenSwitches.length ? `${kitchenSwitches.length} in the kitchen` : "Espresso machine plug"} />
+          <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={kitchenSwitches.length ? `${kitchenSwitches.length} in the kitchen` : "Espresso machine smart plug"} />
           {kitchenSwitches.length
             ? kitchenSwitches.map((d) => <ApplianceRow key={d.id} dev={d} send={send} notify={setToast} narrow />)
-            : <p className="text-[12px] text-slate-500 leading-relaxed">The espresso machine shows up here once its smart plug is connected, with power and a morning warm up schedule.</p>}
+            : <Preview label="NOT CONNECTED YET"><EspressoSample /></Preview>}
         </div>
       </div>
     </main>
