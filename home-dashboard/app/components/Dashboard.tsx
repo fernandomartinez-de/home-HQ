@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
@@ -1517,47 +1517,14 @@ function useSetpoint(heater: Heater | undefined, send: Send) {
   return { value, nudge, lo, hi };
 }
 
-function HeaterPanel({ heater, send, unit, big }: { heater: Heater; send: Send; unit: Unit; big?: boolean }) {
-  const s = heater.state;
-  const { value, nudge, lo, hi } = useSetpoint(heater, send);
-  const off = s?.power === false || s?.mode === "off";
-  const tank = Math.max(0, Math.min(100, s?.tank_pct ?? 0));
-  const onMode = heater.capabilities.modes.includes("energy_saver") ? "energy_saver" : heater.capabilities.modes.find((m) => m !== "off") ?? "energy_saver";
-  const stepCls = `${big ? "w-14 h-14 text-2xl" : "w-11 h-11 text-lg"} rounded-xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 disabled:opacity-30`;
-  return (
-    <>
-      <div className="flex items-center justify-between bg-black/40 p-2 rounded-xl border border-white/5">
-        <button onClick={() => nudge(-1)} disabled={value <= lo} aria-label="Lower temperature" className={stepCls}>−</button>
-        <span className={`${big ? "text-5xl" : "text-3xl"} font-bold font-mono tabular-nums ${off ? "text-slate-600" : "text-white"}`}>{toUnit(value, unit)}°{unit}</span>
-        <button onClick={() => nudge(1)} disabled={value >= hi} aria-label="Raise temperature" className={stepCls}>+</button>
-      </div>
-      <div className="space-y-1.5">
-        <div className="flex justify-between items-center text-[11px]">
-          <span className="text-slate-400 flex items-center gap-1"><Droplets className="w-3.5 h-3.5 text-cyan-400" /> Hot Water Level</span>
-          <span className="font-mono text-cyan-400 font-bold">{s?.tank_pct ?? "--"}%</span>
-        </div>
-        <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden p-0.5 border border-white/5">
-          <div className={`h-full rounded-full transition-all duration-700 ${off ? "bg-slate-500" : "bg-gradient-to-r from-cyan-400 via-amber-400 to-amber-500"}`} style={{ width: `${tank}%` }} />
-        </div>
-      </div>
-      {big && heater.capabilities.supports_power && (
-        <button onClick={() => off
-          ? send(heater, { action: "set_mode", mode: onMode }, { power: true, mode: onMode })
-          : send(heater, { action: "power", on: false }, { power: false, mode: "off" })}
-          className={`h-12 rounded-xl border text-sm font-semibold ${off ? "bg-amber-500 text-slate-950 border-amber-400" : "bg-white/5 text-slate-200 border-white/10"}`}>
-          {off ? "Turn on water heater" : "Turn off water heater"}
-        </button>
-      )}
-    </>
-  );
-}
 
 // ---------- Water tab pieces ----------
 
 const MODE_NAME: Record<string, string> = { energy_saver: "Energy Saver", heat_pump: "Heat Pump", high_demand: "High Demand", electric: "Electric", vacation: "Vacation", gas: "Gas", off: "Off" };
 
 /** A glass tank drawn to the hot water level, with a moving surface and bubbles while it heats. */
-function GlassTank({ pct, heating, off }: { pct: number | null; heating: boolean; off: boolean }) {
+function GlassTank({ pct, heating, off, small }: { pct: number | null; heating: boolean; off: boolean; small?: boolean }) {
+  const uid = useId().replace(/:/g, "");
   const level = Math.max(0, Math.min(100, pct ?? 0));
   const top = 14 + 332 * (1 - level / 100); // liquid surface, inside a 332 tall tank starting at y 14
   const warm = off ? ["#94a3b8", "#475569"] : ["#fcd34d", "#ea580c"];
@@ -1566,23 +1533,23 @@ function GlassTank({ pct, heating, off }: { pct: number | null; heating: boolean
     <div className="relative w-full h-full" role="img" aria-label={`Hot water ${pct ?? "unknown"}%`}>
       <svg viewBox="0 0 176 360" className="absolute inset-0 w-full h-full">
         <defs>
-          <clipPath id="tank-clip"><rect x="14" y="14" width="132" height="332" rx="62" /></clipPath>
-          <linearGradient id="tank-liquid" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={warm[0]} /><stop offset="100%" stopColor={warm[1]} /></linearGradient>
-          <linearGradient id="tank-glass" x1="0" y1="0" x2="1" y2="0">
+          <clipPath id={`tank-clip-${uid}`}><rect x="14" y="14" width="132" height="332" rx="62" /></clipPath>
+          <linearGradient id={`tank-liquid-${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={warm[0]} /><stop offset="100%" stopColor={warm[1]} /></linearGradient>
+          <linearGradient id={`tank-glass-${uid}`} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="#fff" stopOpacity="0.10" /><stop offset="35%" stopColor="#fff" stopOpacity="0.02" /><stop offset="100%" stopColor="#fff" stopOpacity="0.06" />
           </linearGradient>
-          <radialGradient id="tank-glow-r" cx="50%" cy="100%" r="80%"><stop offset="0%" stopColor="#f97316" stopOpacity="0.35" /><stop offset="100%" stopColor="#f97316" stopOpacity="0" /></radialGradient>
+          <radialGradient id={`tank-glow-${uid}`} cx="50%" cy="100%" r="80%"><stop offset="0%" stopColor="#f97316" stopOpacity="0.35" /><stop offset="100%" stopColor="#f97316" stopOpacity="0" /></radialGradient>
         </defs>
-        {!off && <ellipse cx="80" cy="340" rx="90" ry="40" fill="url(#tank-glow-r)" />}
+        {!off && <ellipse cx="80" cy="340" rx="90" ry="40" fill={`url(#tank-glow-${uid})`} />}
         <rect x="14" y="14" width="132" height="332" rx="62" fill="#0b0908" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
-        <g clipPath="url(#tank-clip)">
-          <g className="tank-wave-slow" style={{ opacity: 0.45 }}><path d={wave(top + 2, 6)} fill="url(#tank-liquid)" transform="translate(0 0)" /></g>
-          <g className="tank-wave"><path d={wave(top, 8)} fill="url(#tank-liquid)" /></g>
+        <g clipPath={`url(#tank-clip-${uid})`}>
+          <g className="tank-wave-slow" style={{ opacity: 0.45 }}><path d={wave(top + 2, 6)} fill={`url(#tank-liquid-${uid})`} transform="translate(0 0)" /></g>
+          <g className="tank-wave"><path d={wave(top, 8)} fill={`url(#tank-liquid-${uid})`} /></g>
           {heating && !off && [22, 48, 70, 96, 118, 60, 104].map((x, i) => (
             <circle key={i} className="tank-bubble" cx={x + 14} cy={340} r={2 + (i % 3)} fill="#fff" fillOpacity={0.5}
               style={{ animationDelay: `${(i * 0.47) % 3.4}s` }} />
           ))}
-          <rect x="14" y="14" width="132" height="332" fill="url(#tank-glass)" />
+          <rect x="14" y="14" width="132" height="332" fill={`url(#tank-glass-${uid})`} />
           <rect x="30" y="40" width="10" height="250" rx="5" fill="#fff" fillOpacity="0.07" />
         </g>
         {[25, 50, 75].map((t) => {
@@ -1590,28 +1557,41 @@ function GlassTank({ pct, heating, off }: { pct: number | null; heating: boolean
           return (
             <g key={t}>
               <line x1="132" x2="146" y1={y} y2={y} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
-              <text x="152" y={y + 3.5} fontSize="10" fill="#64748b" fontFamily="ui-monospace, monospace">{t}</text>
+              {!small && <text x="152" y={y + 3.5} fontSize="10" fill="#64748b" fontFamily="ui-monospace, monospace">{t}</text>}
             </g>
           );
         })}
       </svg>
       <span className="absolute inset-y-0 left-0 w-[91%] flex flex-col items-center justify-center pointer-events-none">
-        <span className={`text-[34px] leading-none font-bold font-mono tabular-nums drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] ${off ? "text-slate-300" : "text-white"}`}>{pct ?? "--"}<span className="text-[18px]">%</span></span>
-        <span className="mt-1 text-[9px] font-mono tracking-[0.2em] text-white/70 drop-shadow">HOT WATER</span>
+        <span className={`${small ? "text-[20px]" : "text-[34px]"} leading-none font-bold font-mono tabular-nums drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] ${off ? "text-slate-300" : "text-white"}`}>{pct ?? "--"}<span className={small ? "text-[11px]" : "text-[18px]"}>%</span></span>
+        {!small && <span className="mt-1 text-[9px] font-mono tracking-[0.2em] text-white/70 drop-shadow">HOT WATER</span>}
       </span>
     </div>
   );
 }
 
+/** Heating, ready or off, with a pulsing dot while it heats. */
+function HeaterStatus({ heater }: { heater: Heater }) {
+  const hs = heater.state;
+  const off = hs?.power === false || hs?.mode === "off";
+  const heating = !!hs?.running && !off;
+  return (
+    <span className={`flex items-center gap-1.5 px-2.5 h-7 rounded-lg border text-[11px] font-medium whitespace-nowrap ${heating ? "bg-rose-500/10 border-rose-500/30 text-rose-200" : off ? "bg-white/5 border-white/10 text-slate-400" : "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${heating ? "bg-rose-400 heat-pulse" : off ? "bg-slate-500" : "bg-emerald-400"}`} />
+      {hs?.connected === false ? "Offline" : heating ? hs?.running : off ? "Off" : "Ready • not heating"}
+    </span>
+  );
+}
+
 /** Setpoint as an arc between the heater's lowest and highest temperature, with − and + on either side. */
-function SetpointDial({ value, lo, hi, unit, off, mode, onNudge }: { value: number; lo: number; hi: number; unit: Unit; off: boolean; mode: string; onNudge: (d: number) => void }) {
+function SetpointDial({ value, lo, hi, unit, off, mode, onNudge, small }: { value: number; lo: number; hi: number; unit: Unit; off: boolean; mode: string; onNudge: (d: number) => void; small?: boolean }) {
   const frac = Math.max(0, Math.min(1, (value - lo) / (hi - lo || 1)));
   const arc = 495; // 270° of a circle with r 105
-  const btn = "w-14 h-14 rounded-2xl bg-white/5 border border-white/10 text-white text-2xl font-bold active:scale-95 disabled:opacity-30 transition-transform";
+  const btn = `${small ? "w-10 h-10 rounded-xl text-xl" : "w-14 h-14 rounded-2xl text-2xl"} bg-white/5 border border-white/10 text-white font-bold active:scale-95 disabled:opacity-30 transition-transform`;
   return (
     <div className="flex items-center justify-between gap-2">
       <button onClick={() => onNudge(-1)} disabled={value <= lo} aria-label="Lower temperature" className={btn}>−</button>
-      <span className="relative w-48 h-48">
+      <span className={`relative ${small ? "w-32 h-32" : "w-48 h-48"}`}>
         <svg viewBox="0 0 250 250" className="w-full h-full">
           <defs><linearGradient id="dial-heat" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#f43f5e" /></linearGradient></defs>
           <circle cx="125" cy="125" r="105" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="14" strokeDasharray={`${arc} 660`} strokeLinecap="round" transform="rotate(135 125 125)" />
@@ -1623,12 +1603,12 @@ function SetpointDial({ value, lo, hi, unit, off, mode, onNudge }: { value: numb
           })}
         </svg>
         <span className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[10px] font-mono text-slate-400 tracking-widest">SET TO</span>
-          <span className={`text-5xl font-bold font-mono tabular-nums ${off ? "text-slate-500" : "text-white"}`}>{toUnit(value, unit)}°</span>
-          <span className={`text-[11px] font-mono tracking-wider ${off ? "text-slate-500" : "text-amber-400"}`}>{(MODE_NAME[mode] ?? mode).toUpperCase()}</span>
+          <span className={`${small ? "text-[8px]" : "text-[10px]"} font-mono text-slate-400 tracking-widest`}>SET TO</span>
+          <span className={`${small ? "text-3xl" : "text-5xl"} font-bold font-mono tabular-nums ${off ? "text-slate-500" : "text-white"}`}>{toUnit(value, unit)}°</span>
+          <span className={`${small ? "text-[9px]" : "text-[11px]"} font-mono tracking-wider ${off ? "text-slate-500" : "text-amber-400"}`}>{(MODE_NAME[mode] ?? mode).toUpperCase()}</span>
         </span>
-        <span className="absolute bottom-3 left-6 text-[10px] font-mono text-slate-500">{toUnit(lo, unit)}°</span>
-        <span className="absolute bottom-3 right-6 text-[10px] font-mono text-slate-500">{toUnit(hi, unit)}°</span>
+        {!small && <span className="absolute bottom-3 left-6 text-[10px] font-mono text-slate-500">{toUnit(lo, unit)}°</span>}
+        {!small && <span className="absolute bottom-3 right-6 text-[10px] font-mono text-slate-500">{toUnit(hi, unit)}°</span>}
       </span>
       <button onClick={() => onNudge(1)} disabled={value >= hi} aria-label="Raise temperature" className={btn}>+</button>
     </div>
@@ -1846,6 +1826,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   }, [refresh]);
 
   const heater = data.devices.find((d): d is Heater => d.kind === "water_heater");
+  const setpoint = useSetpoint(heater, send);
   const lights = useMemo(() => data.devices.filter((d): d is Light => d.kind === "light"), [data.devices]);
   const tv = data.devices.find((d): d is TV => d.kind === "tv");
   const cams = data.devices.filter((d): d is Camera => d.kind === "camera");
@@ -2067,9 +2048,21 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           {heater ? (
             <>
               <PanelHead icon={Flame} tone={AMBER} title="Water Heater"
-                sub={`${heater.state?.connected === false ? "Offline" : heater.state?.power === false ? "Off" : heater.state?.running ?? "Idle"} • schedule ${schedule?.enabled ? "on" : "off"}`}
+                sub={`Rheem heat pump • schedule ${schedule?.enabled ? "on" : "off"}`}
                 right={<button onClick={() => setSection("water")} className="px-3 h-9 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-slate-300 flex items-center gap-1">Details<ChevronRight className="w-3.5 h-3.5" /></button>} />
-              <HeaterPanel heater={heater} send={send} unit={unit} />
+              {(() => {
+                const hs = heater.state;
+                const off = hs?.power === false || hs?.mode === "off";
+                return (
+                  <div className="flex items-stretch gap-3 shrink-0">
+                    <div className="relative w-[64px] h-[150px] shrink-0"><GlassTank small pct={hs?.tank_pct ?? null} heating={!!hs?.running && !off} off={off} /></div>
+                    <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1.5">
+                      <HeaterStatus heater={heater} />
+                      <SetpointDial small value={setpoint.value} lo={setpoint.lo} hi={setpoint.hi} unit={unit} off={off} mode={off ? "off" : hs?.mode ?? ""} onNudge={setpoint.nudge} />
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="relative flex-1 min-h-[70px] flex flex-col">
                 <span className="text-[10px] font-mono tracking-widest text-slate-500 mb-1">HOT WATER • LAST 24 H</span>
                 <div className="relative flex-1 min-h-0 flex flex-col"><TankChart points={tankPoints} /></div>
@@ -2208,8 +2201,6 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     const tanks = h.map((x) => x.state?.tank_pct).filter((x): x is number => typeof x === "number");
     return { heatingH: heating / 3600_000, low: tanks.length ? Math.min(...tanks) : null, readings: h.length };
   }, [data.history, heater]);
-  const setpoint = useSetpoint(heater, send);
-
   const waterView = (
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 z-10">
       <div className={`lg:col-span-5 ${PANEL} p-5 flex flex-col gap-4 overflow-hidden`}>
