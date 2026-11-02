@@ -66,7 +66,6 @@ Outstanding
 - [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
 - [ ] Front door smart lock in the Security box (waiting on purchase)
 - [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, Thermomix plug)
-- [ ] Home status tile on the TV dashboard
 
 ## Updating the diagram
 
