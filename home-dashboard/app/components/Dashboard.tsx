@@ -1756,6 +1756,13 @@ function ApplianceRow({ dev, send, notify, narrow }: { dev: Light; send: Send; n
     </div>
   );
 }
+// The bedframe LED strip until it's connected: a stand in light for the Bedroom tab's preview tile.
+const BEDFRAME_SAMPLE = {
+  id: "sample_bedframe", kind: "light", provider: "sample", name: "Bedframe LED", enabled: true, recorded_at: null, room: "Bedroom",
+  state: { online: true, power: true, brightness: 35, color: "#8b5cf6", color_temp_k: null },
+  capabilities: { power: true, color: true, brightness: { min: 1, max: 100 }, color_temp_k: null },
+} as unknown as Light;
+
 // What the espresso machine row will look like once its plug is connected.
 function EspressoSample({ wide }: { wide?: boolean }) {
   if (wide) return (
@@ -2306,7 +2313,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     </div>
   );
 
-  const roomLights = (roomId: string, cols: number, big?: boolean, dense?: boolean) => {
+  const roomLights = (roomId: string, cols: number, big?: boolean, dense?: boolean, extra?: ReactNode) => {
     const list = lightsIn(roomId);
     return (
       <div className="space-y-2" key={roomId}>
@@ -2316,6 +2323,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         </div>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {unitsIn(roomId).map((u) => tile(u, big, dense))}
+          {extra}
         </div>
         {list.length === 0 && <p className="text-[11px] text-slate-500">No lights in this room yet.</p>}
       </div>
@@ -2456,7 +2464,9 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         ) : (
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={Palette} tone={AMBER} title="Lights" sub="Tap a light's name for colors" />
-          {roomLights("bedroom", 2)}
+          {roomLights("bedroom", 2, false, false, !lights.some((l) => /bed\s*frame/i.test(l.name)) && (
+            <div className="relative"><Preview label="NOT CONNECTED YET"><LightTile lights={[BEDFRAME_SAMPLE]} label="Bedframe LED" onOpen={() => {}} onPower={() => {}} onBright={() => {}} /></Preview></div>
+          ))}
         </div>
         )}
         {techBox(room)}

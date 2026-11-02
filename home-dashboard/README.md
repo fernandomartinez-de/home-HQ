@@ -68,6 +68,8 @@ Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)
 - [ ] Espresso machine plug: Shelly Plug US Gen4 for on/off, a morning warm up schedule and power use (waiting on purchase)
 - [ ] Towel warmer: install TV app build 18 so the TV can reach the Bot
+- [ ] Bedframe LED (arrives 2026-11-03): preview tile on the Bedroom tab until it's connected
+- [ ] Espresso machine plug (arrives 2026-11-03): preview row in Living & Kitchen until it's connected
 - [ ] Braava jet m6 mop: credentials script ready (get-braava.ps1), relay through the TV app (paused)
 - [ ] Front door smart lock in the Security box (waiting on purchase)
 - [ ] Power by appliance (meter total, Rheem energy, AC runtime, lights, espresso plug)
