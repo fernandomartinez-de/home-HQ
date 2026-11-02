@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useR
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, type LucideIcon,
+  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, Sunset, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, Cell, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
@@ -1414,7 +1414,10 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
 
 // One slim row per room for the overview's Lighting Console: the rows sit together in one list so the
 // console takes little height.
-function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]; lights: Light[]; onOpen: () => void; onAll: (on: boolean) => void }) {
+// Rooms with lights but no tab of their own (the balcony): a row in the console that only switches.
+const roomIcon = (name: string): LucideIcon => /balcon|terrace|patio|outdoor/i.test(name) ? Sunset : Lightbulb;
+
+function RoomRow({ room, lights, onOpen, onAll }: { room: { id: string; name: string; icon: LucideIcon }; lights: Light[]; onOpen?: () => void; onAll: (on: boolean) => void }) {
   const Icon = room.icon;
   const reachable = lights.filter((l) => l.state?.online !== false);
   const onLights = reachable.filter((l) => l.state?.power);
@@ -1424,13 +1427,13 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
   return (
     <div className="relative flex-1 min-h-[54px] flex items-center overflow-hidden">
       {glow && <span className="absolute inset-y-0 left-0 w-1/2 pointer-events-none breathe" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
-      <button onClick={onOpen} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-3 pl-3 pr-2 text-left active:bg-white/5 transition-colors">
+      <button onClick={onOpen ?? (() => onAll(!allOn))} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-3 pl-3 pr-2 text-left active:bg-white/5 transition-colors">
         <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border transition-shadow duration-700 ${onLights.length ? "bg-white/5 border-white/15 text-slate-100" : "bg-white/5 border-white/10 text-slate-500"}`}
           style={glow ? { boxShadow: `0 0 16px -2px ${glow}` } : undefined}>
           <Icon className="w-4 h-4" />
         </span>
         <span className="flex-1 min-w-0">
-          <span className="flex items-center gap-0.5 text-[14px] font-semibold text-white leading-tight">{room.name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
+          <span className="flex items-center gap-0.5 text-[14px] font-semibold text-white leading-tight">{room.name}{onOpen && <ChevronRight className="w-3.5 h-3.5 text-slate-500" />}</span>
           <span className="block text-[11px] text-slate-400 truncate">
             <span className={onLights.length ? "text-slate-200" : ""}>{onLights.length} of {lights.length} on</span>
             {offline > 0 && <span className="text-rose-400/80"> • {offline} offline</span>}
@@ -1442,7 +1445,7 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
               return (
                 <span key={l.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] ${lit ? "bg-white/10 border-white/15 text-slate-200" : "bg-black/20 border-white/5 text-slate-500"} ${l.state?.online === false ? "opacity-40 line-through" : ""}`}>
                   <span className="w-1.5 h-1.5 rounded-full border border-white/20" style={{ backgroundColor: lit ? lightHex(l) : "transparent" }} />
-                  {shortName(l.name, room.name)}
+                  {lights.length === 1 && shortName(l.name, room.name) === "Lights" ? l.name : shortName(l.name, room.name)}
                 </span>
               );
             })}
@@ -1452,7 +1455,7 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
       <button onClick={() => onAll(!allOn)} disabled={!reachable.length} aria-label={allOn ? `Turn off ${room.name} lights` : `Turn on ${room.name} lights`}
         className={`relative z-10 shrink-0 mr-2.5 h-9 w-[76px] flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-30 ${allOn
           ? "bg-violet-400/15 text-violet-100 border-violet-300/30" : "bg-white/5 text-slate-300 border-white/10"}`}>
-        <Power className="w-3.5 h-3.5" />{allOn ? "All off" : "All on"}
+        <Power className="w-3.5 h-3.5" />{lights.length === 1 ? (allOn ? "Off" : "On") : allOn ? "All off" : "All on"}
       </button>
     </div>
   );
@@ -2097,6 +2100,12 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const setCircuit = (on: boolean) => circuit.filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
   const openLight = lights.find((l) => l.id === lightId) ?? null;
   const otherLights = lights.filter((l) => !ROOMS.some((r) => r.id === roomIdOf(l)));
+  // Lights outside the three rooms, grouped by their room name (the balcony), as console rows.
+  const otherRooms = (() => {
+    const by = new Map<string, Light[]>();
+    for (const l of otherLights) { const n = (l.room ?? "").trim() || "Other"; by.set(n, [...(by.get(n) ?? []), l]); }
+    return [...by].map(([name, ls]) => ({ name, lights: ls }));
+  })();
 
   const setRoom = (roomId: string, on: boolean) =>
     lightsIn(roomId).filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
@@ -2327,8 +2336,10 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             right={<span className="text-[10px] font-mono text-slate-500">Cloud</span>} />
           <div className="flex-1 min-h-0 flex flex-col rounded-2xl border border-white/5 bg-black/25 divide-y divide-white/5 overflow-hidden">
             {ROOMS.map((r) => <RoomRow key={r.id} room={r} lights={lightsIn(r.id)} onOpen={() => setSection(r.id)} onAll={(on) => setRoom(r.id, on)} />)}
+            {otherRooms.map(({ name, lights: ls }) => (
+              <RoomRow key={name} room={{ id: name, name, icon: roomIcon(name) }} lights={ls} onAll={(on) => powerAll(ls, on)} />
+            ))}
           </div>
-          {otherLights.length > 0 && <div className="grid grid-cols-2 gap-2">{otherLights.map((l) => tile({ key: l.id, label: l.name, lights: [l] }))}</div>}
         </div>
         <EnergyTile meter={meter} onOpen={() => setEnergyOpen(true)} onConnect={() => setConedOpen(true)} />
       </div>
