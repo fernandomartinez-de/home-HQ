@@ -504,3 +504,26 @@ body:has(dialog[open]) { overflow: hidden; }
 /* Panels come in column by column. */
 main > :nth-child(2).panel-in, main > :nth-child(2) .panel-in { animation-delay: 0.07s; }
 main > :nth-child(3).panel-in, main > :nth-child(3) .panel-in { animation-delay: 0.14s; }
+
+/* Icon motion: each panel icon moves in a way that fits what it stands for. */
+@keyframes flicker { 0%, 100% { transform: scale(1) rotate(0); opacity: 1; } 25% { transform: scale(1.08, 0.94) rotate(-3deg); opacity: 0.85; } 50% { transform: scale(0.96, 1.06) rotate(2deg); } 75% { transform: scale(1.05, 0.97) rotate(-1deg); opacity: 0.9; } }
+.icon-flicker { animation: flicker 1.8s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes crackle { 0%, 88%, 100% { opacity: 1; filter: none; } 90% { opacity: 0.4; } 92% { opacity: 1; filter: drop-shadow(0 0 4px currentColor); } 94% { opacity: 0.5; } 96% { opacity: 1; filter: drop-shadow(0 0 6px currentColor); } }
+.icon-crackle { animation: crackle 3.2s linear infinite; }
+@keyframes beat { 0%, 60%, 100% { transform: scale(1); } 15% { transform: scale(1.14); } 30% { transform: scale(0.98); } 45% { transform: scale(1.08); } }
+.icon-beat { animation: beat 2.4s ease-in-out infinite; }
+@keyframes glow-icon { 0%, 100% { filter: drop-shadow(0 0 0 currentColor); } 50% { filter: drop-shadow(0 0 5px currentColor); } }
+.icon-glow { animation: glow-icon 3s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+.icon-bob { animation: bob 2.6s ease-in-out infinite; }
+@keyframes tilt { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-10deg); } }
+.icon-tilt { animation: tilt 4s ease-in-out infinite; }
+@keyframes grow { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.75); } }
+.icon-grow { animation: grow 2.2s ease-in-out infinite; transform-origin: bottom; }
+@keyframes pop { 0% { transform: scale(0.6) rotate(-12deg); } 60% { transform: scale(1.25) rotate(4deg); } 100% { transform: scale(1) rotate(0); } }
+.icon-pop { animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes scene-run { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(1.2); } 100% { transform: rotate(360deg) scale(1); } }
+.scene-run { animation: scene-run 0.9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .icon-flicker, .icon-crackle, .icon-beat, .icon-glow, .icon-bob, .icon-tilt, .icon-grow, .icon-pop, .scene-run { animation: none; }
+}

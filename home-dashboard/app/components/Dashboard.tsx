@@ -109,11 +109,18 @@ const CYAN = "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
 const AMBER = "bg-amber-500/10 text-amber-400 border-amber-500/20";
 const GREEN = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
+// How each panel icon moves: a flickering flame, a crackling bolt, a beating shield, and so on.
+const ICON_MOTION = new Map<LucideIcon, string>([
+  [Flame, "icon-flicker"], [Zap, "icon-crackle"], [ShieldCheck, "icon-beat"], [ShieldAlert, "icon-beat"], [Activity, "icon-beat"],
+  [Thermometer, "icon-bob"], [Tv, "icon-glow"], [Lightbulb, "icon-glow"], [Video, "icon-glow"], [BellRing, "icon-tilt"],
+  [Palette, "icon-tilt"], [Sliders, "icon-tilt"], [ChartColumn, "icon-grow"], [Plug, "icon-bob"], [DoorClosed, "icon-bob"], [ListChecks, "icon-bob"],
+]);
+
 function PanelHead({ icon: Icon, tone, title, sub, right }: { icon: LucideIcon; tone: string; title: string; sub?: ReactNode; right?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-white/10">
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className={`p-2 rounded-xl border shrink-0 ${tone}`}><Icon className="w-4 h-4" /></div>
+        <div className={`p-2 rounded-xl border shrink-0 ${tone}`}><Icon className={`w-4 h-4 ${ICON_MOTION.get(Icon) ?? ""}`} /></div>
         <div className="min-w-0"><h2 className="text-[13px] font-bold text-white tracking-wide">{title}</h2>{sub && <p className="text-[11px] text-slate-400 truncate">{sub}</p>}</div>
       </div>
       {right}
@@ -236,7 +243,7 @@ function PowerSample({ compact }: { compact?: boolean }) {
               <AreaChart width={w} height={h} data={POWER_SAMPLE.hourly} margin={{ top: 4, right: 4, left: -26, bottom: 0 }}>
                 <XAxis dataKey="time" stroke="#64748b" fontSize={9} tickLine={false} interval={5} />
                 <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
-                {POWER_SAMPLE.sources.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.2} strokeWidth={1.5} isAnimationActive={false} />)}
+                {POWER_SAMPLE.sources.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.2} strokeWidth={1.5} isAnimationActive animationDuration={900} animationEasing="ease-out" />)}
               </AreaChart>
             )}</Sized>
           </div>
@@ -259,7 +266,7 @@ function PowerSample({ compact }: { compact?: boolean }) {
             <AreaChart width={w} height={h} data={POWER_SAMPLE.hourly} margin={{ top: 5, right: 4, left: -26, bottom: 0 }}>
               <XAxis dataKey="time" stroke="#64748b" fontSize={9} tickLine={false} interval={5} />
               <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
-              {POWER_SAMPLE.sources.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.2} strokeWidth={1.5} isAnimationActive={false} />)}
+              {POWER_SAMPLE.sources.map((s) => <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.2} strokeWidth={1.5} isAnimationActive animationDuration={900} animationEasing="ease-out" />)}
             </AreaChart>
           )}</Sized>
         </div>
@@ -364,11 +371,36 @@ function groupText(g: ActGroup) {
   return `${name} • ${what}${g.count > 1 ? ` ×${g.count}` : ""}`;
 }
 
+// Counts the first number in a label up from zero when it appears or changes ("$97.08", "6.8 kWh", "72%").
+function CountUp({ text }: { text: string }) {
+  const m = /-?\d[\d,]*(\.\d+)?/.exec(text);
+  const target = m ? Number(m[0].replace(/,/g, "")) : NaN;
+  const decimals = m?.[1] ? m[1].length - 1 : 0;
+  const [shown, setShown] = useState(Number.isFinite(target) ? 0 : target);
+  const from = useRef(0);
+  useEffect(() => {
+    if (!Number.isFinite(target)) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setShown(target); return; }
+    const start = performance.now(), a = from.current, dur = 800;
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - start) / dur), e = 1 - Math.pow(1 - k, 3);
+      setShown(a + (target - a) * e);
+      if (k < 1) raf = requestAnimationFrame(step); else from.current = target;
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  if (!m || !Number.isFinite(target)) return <>{text}</>;
+  const num = shown.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: m[0].includes(",") });
+  return <>{text.slice(0, m.index)}{num}{text.slice(m.index + m[0].length)}</>;
+}
+
 function MiniStat({ label, value, sub, tone = "text-slate-100" }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <div className="min-w-0 rounded-xl bg-black/30 border border-white/5 px-3 py-2">
       <div className="text-[9px] font-mono tracking-widest text-slate-500 truncate">{label}</div>
-      <div className={`text-[18px] leading-tight font-bold font-mono tabular-nums truncate ${tone}`}>{value}</div>
+      <div className={`text-[18px] leading-tight font-bold font-mono tabular-nums truncate ${tone}`}><CountUp text={value} /></div>
       {sub && <div className="text-[10px] text-slate-500 truncate">{sub}</div>}
     </div>
   );
@@ -477,7 +509,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
                     <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
                     <Tooltip {...TIP} formatter={(v) => [`${Number(v).toFixed(1)} kWh`, "Used"]} />
                     {avg30 != null && <ReferenceLine y={avg30} stroke="#94a3b8" strokeDasharray="4 4" strokeOpacity={0.6} />}
-                    <Bar dataKey="kwh" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                    <Bar dataKey="kwh" radius={[4, 4, 0, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out">
                       {dailyData.map((x) => <Cell key={x.d} fill={x.weekend ? "#6ee7b7" : "#10b981"} fillOpacity={x.weekend ? 0.55 : 0.85} />)}
                     </Bar>
                   </BarChart>
@@ -498,7 +530,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
                     <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
                     <YAxis stroke="#64748b" fontSize={10} tickLine={false} tickFormatter={(v) => `$${v}`} />
                     <Tooltip {...TIP} formatter={(v, _n, p) => [`$${Number(v).toFixed(2)} • ${(p.payload as { kwh: number }).kwh} kWh`, (p.payload as { range: string }).range]} />
-                    <Bar dataKey="cost" fill="#10b981" fillOpacity={0.85} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="cost" fill="#10b981" fillOpacity={0.85} radius={[4, 4, 0, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out" />
                   </BarChart>
                 )}</Sized>
               </div>
@@ -515,7 +547,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
                   <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
                   <YAxis stroke="#64748b" fontSize={10} tickLine={false} allowDecimals={false} />
                   <Tooltip {...TIP} formatter={(v, n) => [hoursText(Number(v)), String(n)]} />
-                  {rooms.map((r, i) => <Bar key={r} dataKey={r} stackId="rooms" fill={ROOM_COLOR[r] ?? ROOM_COLOR.Other} fillOpacity={0.8} radius={i === rooms.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />)}
+                  {rooms.map((r, i) => <Bar key={r} dataKey={r} stackId="rooms" fill={ROOM_COLOR[r] ?? ROOM_COLOR.Other} fillOpacity={0.8} radius={i === rooms.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive animationDuration={900} animationEasing="ease-out" />)}
                 </BarChart>
               )}</Sized>
             </div>
@@ -533,8 +565,8 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
                   <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
                   <YAxis stroke="#64748b" fontSize={10} tickLine={false} allowDecimals={false} />
                   <Tooltip {...TIP} formatter={(v, n) => [hoursText(Number(v)), n === "pump" ? "Heat pump" : "Electric element"]} />
-                  <Bar dataKey="pump" stackId="h" fill="#f59e0b" fillOpacity={0.8} isAnimationActive={false} />
-                  <Bar dataKey="element" stackId="h" fill="#f43f5e" fillOpacity={0.8} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="pump" stackId="h" fill="#f59e0b" fillOpacity={0.8} isAnimationActive animationDuration={900} animationEasing="ease-out" />
+                  <Bar dataKey="element" stackId="h" fill="#f43f5e" fillOpacity={0.8} radius={[4, 4, 0, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out" />
                 </BarChart>
               )}</Sized>
             </div>
@@ -593,7 +625,7 @@ function EnergyTile({ meter, onOpen, onConnect }: { meter: Meter | undefined; on
   return (
     <button onClick={onOpen} aria-label="Open Power & Energy details" className={`${PANEL} p-3 flex flex-col gap-2 shrink-0 text-left active:scale-[0.99] transition-transform`}>
       <div className="flex items-center gap-2.5 w-full">
-        <div className={`p-2 rounded-xl border shrink-0 ${GREEN} glow-ring`}><Zap className="w-4 h-4" /></div>
+        <div className={`p-2 rounded-xl border shrink-0 ${GREEN} glow-ring`}><Zap className="w-4 h-4 icon-crackle" /></div>
         <div className="flex-1 min-w-0"><h2 className="text-[13px] font-bold text-white">Power & Energy</h2><p className="text-[11px] text-slate-400 truncate">Con Edison • tap for the full report</p></div>
         <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
       </div>
@@ -606,7 +638,7 @@ function EnergyTile({ meter, onOpen, onConnect }: { meter: Meter | undefined; on
         ].map(([label, value, tone]) => (
           <span key={label} className="min-w-0 rounded-lg bg-black/30 border border-white/5 px-2 py-1.5">
             <span className="block text-[8px] font-mono tracking-widest text-slate-500 truncate">{label}</span>
-            <span className={`block text-[14px] font-bold font-mono tabular-nums ${tone}`}>{value}</span>
+            <span className={`block text-[14px] font-bold font-mono tabular-nums ${tone}`}><CountUp text={value} /></span>
           </span>
         ))}
       </div>
@@ -694,8 +726,8 @@ function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose:
         <div className="grid grid-cols-12 gap-3 shrink-0">
           <div className="col-span-8 flex flex-col gap-2.5">
             <div className="grid grid-cols-4 gap-2 shrink-0">
-              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.soFarIsEst ? "SO FAR (EST.)" : "BILL SO FAR"}</div><div className="text-[20px] font-bold font-mono text-emerald-300">{money(m.soFar)}</div><div className="text-[10px] text-slate-500">{m.dayOf && m.days ? `Day ${Math.min(m.dayOf, m.days)} of ${m.days}` : ""}</div></div>
-              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.projIsEst ? "EST. TOTAL" : "PROJECTED"}</div><div className="text-[20px] font-bold font-mono">{money(m.projected)}</div><div className="text-[10px] text-slate-500">{m.lastYear?.cost ? `Last year ${money(m.lastYear.cost)}` : ""}</div></div>
+              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.soFarIsEst ? "SO FAR (EST.)" : "BILL SO FAR"}</div><div className="text-[20px] font-bold font-mono text-emerald-300"><CountUp text={money(m.soFar)} /></div><div className="text-[10px] text-slate-500">{m.dayOf && m.days ? `Day ${Math.min(m.dayOf, m.days)} of ${m.days}` : ""}</div></div>
+              <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.projIsEst ? "EST. TOTAL" : "PROJECTED"}</div><div className="text-[20px] font-bold font-mono"><CountUp text={money(m.projected)} /></div><div className="text-[10px] text-slate-500">{m.lastYear?.cost ? `Last year ${money(m.lastYear.cost)}` : ""}</div></div>
               <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">{m.pending ? "NEXT BILL (EST.)" : "LAST BILL"}</div><div className="text-[20px] font-bold font-mono">{m.pending ? `≈${money(m.pendingCost)}` : money(m.last?.cost)}</div><div className="text-[10px] text-slate-500 truncate">{m.pending ? `${billDay(m.pending.start)} to ${billDay(m.pending.end)}, not posted` : m.last ? `${billDay(m.last.start)} to ${billDay(m.last.end)}` : ""}</div></div>
               <div className={tile}><div className="text-[9px] font-mono tracking-widest text-slate-500">RATE</div><div className="text-[20px] font-bold font-mono">{m.rate ? `$${m.rate.toFixed(3)}` : "--"}</div><div className="text-[10px] text-slate-500">per kWh, all in{rates.length > 1 ? ` • ${Math.round(((rates[rates.length - 1] - rates[0]) / rates[0]) * 100)}% in a year` : ""}</div></div>
             </div>
@@ -733,7 +765,7 @@ function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose:
                     <XAxis dataKey="label" stroke="#64748b" fontSize={10} tickLine={false} />
                     <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
                     <Tooltip {...TIP} formatter={(v, _n, p) => [`${v} kWh${(p.payload as { partial: boolean }).partial ? " so far" : ""}`, "Used"]} />
-                    <Bar dataKey="kwh" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                    <Bar dataKey="kwh" radius={[4, 4, 0, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out">
                       {monthData.map((x) => <Cell key={x.k} fill={x.top ? "#f59e0b" : "#10b981"} fillOpacity={x.partial ? 0.35 : 0.85} />)}
                     </Bar>
                   </BarChart>
@@ -761,7 +793,7 @@ function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose:
                     <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
                     <Tooltip {...TIP} formatter={(v) => [`${Number(v).toFixed(2)} kWh`, "Used"]} />
                     {base != null && <ReferenceLine y={base} stroke="#22d3ee" strokeDasharray="3 3" strokeOpacity={0.7} />}
-                    <Area type="monotone" dataKey="kwh" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="kwh" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} isAnimationActive animationDuration={900} animationEasing="ease-out" />
                   </AreaChart>
                 )}</Sized>
               ) : <span className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-500">No hourly data yet</span>}
@@ -776,7 +808,7 @@ function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose:
                   <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
                   <YAxis stroke="#64748b" fontSize={9} tickLine={false} />
                   <Tooltip {...TIP} formatter={(v) => [`${Number(v).toFixed(1)} kWh`, "Average"]} />
-                  <Bar dataKey="kwh" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                  <Bar dataKey="kwh" radius={[3, 3, 0, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out">
                     {dow.map((x) => <Cell key={x.name} fill={x.weekend ? "#6ee7b7" : "#10b981"} fillOpacity={x.weekend ? 0.55 : 0.85} />)}
                   </Bar>
                 </BarChart>
@@ -792,7 +824,7 @@ function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose:
                   <XAxis dataKey="label" stroke="#64748b" fontSize={9} tickLine={false} interval={1} />
                   <YAxis stroke="#64748b" fontSize={9} tickLine={false} tickFormatter={(v) => `$${v}`} />
                   <Tooltip {...TIP} formatter={(v, _n, p) => [`$${Number(v).toFixed(2)} • ${(p.payload as { kwh: number }).kwh} kWh`, (p.payload as { range: string }).range]} />
-                  <Bar dataKey="cost" fill="#10b981" fillOpacity={0.85} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="cost" fill="#10b981" fillOpacity={0.85} radius={[3, 3, 0, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out" />
                 </BarChart>
               )}</Sized>
             </div>
@@ -880,7 +912,7 @@ function RoomTempSample() {
           <AreaChart width={w} height={h} data={ROOM_TEMP_SAMPLE} margin={{ top: 5, right: 4, left: -22, bottom: 0 }}>
             <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} interval={2} />
             <YAxis stroke="#64748b" fontSize={10} tickLine={false} domain={[68, 84]} />
-            <Area type="monotone" dataKey="v" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.15} strokeWidth={2} isAnimationActive={false} />
+            <Area type="monotone" dataKey="v" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.15} strokeWidth={2} isAnimationActive animationDuration={900} animationEasing="ease-out" />
           </AreaChart>
         )}</Sized>
       </div>
@@ -1577,7 +1609,7 @@ function GlassTank({ pct, heating, off, small }: { pct: number | null; heating: 
         })}
       </svg>
       <span className="absolute inset-y-0 left-0 w-[91%] flex flex-col items-center justify-center pointer-events-none">
-        <span className={`${small ? "text-[20px]" : "text-[34px]"} leading-none font-bold font-mono tabular-nums drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] ${off ? "text-slate-300" : "text-white"}`}>{pct ?? "--"}<span className={small ? "text-[11px]" : "text-[18px]"}>%</span></span>
+        <span className={`${small ? "text-[20px]" : "text-[34px]"} leading-none font-bold font-mono tabular-nums drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] ${off ? "text-slate-300" : "text-white"}`}>{pct == null ? "--" : <CountUp text={String(pct)} />}<span className={small ? "text-[11px]" : "text-[18px]"}>%</span></span>
         {!small && <span className="mt-1 text-[9px] font-mono tracking-[0.2em] text-white/70 drop-shadow">HOT WATER</span>}
       </span>
     </div>
@@ -1711,7 +1743,7 @@ function TankChart({ points, legend }: { points: TankPoint[]; legend?: boolean }
             <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
             <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} />
             <Tooltip {...TIP} formatter={(v, _n, p) => [`${v}%${(p.payload as TankPoint).heating ? " • heating" : (p.payload as TankPoint).off ? " • off" : ""}`, "Hot water"]} />
-            <Area type="monotone" dataKey="tank" stroke="url(#g-tank-line)" fill="url(#g-tank)" strokeWidth={2.5} filter="url(#tank-glow)" isAnimationActive={false}
+            <Area type="monotone" dataKey="tank" stroke="url(#g-tank-line)" fill="url(#g-tank)" strokeWidth={2.5} filter="url(#tank-glow)" isAnimationActive animationDuration={900} animationEasing="ease-out"
               dot={false} activeDot={{ r: 4, fill: "#fbbf24", stroke: "#110e0c", strokeWidth: 2 }} />
             <ReferenceDot x={last.time} y={last.tank} r={4} fill="#fbbf24" stroke="#110e0c" strokeWidth={2} />
           </AreaChart>
@@ -2460,7 +2492,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             return (
               <button key={id} onClick={() => applyScene(id)}
                 className={`flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-medium transition-all active:scale-95 ${active ? "bg-amber-500 text-slate-950 font-semibold shadow-lg shadow-amber-500/20" : "bg-white/5 text-slate-400 border border-white/5"}`}>
-                <Icon className={`w-3.5 h-3.5 ${active ? "text-slate-950" : "text-slate-400"}`} />{id}
+                <Icon className={`w-3.5 h-3.5 ${active ? "text-slate-950 scene-run" : "text-slate-400"}`} />{id}
               </button>
             );
           })}
@@ -2473,7 +2505,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           return (
             <button key={id} onClick={() => setSection(id)} aria-current={active ? "page" : undefined}
               className={`flex-1 min-w-[96px] h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-all ${active ? "bg-white/10 text-white border border-amber-500/40 shadow-lg shadow-amber-950/30" : "text-slate-400 border border-transparent"}`}>
-              <Icon className={`w-4 h-4 ${active ? "text-amber-400" : "text-slate-500"}`} />{label}
+              <Icon key={active ? `${id}-on` : id} className={`w-4 h-4 ${active ? "text-amber-400 icon-pop" : "text-slate-500"}`} />{label}
               {meta && <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${active ? "bg-amber-500/15 text-amber-300" : "bg-white/5 text-slate-500"}`}>{meta}</span>}
             </button>
           );
