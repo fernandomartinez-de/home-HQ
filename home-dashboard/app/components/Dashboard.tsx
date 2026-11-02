@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useR
 import {
   Thermometer, ShieldCheck, ShieldAlert, Flame, Droplets, Sun, Tv, Moon, Power, Sliders, Activity, X,
   Palette, Check, Wind, LayoutGrid, Sofa, CookingPot, BedDouble, ChevronRight, ChevronDown, ListChecks, Zap,
-  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
+  AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, Cell, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
 import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
@@ -104,7 +104,7 @@ function Sized({ children }: { children: (w: number, h: number) => ReactNode }) 
   return <div ref={ref} className="absolute inset-0">{size && size.w > 0 && size.h > 0 ? children(size.w, size.h) : null}</div>;
 }
 
-const PANEL = "relative bg-[#171310]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl";
+const PANEL = "relative bg-[#171310]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl panel-in";
 const CYAN = "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
 const AMBER = "bg-amber-500/10 text-amber-400 border-amber-500/20";
 const GREEN = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
@@ -176,7 +176,7 @@ function SampleAcRow({ name, room, set, mode }: { name: string; room: number; se
   return (
     <div className="bg-black/30 p-2.5 rounded-2xl border border-white/5 flex items-center gap-2.5">
       <span className="flex-1 min-w-0">
-        <span className="text-[13px] font-bold text-white flex items-center gap-1 whitespace-nowrap"><Wind className="w-3.5 h-3.5 text-cyan-400 shrink-0" />{name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
+        <span className="text-[13px] font-bold text-white flex items-center gap-1 whitespace-nowrap"><Fan className="w-3.5 h-3.5 text-cyan-400 shrink-0 spin-slow" />{name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
         <span className="text-[11px] text-slate-400">Room {room}° • <span className="text-cyan-400 font-mono uppercase">{mode}</span></span>
       </span>
       <span className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold">−</span>
@@ -593,10 +593,11 @@ function EnergyTile({ meter, onOpen, onConnect }: { meter: Meter | undefined; on
   return (
     <button onClick={onOpen} aria-label="Open Power & Energy details" className={`${PANEL} p-3 flex flex-col gap-2 shrink-0 text-left active:scale-[0.99] transition-transform`}>
       <div className="flex items-center gap-2.5 w-full">
-        <div className={`p-2 rounded-xl border shrink-0 ${GREEN}`}><Zap className="w-4 h-4" /></div>
+        <div className={`p-2 rounded-xl border shrink-0 ${GREEN} glow-ring`}><Zap className="w-4 h-4" /></div>
         <div className="flex-1 min-w-0"><h2 className="text-[13px] font-bold text-white">Power & Energy</h2><p className="text-[11px] text-slate-400 truncate">Con Edison • tap for the full report</p></div>
         <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
       </div>
+      <span aria-hidden="true" className="block w-full h-px rounded-full bg-emerald-500/15 overflow-hidden"><span className="block h-full w-full energy-flow" /></span>
       <div className="grid grid-cols-3 gap-2 w-full">
         {[
           [m.soFarIsEst ? "SO FAR (EST.)" : "BILL SO FAR", money(m.soFar), "text-emerald-300"],
@@ -1077,6 +1078,9 @@ function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
     <>
       <div className="relative flex-1 min-h-[120px] rounded-2xl overflow-hidden border border-white/10 bg-black">
         {src && <img src={src} alt={`${cam.name} camera snapshot`} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300" style={{ transform: `scale(${zoom})` }} />}
+        {src && live.status !== "live" && (
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-16 pointer-events-none scan-line bg-gradient-to-b from-transparent via-emerald-300/10 to-transparent" />
+        )}
         {live.stream && <LiveVideo stream={live.stream} muted={muted} zoom={zoom} />}
         {!src && !err && !live.stream && <span className="absolute inset-0 flex items-center justify-center text-[12px] text-slate-500">Loading snapshot</span>}
         {(live.err || (err && !live.stream)) && (
@@ -1138,7 +1142,7 @@ function ModeChip({ cam, onClick }: { cam: Camera; onClick: () => void }) {
   const armed = m !== "disarmed";
   return (
     <button onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border whitespace-nowrap shrink-0 active:scale-95 ${armed ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-rose-500/10 text-rose-400 border-rose-500/30"}`}>
+      className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border whitespace-nowrap shrink-0 active:scale-95 ${armed ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 glow-ring" : "bg-rose-500/10 text-rose-400 border-rose-500/30"}`}>
       {armed ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}{armed ? `Armed • ${MODE_LABEL[m] ?? m}` : "Disarmed"}
     </button>
   );
@@ -1271,6 +1275,15 @@ function LockPanelSample() {
   );
 }
 
+/** Little bouncing bars while the TV is playing. */
+function Equalizer() {
+  return (
+    <span aria-hidden="true" className="flex items-end gap-[2px] h-3">
+      {[0, 0.3, 0.15, 0.45].map((d, i) => <span key={i} className="eq-bar w-[2px] h-full rounded-full bg-cyan-300" style={{ animationDelay: `${d}s`, animationDuration: `${0.8 + i * 0.15}s` }} />)}
+    </span>
+  );
+}
+
 function TvSample() {
   const key = "h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-200";
   return (
@@ -1329,7 +1342,7 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
     <div className={`relative w-full ${big ? "h-40" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
       ? "bg-[#1e1916]/40 border-white/5 opacity-40"
       : on ? "bg-gradient-to-b from-[#2a211a] to-[#1c1511] border-amber-500/40 shadow-lg shadow-amber-950/40" : "bg-[#1e1916]/60 border-white/5"}`}>
-      {on && <span className="absolute inset-x-0 bottom-0 h-2/3 opacity-35 pointer-events-none" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
+      {on && <span className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none breathe" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
       <div className={`relative z-10 flex-1 min-h-0 flex items-start gap-2 ${big ? "p-4 pb-2" : "p-3 pb-1.5"}`}>
         <button onClick={onOpen} disabled={offline} aria-label={`${label} color`} className="flex-1 min-w-0 h-full text-left flex flex-col justify-between">
           <span className="flex items-center gap-2 min-w-0">
@@ -1375,9 +1388,10 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
   const glow = onLights[0] ? lightHex(onLights[0]) : null;
   return (
     <div className="relative flex-1 min-h-[54px] flex items-center overflow-hidden">
-      {glow && <span className="absolute inset-y-0 left-0 w-1/2 opacity-20 pointer-events-none" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
+      {glow && <span className="absolute inset-y-0 left-0 w-1/2 pointer-events-none breathe" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
       <button onClick={onOpen} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-3 pl-3 pr-2 text-left active:bg-white/5 transition-colors">
-        <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}>
+        <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border transition-shadow duration-700 ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}
+          style={glow ? { boxShadow: `0 0 16px -2px ${glow}` } : undefined}>
           <Icon className="w-4 h-4" />
         </span>
         <span className="flex-1 min-w-0">
@@ -2088,6 +2102,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             sub={!tvSeen ? "Fire TV" : tvOn ? `Fire TV • ${tv?.state?.app_name ?? "On"}` : "Fire TV • asleep or off"}
             right={tvOn && tv?.state?.volume != null ? (
               <span className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-black/40 border border-white/10 text-[11px] font-mono text-cyan-300">
+                {!tv.state.muted && <Equalizer />}
                 {tv.state.muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}{tv.state.muted ? "MUTED" : `VOL ${tv.state.volume}`}
               </span>
             ) : undefined} />
@@ -2405,7 +2420,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <div className="h-5 w-px bg-white/10 hidden md:block" />
           <div className="relative">
             <button onClick={() => setAlertsOpen((o) => !o)} aria-expanded={alertsOpen}
-              className={`h-9 flex items-center gap-2 pl-2.5 pr-2 rounded-xl border text-[11px] font-medium transition-all active:scale-95 ${alerts.some((a) => a.level === "warn") ? "bg-rose-500/10 border-rose-500/30 text-rose-300" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"}`}>
+              className={`h-9 flex items-center gap-2 pl-2.5 pr-2 rounded-xl border text-[11px] font-medium transition-all active:scale-95 ${alerts.some((a) => a.level === "warn") ? "bg-rose-500/10 border-rose-500/30 text-rose-300 alert-pulse" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"}`}>
               {alerts.length ? <AlertTriangle className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
               {alerts.length > 0 && <span className="font-mono font-bold">{alerts.length}</span>}
               <span className="max-w-[170px] truncate text-slate-300 hidden md:inline">{alerts[0]?.text ?? "All systems normal"}</span>

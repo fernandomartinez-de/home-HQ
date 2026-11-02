@@ -480,3 +480,27 @@ body:has(dialog[open]) { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .tank-wave, .tank-wave-slow, .tank-bubble, .heat-pulse { animation: none; }
 }
+
+/* App wide motion: only where something is happening, and none with Reduce Motion. */
+@keyframes panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.panel-in { animation: panel-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes breathe { 0%, 100% { opacity: 0.18; } 50% { opacity: 0.42; } }
+.breathe { animation: breathe 4.5s ease-in-out infinite; }
+@keyframes glow-ring { 0% { box-shadow: 0 0 0 0 var(--ring, rgba(52, 211, 153, 0.45)); } 70%, 100% { box-shadow: 0 0 0 8px rgba(0, 0, 0, 0); } }
+.glow-ring { animation: glow-ring 2.4s ease-out infinite; }
+@keyframes eq { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+.eq-bar { transform-origin: bottom; animation: eq 1s ease-in-out infinite; }
+@keyframes scan { from { transform: translateY(-100%); } to { transform: translateY(100vh); } }
+.scan-line { animation: scan 6s linear infinite; }
+@keyframes flow { from { background-position: 0 0; } to { background-position: 200% 0; } }
+.energy-flow { background: linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.0) 20%, rgba(52, 211, 153, 0.9) 50%, rgba(16, 185, 129, 0.0) 80%, transparent 100%); background-size: 50% 100%; background-repeat: repeat-x; animation: flow 2.8s linear infinite; }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin-slow 3s linear infinite; }
+@keyframes alert-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.0); } 50% { box-shadow: 0 0 14px 1px rgba(244, 63, 94, 0.35); } }
+.alert-pulse { animation: alert-pulse 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .panel-in, .breathe, .glow-ring, .eq-bar, .scan-line, .energy-flow, .spin-slow, .alert-pulse { animation: none; }
+}
+/* Panels come in column by column. */
+main > :nth-child(2).panel-in, main > :nth-child(2) .panel-in { animation-delay: 0.07s; }
+main > :nth-child(3).panel-in, main > :nth-child(3) .panel-in { animation-delay: 0.14s; }
