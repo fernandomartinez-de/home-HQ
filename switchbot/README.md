@@ -15,6 +15,17 @@ home-dashboard ──> switchbot function (Supabase) ──> SwitchBot Cloud ─
   Switch mode (with the add on) reports real on and off.
 * **Limits:** 10,000 calls a day; polling every 5 minutes uses a few hundred.
 
+## No hub: the TV stands in
+
+A Bot without a hub never shows up in the SwitchBot cloud. The Fire TV app (BotRelay in
+`tv-dashboard/android`) does the hub's job over Bluetooth instead:
+
+* Every 5 minutes it listens for Bots and reports each one's mode, on or off, and battery. A new
+  Bot appears in `home_devices` as "SwitchBot Bot" (provider_ref `{mac, via: "tv"}`); rename it there.
+* The dashboard's commands for that Bot are queued for the TV, which connects, presses, and reports
+  back. This keeps working with the TV asleep.
+* Range is Bluetooth range, about 10 m with few walls. Bots with a password aren't supported.
+
 ## Setup
 
 1. SwitchBot app: Profile, Preferences, About, tap **App Version** 10 times, open

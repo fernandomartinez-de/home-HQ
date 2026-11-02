@@ -17,10 +17,18 @@ public class MainActivity extends Activity {
         web = Dash.create(this, new TvBridge(this));
         setContentView(web);
         hideBars();
-        // Android only reveals the Wi-Fi network name to apps with location access; ask once.
-        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        // Android only reveals the Wi-Fi network name (and, before Android 12, Bluetooth scan results
+        // for the SwitchBot relay) to apps with location access; ask once. Android 12+ asks for
+        // Bluetooth scan and connect instead.
+        java.util.List<String> want = new java.util.ArrayList<>();
+        want.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            want.add(android.Manifest.permission.BLUETOOTH_SCAN);
+            want.add(android.Manifest.permission.BLUETOOTH_CONNECT);
         }
+        java.util.List<String> missing = new java.util.ArrayList<>();
+        for (String p : want) if (checkSelfPermission(p) != android.content.pm.PackageManager.PERMISSION_GRANTED) missing.add(p);
+        if (!missing.isEmpty()) requestPermissions(missing.toArray(new String[0]), 1);
     }
 
     @Override

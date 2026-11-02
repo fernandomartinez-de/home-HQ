@@ -32,10 +32,15 @@ import java.util.concurrent.TimeUnit;
  * every few minutes so the dashboard knows the TV is on.
  *
  * Commands: launch (one of the dashboard's apps), home, back, volume up/down/mute, sleep.
+ *
+ * It also stands in for a SwitchBot Hub (BotRelay): commands carrying "ble" press a SwitchBot Bot
+ * over Bluetooth, and a scan every few minutes reports each Bot it hears. While the screen is off
+ * the poll keeps going for Bot commands only, so the towel warmer works with the TV asleep.
  */
 final class RemoteControl {
     private static final String TAG = "TvDashRemote";
     private static final long HEARTBEAT_MS = 3 * 60_000;
+    private static final long BOT_SCAN_MS = 5 * 60_000;
 
     private final AccessibilityService service;
     private final Runnable openDashboard;
@@ -46,10 +51,13 @@ final class RemoteControl {
     private volatile boolean dirty = true;
     private Thread loop;
     private Thread reporter;
+    private Thread botScanner;
+    private final BotRelay bots;
 
     RemoteControl(AccessibilityService service, Runnable openDashboard) {
         this.service = service;
         this.openDashboard = openDashboard;
+        this.bots = new BotRelay(service);
     }
 
     void start() {
@@ -61,12 +69,16 @@ final class RemoteControl {
         reporter = new Thread(this::reportLoop, "tv-remote-report");
         reporter.setDaemon(true);
         reporter.start();
+        botScanner = new Thread(this::botLoop, "tv-bot-scan");
+        botScanner.setDaemon(true);
+        botScanner.start();
     }
 
     void stop() {
         running = false;
         if (loop != null) loop.interrupt();
         if (reporter != null) reporter.interrupt();
+        if (botScanner != null) botScanner.interrupt();
     }
 
     /** The app on screen changed (from HomeService's window events). */
@@ -90,20 +102,30 @@ final class RemoteControl {
         long backoff = 5_000;
         while (running) {
             try {
-                if (!screenOn) { Thread.sleep(30_000); continue; }
                 String key = Dash.key(service);
                 if (key.isEmpty()) { Thread.sleep(60_000); continue; }
-                JSONObject res = request("GET", null, key, 40_000);
+                // Screen off: only Bot commands come back, so nothing wakes the TV.
+                JSONObject res = request("GET", null, key, 40_000, screenOn ? "" : "?screen=off");
                 JSONArray cmds = res.optJSONArray("commands");
                 if (cmds != null && cmds.length() > 0) {
                     JSONArray results = new JSONArray();
+                    boolean botRan = false;
                     for (int i = 0; i < cmds.length(); i++) {
                         JSONObject c = cmds.getJSONObject(i);
-                        String err = run(c.optJSONObject("command"));
+                        JSONObject cmd = c.optJSONObject("command");
+                        JSONObject ble = cmd == null ? null : cmd.optJSONObject("ble");
+                        String err;
+                        if (ble != null) {
+                            err = bots.send(ble.optString("mac", null), ble.optString("op"));
+                            botRan = true;
+                        } else {
+                            err = run(cmd);
+                        }
                         results.put(new JSONObject().put("id", c.getLong("id")).put("ok", err == null).put("error", err));
                     }
-                    Thread.sleep(800); // let the app on screen settle before reporting it
-                    report(key, results);
+                    if (botRan) Thread.sleep(1500); // let the Bot move, then hear its new state
+                    else Thread.sleep(800);         // let the app on screen settle before reporting it
+                    report(key, results, botRan ? bots.scan(4000) : null);
                 }
                 backoff = 5_000;
             } catch (InterruptedException e) {
@@ -125,7 +147,7 @@ final class RemoteControl {
                     String key = Dash.key(service);
                     if (!key.isEmpty()) {
                         dirty = false;
-                        report(key, null);
+                        report(key, null, null);
                         last = now;
                     }
                 }
@@ -137,6 +159,24 @@ final class RemoteControl {
                 Log.w(TAG, "report failed: " + e.getMessage());
                 dirty = true;
                 try { Thread.sleep(30_000); } catch (InterruptedException ignored) { }
+            }
+        }
+    }
+
+    /** Every few minutes, listen for SwitchBot Bots and report what they say (mode, on, battery). */
+    private void botLoop() {
+        while (running) {
+            try {
+                Thread.sleep(20_000); // first scan shortly after start, then on the interval
+                String key = Dash.key(service);
+                JSONArray heard = key.isEmpty() ? null : bots.scan(8000);
+                if (heard != null && heard.length() > 0) report(key, null, heard);
+                Thread.sleep(BOT_SCAN_MS - 20_000);
+            } catch (InterruptedException e) {
+                if (!running) return;
+            } catch (Exception e) {
+                Log.w(TAG, "Bot scan failed: " + e.getMessage());
+                try { Thread.sleep(BOT_SCAN_MS); } catch (InterruptedException ignored) { }
             }
         }
     }
@@ -202,7 +242,7 @@ final class RemoteControl {
 
     // ---------- talking to Supabase ----------
 
-    private void report(String key, JSONArray results) throws Exception {
+    private void report(String key, JSONArray results, JSONArray ble) throws Exception {
         AudioManager audio = (AudioManager) service.getSystemService(Context.AUDIO_SERVICE);
         JSONObject state = new JSONObject()
                 .put("screen", screenOn ? "on" : "off")
@@ -214,7 +254,8 @@ final class RemoteControl {
                 .put("version", BuildConfig.VERSION_NAME);
         JSONObject body = new JSONObject().put("action", "report").put("state", state);
         if (results != null) body.put("results", results);
-        request("POST", body.toString(), key, 15_000);
+        if (ble != null) body.put("ble", ble);
+        request("POST", body.toString(), key, 15_000, "");
     }
 
     private Object appName(String pkg) {
@@ -230,8 +271,8 @@ final class RemoteControl {
         }
     }
 
-    private static JSONObject request(String method, String body, String key, int readTimeoutMs) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(BuildConfig.TV_REMOTE_URL).openConnection();
+    private static JSONObject request(String method, String body, String key, int readTimeoutMs, String query) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(BuildConfig.TV_REMOTE_URL + query).openConnection();
         try {
             c.setRequestMethod(method);
             c.setConnectTimeout(10_000);

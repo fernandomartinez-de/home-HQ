@@ -12,7 +12,13 @@
 //
 // TV app (header x-tv-key, checked against tv_config.config.tv_key_sha256):
 //   GET  /tv                    waits up to 25 s for commands, returns {"commands":[{id, command}]}
-//   POST /tv {"action":"report","state":{...},"results":[{"id":1,"ok":true,"error":null}]}
+//   GET  /tv?screen=off         the same, but only SwitchBot Bot commands (nothing that wakes the TV)
+//   POST /tv {"action":"report","state":{...},"results":[{"id":1,"ok":true,"error":null}],
+//             "ble":[{"mac":"..","mode":"pressMode","on":false,"battery":90,"rssi":-70}]}
+//
+// SwitchBot relay: the TV app stands in for a SwitchBot Hub. Bots it hears over Bluetooth are added
+// as switch devices (provider switchbot, provider_ref.via "tv"); the switchbot function queues their
+// commands with a "ble" part, which the TV picks up here alongside its own.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -73,12 +79,21 @@ async function command(id: string, cmd: any, source = "ui") {
 
 // ---------- TV side ----------
 
-async function takeCommands() {
+// The devices whose commands the TV runs: itself (unless asleep) and every Bot it relays for.
+async function relayed(): Promise<string[]> {
+  const { data } = await db.from("home_devices").select("id").eq("provider", "switchbot").eq("provider_ref->>via", "tv");
+  return (data ?? []).map((d) => d.id);
+}
+
+async function takeCommands(asleep: boolean) {
   const now = Date.now();
+  const bots = await relayed();
+  const ids = asleep ? bots : [DEVICE, ...bots];
+  if (!ids.length) return [];
   await db.from("home_commands").update({ status: "expired", completed_at: new Date(now).toISOString() })
-    .eq("device_id", DEVICE).eq("status", "pending").lt("requested_at", new Date(now - EXPIRE_S * 1000).toISOString());
+    .in("device_id", [DEVICE, ...bots]).eq("status", "pending").lt("requested_at", new Date(now - EXPIRE_S * 1000).toISOString());
   const { data, error } = await db.from("home_commands").select("id, command")
-    .eq("device_id", DEVICE).eq("status", "pending").order("requested_at", { ascending: true }).limit(10);
+    .in("device_id", ids).eq("status", "pending").order("requested_at", { ascending: true }).limit(10);
   if (error) throw error;
   if (!data?.length) return [];
   // Claim them; only rows still pending are returned, so two open polls never run the same command.
@@ -89,25 +104,66 @@ async function takeCommands() {
 }
 
 async function longPoll(req: Request) {
+  const asleep = new URL(req.url).searchParams.get("screen") === "off";
   const until = Date.now() + WAIT_MS;
   while (Date.now() < until && !req.signal.aborted) {
-    const cmds = await takeCommands();
+    const cmds = await takeCommands(asleep);
     if (cmds.length) return cmds;
     await sleep(1000);
   }
   return [];
 }
 
+const botId = (mac: string) => `switchbot_${mac.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`;
+
+async function lastState(id: string) {
+  const { data } = await db.from("home_readings").select("state").eq("device_id", id)
+    .order("recorded_at", { ascending: false }).limit(1).maybeSingle();
+  return (data?.state ?? {}) as Record<string, unknown>;
+}
+
+// A Bot the TV heard: add it the first time (named later in Supabase), then store its state. In
+// press mode the Bot can't know if the appliance is on, so power carries over from the last reading.
+async function botHeard(b: any) {
+  if (typeof b?.mac !== "string" || !/^[0-9A-Fa-f:]{17}$/.test(b.mac)) return;
+  const id = botId(b.mac);
+  await db.from("home_devices").upsert({
+    id, kind: "switch", provider: "switchbot", name: "SwitchBot Bot",
+    provider_ref: { mac: b.mac.toUpperCase(), via: "tv", type: "Bot" },
+    capabilities: { power: true, brightness: null, color: false, color_temp_k: null, press: true, type: "Bot" },
+  }, { onConflict: "id", ignoreDuplicates: true });
+  const press = b.mode !== "switchMode";
+  const last = await lastState(id);
+  await db.from("home_readings").insert({
+    device_id: id, source: "device",
+    state: {
+      online: true,
+      power: press ? (typeof last.power === "boolean" ? last.power : null) : !!b.on,
+      mode: press ? "pressMode" : "switchMode",
+      battery: Number.isFinite(b.battery) ? b.battery : null,
+      rssi: Number.isFinite(b.rssi) ? b.rssi : null,
+      via: "tv", brightness: null, color: null, color_temp_k: null,
+    },
+  });
+}
+
 async function report(body: any) {
   const results: { id: number; ok: boolean; error?: string | null }[] = Array.isArray(body.results) ? body.results : [];
+  const ids = [DEVICE, ...(await relayed())];
   for (const r of results) {
     if (typeof r?.id !== "number") continue;
-    await db.from("home_commands").update({
+    const { data: row } = await db.from("home_commands").update({
       status: r.ok ? "done" : "failed",
       result: r.ok ? { ok: true } : { error: String(r.error ?? "failed") },
       completed_at: new Date().toISOString(),
-    }).eq("id", r.id).eq("device_id", DEVICE);
+    }).eq("id", r.id).in("device_id", ids).select("device_id, command").maybeSingle();
+    // A Bot that just tapped (press mode): the appliance is now what the dashboard asked for.
+    if (r.ok && row?.command?.ble && typeof row.command.on === "boolean") {
+      const last = await lastState(row.device_id);
+      await db.from("home_readings").insert({ device_id: row.device_id, source: "command", state: { ...last, online: true, power: row.command.on } });
+    }
   }
+  for (const b of Array.isArray(body.ble) ? body.ble.slice(0, 20) : []) await botHeard(b);
   if (body.state && typeof body.state === "object") {
     const s = body.state;
     const state = {

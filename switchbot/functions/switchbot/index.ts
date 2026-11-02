@@ -12,6 +12,9 @@
 //                  {"action":"press"}                         (Bot only)
 //   POST /switchbot {"action":"list"}   every device and remote on the account, supported or not
 //
+// Bots with no hub: the TV app stands in for the hub over Bluetooth (provider_ref.via "tv"). Their
+// commands are queued for the TV with a "ble" part; see the tv function and the TV app's BotRelay.
+//
 // A Bot in press mode only taps its button, so SwitchBot can't say whether the appliance is on.
 // For those, power is what the dashboard last asked for, carried from reading to reading.
 
@@ -125,7 +128,40 @@ async function poll() {
   return out;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// A Bot the TV relays for: work out the Bot command, queue it for the TV, and wait a little for it.
+async function relay(id: string, mac: string, cmd: any, source: string) {
+  const { data: last } = await db.from("home_readings").select("state").eq("device_id", id)
+    .order("recorded_at", { ascending: false }).limit(1).maybeSingle();
+  const s = (last?.state ?? {}) as { mode?: string; power?: boolean | null };
+  let op: string;
+  if (cmd?.action === "press") op = "press";
+  else if (cmd?.action === "power") {
+    if (s.mode === "switchMode") op = cmd.on ? "on" : "off";
+    else if (s.power === !!cmd.on) {
+      await db.from("home_commands").insert({ device_id: id, command: cmd, source, status: "done", result: { skipped: "already there" }, completed_at: new Date().toISOString() });
+      return { ok: true, skipped: true };
+    } else op = "press";
+  } else throw new Error("unknown command; use power or press");
+
+  const command = cmd?.action === "power" ? { action: "power", on: !!cmd.on, ble: { mac, op } } : { action: "press", ble: { mac, op } };
+  const { data: row, error } = await db.from("home_commands")
+    .insert({ device_id: id, command, source, status: "pending" }).select("id").single();
+  if (error) throw error;
+  for (let i = 0; i < 16; i++) {
+    await sleep(500);
+    const { data: c } = await db.from("home_commands").select("status, result").eq("id", row.id).single();
+    if (c?.status === "done") return { ok: true, command_id: row.id };
+    if (c?.status === "failed") throw new Error(c.result?.error ?? "the TV couldn't reach the Bot");
+    if (c?.status === "expired") throw new Error("the TV didn't pick it up (is it unplugged?)");
+  }
+  return { ok: true, command_id: row.id, queued: true };
+}
+
 async function command(id: string, cmd: any, source = "ui") {
+  const { data: dev } = await db.from("home_devices").select("provider_ref").eq("id", id).maybeSingle();
+  if (dev?.provider_ref?.via === "tv") return relay(id, String(dev.provider_ref.mac ?? ""), cmd, source);
   const { data: row, error } = await db.from("home_commands")
     .insert({ device_id: id, command: cmd, source, status: "pending" }).select("id").single();
   if (error) throw error;
