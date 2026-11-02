@@ -58,6 +58,7 @@ Done
 - [x] History tab: a year of Con Edison daily usage and bills, room lit hours, hot water heating, TV, camera and activity (2026-11-01)
 - [x] Power & Energy: compact overview tile that opens a full report (cycle, 12 months, by hour, day of week, bills, always on load, insights) (2026-11-01)
 - [x] Water tab redesign: animated glass tank, setpoint dial, mode buttons, schedule timeline with now line, tank chart with heating bands (2026-11-01)
+- [x] Water tab tank insights (6/12/24 h, low point, cycles, schedule and heating lanes); violet theme to match the logo; animations throughout (2026-11-01)
 
 Outstanding
 - [ ] AC: ESP32 bridges for both LG zones, then the ac function and live AC controls (waiting on parts)

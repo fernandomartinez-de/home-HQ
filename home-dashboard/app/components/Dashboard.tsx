@@ -104,9 +104,9 @@ function Sized({ children }: { children: (w: number, h: number) => ReactNode }) 
   return <div ref={ref} className="absolute inset-0">{size && size.w > 0 && size.h > 0 ? children(size.w, size.h) : null}</div>;
 }
 
-const PANEL = "relative bg-[#171310]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl panel-in";
+const PANEL = "relative bg-[#15121c]/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl panel-in";
 const CYAN = "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
-const AMBER = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+const AMBER = "bg-violet-500/10 text-violet-400 border-violet-500/20";
 const GREEN = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
 // How each panel icon moves: a flickering flame, a crackling bolt, a beating shield, and so on.
@@ -129,7 +129,7 @@ function PanelHead({ icon: Icon, tone, title, sub, right }: { icon: LucideIcon; 
 }
 
 function PowerBtn({ on, onClick, tone = "cyan", disabled, label }: { on: boolean; onClick?: () => void; tone?: "cyan" | "amber"; disabled?: boolean; label: string }) {
-  const onCls = tone === "cyan" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : "bg-amber-500/20 text-amber-300 border-amber-500/40";
+  const onCls = tone === "cyan" ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40" : "bg-violet-500/20 text-violet-300 border-violet-500/40";
   return (
     <button onClick={onClick} disabled={disabled} aria-label={label} aria-pressed={on}
       className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-xl border transition-all active:scale-95 disabled:opacity-30 ${on ? onCls : "bg-white/5 text-slate-500 border-white/10"}`}>
@@ -172,7 +172,7 @@ function Preview({ children, className = "", label = "NOT CONNECTED" }: { childr
   return (
     <div className={`flex flex-col ${className}`}>
       <div aria-hidden="true" className="flex-1 min-h-0 flex flex-col gap-2.5 opacity-55 saturate-50 pointer-events-none select-none">{children}</div>
-      <span className="absolute -top-2.5 right-6 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#110e0c] border border-white/15 text-[9px] font-mono tracking-wider text-slate-400">
+      <span className="absolute -top-2.5 right-6 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#0e0c14] border border-white/15 text-[9px] font-mono tracking-wider text-slate-400">
         <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />{label}
       </span>
     </div>
@@ -198,7 +198,7 @@ function CamStandIn({ big }: { big?: boolean }) {
   return (
     <>
       <div className="relative flex-1 min-h-[120px] rounded-2xl overflow-hidden border border-white/10 bg-black">
-        <div className="absolute inset-0" style={{ background: "radial-gradient(40% 55% at 22% 62%, rgba(245,158,11,0.55), transparent 70%), radial-gradient(30% 40% at 78% 70%, rgba(99,102,241,0.45), transparent 70%), linear-gradient(180deg, #2b231d 0%, #1a1512 55%, #0f0c0a 100%)" }}>
+        <div className="absolute inset-0" style={{ background: "radial-gradient(40% 55% at 22% 62%, rgba(245,158,11,0.55), transparent 70%), radial-gradient(30% 40% at 78% 70%, rgba(99,102,241,0.45), transparent 70%), linear-gradient(180deg, #251e30 0%, #17131f 55%, #0f0c0a 100%)" }}>
           <div className="absolute left-[8%] right-[8%] bottom-[14%] h-[22%] rounded-t-[28px] bg-[#3a2e25]/80" />
           <div className="absolute left-[14%] bottom-[30%] w-[16%] h-[14%] rounded-xl bg-[#4a3a2e]/80" />
           <div className="absolute right-[12%] top-[18%] w-[30%] h-[34%] rounded-md bg-black/70 border border-white/10" />
@@ -208,8 +208,8 @@ function CamStandIn({ big }: { big?: boolean }) {
       <div className="flex items-center justify-between gap-2">
         <span className={`flex items-center gap-1.5 px-3 ${big ? "h-12 text-sm" : "h-10 text-[11px]"} rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-semibold`}><Video className="w-3.5 h-3.5" /> Live view</span>
         <span className="flex items-center gap-2">
-          <span className={`flex items-center gap-1.5 px-3 ${big ? "h-12 text-sm" : "h-10 text-[11px]"} bg-white/5 border border-white/10 rounded-xl text-slate-200`}><RefreshCw className="w-3.5 h-3.5 text-amber-400" /> Snap</span>
-          <span className={`flex items-center px-3 ${big ? "h-12" : "h-10"} bg-black/40 rounded-xl border border-white/5 text-amber-400 font-mono font-bold text-[11px]`}>1.0x</span>
+          <span className={`flex items-center gap-1.5 px-3 ${big ? "h-12 text-sm" : "h-10 text-[11px]"} bg-white/5 border border-white/10 rounded-xl text-slate-200`}><RefreshCw className="w-3.5 h-3.5 text-violet-400" /> Snap</span>
+          <span className={`flex items-center px-3 ${big ? "h-12" : "h-10"} bg-black/40 rounded-xl border border-white/5 text-violet-400 font-mono font-bold text-[11px]`}>1.0x</span>
         </span>
       </div>
     </>
@@ -341,7 +341,7 @@ const shiftDay = (d: string, n: number) => new Date(atNoon(d).getTime() + n * 86
 const hoursText = (h: number | null | undefined) => (h == null ? "--" : h >= 10 ? `${Math.round(h)} h` : `${h.toFixed(1)} h`);
 const sum = (xs: (number | null | undefined)[]) => xs.reduce<number>((t, x) => t + (x ?? 0), 0);
 
-const TIP = { contentStyle: { background: "#1c1613", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, fontSize: 11 }, labelStyle: { color: "#e2e8f0" }, cursor: { fill: "rgba(255,255,255,0.04)" } };
+const TIP = { contentStyle: { background: "#1a1622", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, fontSize: 11 }, labelStyle: { color: "#e2e8f0" }, cursor: { fill: "rgba(255,255,255,0.04)" } };
 
 // Commands as people think of them: four kitchen bulbs switched off together is one entry, and a run of
 // volume taps on the TV is one entry with a count.
@@ -479,7 +479,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
     <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/10">
       {([["daily", "30 days"], ["bills", "Bills"]] as const).map(([id, label]) => (
         <button key={id} onClick={() => setMode(id)} aria-pressed={mode === id}
-          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${mode === id ? "bg-emerald-500 text-slate-950" : "text-slate-400"}`}>{label}</button>
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${mode === id ? "bg-violet-500 text-white" : "text-slate-400"}`}>{label}</button>
       ))}
     </div>
   );
@@ -581,7 +581,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className="grid grid-cols-2 gap-2 shrink-0">
           <MiniStat label="TV TODAY" value={hoursText(tvToday)} sub={tvAvg != null ? `Avg ${hoursText(tvAvg)} a day` : "Collecting"} tone="text-cyan-300" />
-          <MiniStat label="CAMERA EVENTS" value={String(a.camera.length)} sub={`${people} with a person • 7 days`} tone="text-amber-300" />
+          <MiniStat label="CAMERA EVENTS" value={String(a.camera.length)} sub={`${people} with a person • 7 days`} tone="text-violet-300" />
           <MiniStat label="MOST LIT ROOM" value={brightest ?? "--"} sub={brightest ? `${hoursText(roomAvg(brightest))} a day` : undefined} />
           <MiniStat label="COMMANDS" value={String(a.activity.length >= 200 ? "200+" : a.activity.length)} sub={`${bySchedule} by schedule • 7 days`} />
         </div>
@@ -590,7 +590,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
           <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none space-y-1.5">
             {groups.slice(0, 60).map((g) => (
               <div key={g.item.id} className="flex items-center gap-2.5 bg-black/30 px-2.5 py-2 rounded-xl border border-white/5">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${g.item.source === "schedule" ? "bg-cyan-400" : "bg-amber-400"}`} />
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${g.item.source === "schedule" ? "bg-cyan-400" : "bg-violet-400"}`} />
                 <span className="flex-1 min-w-0 text-[12px] text-slate-200 truncate">{groupText(g)}</span>
                 <span className="text-[10px] font-mono text-slate-500 shrink-0">{atNoon(nyDayOf(g.item.t)).toLocaleDateString([], { weekday: "short", timeZone: "UTC" })} {clockTime(g.item.t)}</span>
               </div>
@@ -598,7 +598,7 @@ function HistoryView({ meter, onConnectConed }: { meter?: Meter; onConnectConed:
             {!groups.length && <p className="text-[12px] text-slate-500 px-1">Nothing this week.</p>}
           </div>
           <div className="pt-1 flex items-center gap-3 text-[10px] text-slate-500">
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Dashboard</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-violet-400" />Dashboard</span>
             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />Schedule</span>
           </div>
         </div>
@@ -714,7 +714,7 @@ function EnergyDetail({ meter, onClose, onDisconnect }: { meter: Meter; onClose:
   const tile = "min-w-0 rounded-xl bg-black/30 border border-white/5 px-3 py-2";
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md p-4 flex" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="flex-1 min-h-0 bg-[#171310] border border-white/15 rounded-3xl shadow-2xl p-4 flex flex-col gap-3 overflow-hidden">
+      <div className="flex-1 min-h-0 bg-[#15121c] border border-white/15 rounded-3xl shadow-2xl p-4 flex flex-col gap-3 overflow-hidden">
         <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className={`p-2 rounded-xl border ${GREEN}`}><Zap className="w-4 h-4" /></div>
@@ -877,7 +877,7 @@ function ConEdConnect({ onClose, onConnected }: { onClose: () => void; onConnect
   const input = "w-full h-12 px-4 rounded-xl bg-black/40 border border-white/10 text-[15px] text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 select-text";
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <form onSubmit={submit} className="bg-[#1c1613] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-3">
+      <form onSubmit={submit} className="bg-[#1a1622] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className={`p-2 rounded-xl border ${GREEN}`}><Zap className="w-4 h-4" /></div>
@@ -1155,11 +1155,11 @@ function RingFeed({ cam, big }: { cam: Camera; big?: boolean }) {
           <a href="shortcuts://run-shortcut?name=Open%20Ring" aria-label="Open the Ring app"
             className={`${btn} bg-white/5 border border-white/10 text-slate-200`}><ExternalLink className="w-3.5 h-3.5 text-cyan-400" />{big ? " Ring app" : ""}</a>
           <button onClick={() => load(true)} disabled={busy || live.status !== "off"} className={`${btn} bg-white/5 border border-white/10 text-slate-200 disabled:opacity-50`}>
-            <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${busy ? "animate-spin" : ""}`} /> Snap
+            <RefreshCw className={`w-3.5 h-3.5 text-violet-400 ${busy ? "animate-spin" : ""}`} /> Snap
           </button>
           <span className={`flex items-center gap-1 px-1.5 ${big ? "h-12" : "h-10"} bg-black/40 rounded-xl border border-white/5 text-slate-400`}>
             <button aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(1, +(z - 0.5).toFixed(1)))} className="w-8 h-8 flex items-center justify-center"><ZoomOut className="w-3.5 h-3.5" /></button>
-            <span className="text-amber-400 font-mono font-bold text-[11px] w-8 text-center">{zoom.toFixed(1)}x</span>
+            <span className="text-violet-400 font-mono font-bold text-[11px] w-8 text-center">{zoom.toFixed(1)}x</span>
             <button aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(3, +(z + 0.5).toFixed(1)))} className="w-8 h-8 flex items-center justify-center"><ZoomIn className="w-3.5 h-3.5" /></button>
           </span>
         </span>
@@ -1218,7 +1218,7 @@ function RingConnect({ onConnected }: { onConnected: () => void }) {
   return (
     <form onSubmit={submit} className="w-full max-w-sm mx-auto flex flex-col gap-3">
       <div className="text-center space-y-1 mb-1">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400 flex items-center justify-center"><Video className="w-5 h-5" /></div>
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/25 text-violet-400 flex items-center justify-center"><Video className="w-5 h-5" /></div>
         <h3 className="text-[15px] font-bold text-white pt-2">Connect your Ring account</h3>
         <p className="text-[12px] text-slate-400">{prompt ?? "Your password goes to Ring once and isn't saved. Ring will send you a code."}</p>
       </div>
@@ -1236,7 +1236,7 @@ function RingConnect({ onConnected }: { onConnected: () => void }) {
         </>
       )}
       {err && <p role="alert" className="text-[12px] text-rose-300 text-center">{err}</p>}
-      <button type="submit" disabled={busy} className="h-12 rounded-xl bg-amber-500 text-slate-950 text-sm font-bold disabled:opacity-60 active:scale-[0.99]">
+      <button type="submit" disabled={busy} className="h-12 rounded-xl bg-violet-500 text-white text-sm font-bold disabled:opacity-60 active:scale-[0.99]">
         {busy ? "Connecting" : prompt ? "Verify and connect" : "Continue"}
       </button>
       {prompt && <button type="button" onClick={() => { setPrompt(null); setErr(null); }} className="text-[12px] text-slate-400 underline underline-offset-4">Start over</button>}
@@ -1264,7 +1264,7 @@ function TvPanel({ tv, send, compact }: { tv: TV; send: Send; compact?: boolean 
       </div>
       <div className="grid grid-cols-5 gap-1.5">
         <button aria-label="Put the TV to sleep" disabled={!on} onClick={() => send(tv, { action: "sleep" }, { screen: "off" })}
-          className={`${key} !bg-amber-500/20 !border-amber-500/40 !text-amber-300`}><Power className="w-4 h-4" /></button>
+          className={`${key} !bg-violet-500/20 !border-violet-500/40 !text-violet-300`}><Power className="w-4 h-4" /></button>
         <button aria-label="Home" disabled={!on} onClick={() => send(tv, { action: "home" }, { app: "app.tvdashboard", app_name: "Dashboard" })} className={key}><HomeIcon className="w-4 h-4" /></button>
         <button aria-label="Back" disabled={!on} onClick={() => send(tv, { action: "back" }, {})} className={key}><Undo2 className="w-4 h-4" /></button>
         <button aria-label="Volume down" disabled={!on} onClick={() => send(tv, { action: "volume", dir: "down" }, { volume: Math.max(0, vol - 1), muted: false })} className={key}><Volume1 className="w-4 h-4" /></button>
@@ -1285,7 +1285,7 @@ function LockSample({ noButton }: { noButton?: boolean }) {
       </span>
       <span className="flex flex-col items-end gap-1.5 shrink-0">
         <span className="text-[10px] font-mono text-slate-400">BATTERY 86%</span>
-        {!noButton && <span className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl bg-white/5 border border-white/10 text-[12px] font-semibold text-slate-200"><LockOpen className="w-4 h-4 text-amber-400" />Unlock</span>}
+        {!noButton && <span className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl bg-white/5 border border-white/10 text-[12px] font-semibold text-slate-200"><LockOpen className="w-4 h-4 text-violet-400" />Unlock</span>}
       </span>
     </div>
   );
@@ -1298,7 +1298,7 @@ function LockPanelSample() {
       <LockSample noButton />
       <span className="grid grid-cols-2 gap-1.5">
         <span className="h-11 rounded-xl bg-emerald-500 text-slate-950 text-[12px] font-bold flex items-center justify-center gap-1.5"><Lock className="w-4 h-4" />Lock</span>
-        <span className="h-11 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-[12px] font-semibold flex items-center justify-center gap-1.5"><LockOpen className="w-4 h-4 text-amber-400" />Unlock</span>
+        <span className="h-11 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-[12px] font-semibold flex items-center justify-center gap-1.5"><LockOpen className="w-4 h-4 text-violet-400" />Unlock</span>
       </span>
       <span className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
         <span>Auto lock after 2 min</span><span className="font-mono text-slate-500">DOOR CLOSED</span>
@@ -1326,7 +1326,7 @@ function TvSample() {
         ))}
       </div>
       <div className="grid grid-cols-5 gap-1.5">
-        <span className={`${key} bg-amber-500/20 border-amber-500/40 text-amber-300`}><Power className="w-4 h-4" /></span>
+        <span className={`${key} bg-violet-500/20 border-violet-500/40 text-violet-300`}><Power className="w-4 h-4" /></span>
         <span className={key}><HomeIcon className="w-4 h-4" /></span>
         <span className={key}><Undo2 className="w-4 h-4" /></span>
         <span className={key}><Volume1 className="w-4 h-4" /></span>
@@ -1372,8 +1372,8 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
   const pct = range ? ((b - range.min) / Math.max(1, range.max - range.min)) * 100 : 0;
   return (
     <div className={`relative w-full ${big ? "h-40" : "h-[120px]"} rounded-2xl border transition-all duration-300 flex flex-col overflow-hidden select-none ${offline
-      ? "bg-[#1e1916]/40 border-white/5 opacity-40"
-      : on ? "bg-gradient-to-b from-[#2a211a] to-[#1c1511] border-amber-500/40 shadow-lg shadow-amber-950/40" : "bg-[#1e1916]/60 border-white/5"}`}>
+      ? "bg-[#1b1723]/40 border-white/5 opacity-40"
+      : on ? "bg-gradient-to-b from-[#241c33] to-[#171223] border-violet-500/40 shadow-lg shadow-violet-950/40" : "bg-[#1b1723]/60 border-white/5"}`}>
       {on && <span className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none breathe" style={{ background: `radial-gradient(circle at bottom, ${hex}, transparent 80%)` }} />}
       <div className={`relative z-10 flex-1 min-h-0 flex items-start gap-2 ${big ? "p-4 pb-2" : "p-3 pb-1.5"}`}>
         <button onClick={onOpen} disabled={offline} aria-label={`${label} color`} className="flex-1 min-w-0 h-full text-left flex flex-col justify-between">
@@ -1388,11 +1388,11 @@ function LightTile({ lights, label, onOpen, onPower, onBright, big }: {
               </span>
             ) : on && <span className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: hex }} />}
           </span>
-          <span className={`${big ? "text-sm" : "text-[11px]"} font-medium ${offline ? "text-rose-400/90" : on ? "text-amber-200/90" : "text-slate-500"}`}>{status}</span>
+          <span className={`${big ? "text-sm" : "text-[11px]"} font-medium ${offline ? "text-rose-400/90" : on ? "text-violet-200/90" : "text-slate-500"}`}>{status}</span>
         </button>
         <button onClick={() => onPower(!on)} disabled={offline} aria-label={on ? `Turn off ${label}` : `Turn on ${label}`} aria-pressed={on}
           className={`shrink-0 ${big ? "w-11 h-11" : "w-10 h-10"} flex items-center justify-center rounded-xl border transition-all active:scale-95 ${on
-            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
+            ? "bg-violet-500 text-white border-violet-400 shadow-md shadow-violet-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
           <Power className="w-4 h-4" />
         </button>
       </div>
@@ -1422,14 +1422,14 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
     <div className="relative flex-1 min-h-[54px] flex items-center overflow-hidden">
       {glow && <span className="absolute inset-y-0 left-0 w-1/2 pointer-events-none breathe" style={{ background: `radial-gradient(circle at left, ${glow}, transparent 75%)` }} />}
       <button onClick={onOpen} className="relative z-10 flex-1 min-w-0 h-full flex items-center gap-3 pl-3 pr-2 text-left active:bg-white/5 transition-colors">
-        <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border transition-shadow duration-700 ${onLights.length ? "bg-amber-500/15 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-slate-500"}`}
+        <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border transition-shadow duration-700 ${onLights.length ? "bg-violet-500/15 border-violet-500/30 text-violet-300" : "bg-white/5 border-white/10 text-slate-500"}`}
           style={glow ? { boxShadow: `0 0 16px -2px ${glow}` } : undefined}>
           <Icon className="w-4 h-4" />
         </span>
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-0.5 text-[14px] font-semibold text-white leading-tight">{room.name}<ChevronRight className="w-3.5 h-3.5 text-slate-500" /></span>
           <span className="block text-[11px] text-slate-400 truncate">
-            <span className={onLights.length ? "text-amber-200/90" : ""}>{onLights.length} of {lights.length} on</span>
+            <span className={onLights.length ? "text-violet-200/90" : ""}>{onLights.length} of {lights.length} on</span>
             {offline > 0 && <span className="text-rose-400/80"> • {offline} offline</span>}
           </span>
           {/* Each light as a chip, so the row shows which lights are on at a glance. */}
@@ -1448,7 +1448,7 @@ function RoomRow({ room, lights, onOpen, onAll }: { room: (typeof ROOMS)[number]
       </button>
       <button onClick={() => onAll(!allOn)} disabled={!reachable.length} aria-label={allOn ? `Turn off ${room.name} lights` : `Turn on ${room.name} lights`}
         className={`relative z-10 shrink-0 mr-2.5 h-9 w-[76px] flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-30 ${allOn
-          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
+          ? "bg-violet-500 text-white border-violet-400 shadow-md shadow-violet-500/20" : "bg-white/5 text-slate-300 border-white/10"}`}>
         <Power className="w-3.5 h-3.5" />{allOn ? "All off" : "All on"}
       </button>
     </div>
@@ -1497,7 +1497,7 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-[#1c1613] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4">
+      <div className="bg-[#1a1622] border border-white/15 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="w-4 h-4 rounded-full border border-white/30" style={{ backgroundColor: on ? hex : "transparent" }} />
@@ -1514,7 +1514,7 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
               onPointerUp={() => { dragging.current = false; if (preview) setColor(preview); }}>
               <canvas ref={canvas} width={180} height={180} className="rounded-full block" />
             </div>
-            <span className="text-[10px] font-mono text-amber-400 uppercase bg-black/40 px-3 py-1 rounded-xl border border-white/10">{hex}</span>
+            <span className="text-[10px] font-mono text-violet-400 uppercase bg-black/40 px-3 py-1 rounded-xl border border-white/10">{hex}</span>
           </div>
         )}
 
@@ -1651,7 +1651,7 @@ function SetpointDial({ value, lo, hi, unit, off, mode, onNudge, small }: { valu
         <span className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`${small ? "text-[8px]" : "text-[10px]"} font-mono text-slate-400 tracking-widest`}>SET TO</span>
           <span className={`${small ? "text-3xl" : "text-5xl"} font-bold font-mono tabular-nums ${off ? "text-slate-500" : "text-white"}`}>{toUnit(value, unit)}°</span>
-          <span className={`${small ? "text-[9px]" : "text-[11px]"} font-mono tracking-wider ${off ? "text-slate-500" : "text-amber-400"}`}>{(MODE_NAME[mode] ?? mode).toUpperCase()}</span>
+          <span className={`${small ? "text-[9px]" : "text-[11px]"} font-mono tracking-wider ${off ? "text-slate-500" : "text-violet-400"}`}>{(MODE_NAME[mode] ?? mode).toUpperCase()}</span>
         </span>
         {!small && <span className="absolute bottom-3 left-6 text-[10px] font-mono text-slate-500">{toUnit(lo, unit)}°</span>}
         {!small && <span className="absolute bottom-3 right-6 text-[10px] font-mono text-slate-500">{toUnit(hi, unit)}°</span>}
@@ -1671,13 +1671,13 @@ function WeekTimeline({ schedule }: { schedule: Schedule }) {
   const today = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
   const nowMin = now ? (Number(get("hour")) % 24) * 60 + Number(get("minute")) : null;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       {DAY_ROWS.map(({ d, s: label }) => {
         const isToday = d === today;
         return (
-          <div key={d} className={`grid grid-cols-[44px_1fr] gap-2 items-center rounded-lg ${isToday ? "bg-amber-500/5" : ""}`}>
-            <span className={`text-[11px] font-mono pl-1 ${isToday ? "text-amber-300 font-bold" : "text-slate-500"}`}>{label}</span>
-            <div className={`relative h-6 rounded-md overflow-hidden ${isToday ? "bg-white/[0.07]" : "bg-white/[0.04]"}`}>
+          <div key={d} className={`grid grid-cols-[44px_1fr] gap-2 items-center rounded-lg ${isToday ? "bg-violet-500/5" : ""}`}>
+            <span className={`text-[11px] font-mono pl-1 ${isToday ? "text-violet-300 font-bold" : "text-slate-500"}`}>{label}</span>
+            <div className={`relative h-5 rounded-md overflow-hidden ${isToday ? "bg-white/[0.07]" : "bg-white/[0.04]"}`}>
               {[6, 12, 18].map((h) => <span key={h} className="absolute inset-y-0 w-px bg-white/5" style={{ left: `${(h / 24) * 100}%` }} />)}
               {schedule.blocks.filter((b) => b.day === d).map((b, i) => {
                 const a = toMin(b.start), z = toMin(b.stop) > a ? toMin(b.stop) : 1440;
@@ -1686,7 +1686,7 @@ function WeekTimeline({ schedule }: { schedule: Schedule }) {
                 return (
                   <span key={i} title={`${b.start} to ${b.stop}${b.command.setpoint ? `, ${b.command.setpoint}°` : ""}`}
                     className={`absolute inset-y-0.5 rounded flex items-center justify-center text-[10px] font-mono font-bold overflow-hidden ${!schedule.enabled ? "bg-slate-600/60 text-slate-300"
-                      : offBlock ? "bg-slate-500/40 text-slate-300" : "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.35)]"}`}
+                      : offBlock ? "bg-slate-500/40 text-slate-300" : "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]"}`}
                     style={{ left: `${(a / 1440) * 100}%`, width: `${((z - a) / 1440) * 100}%` }}>
                     {wide && (offBlock ? "OFF" : b.command.setpoint ? `${b.command.setpoint}°` : "")}
                   </span>
@@ -1701,6 +1701,153 @@ function WeekTimeline({ schedule }: { schedule: Schedule }) {
       })}
       <div className="grid grid-cols-[44px_1fr] gap-2"><span /><div className="flex justify-between text-[10px] font-mono text-slate-500"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div></div>
     </div>
+  );
+}
+
+// ---------- Water tab: tank insights ----------
+
+type HeaterPoint = { ts: number; tank: number; heating: boolean; element: boolean; off: boolean };
+type Span = { a: number; z: number };
+
+// Consecutive readings where a test holds, as time spans (each reading lasts until the next one).
+function spansOf(series: HeaterPoint[], test: (p: HeaterPoint) => boolean, end: number): Span[] {
+  const out: Span[] = [];
+  series.forEach((p, i) => {
+    if (!test(p)) return;
+    const z = Math.min(series[i + 1]?.ts ?? end, p.ts + 15 * 60_000);
+    const last = out[out.length - 1];
+    if (last && p.ts - last.z < 60_000) last.z = z; else out.push({ a: p.ts, z });
+  });
+  return out;
+}
+
+// The schedule's windows that fall inside a time range, in the iPad's local time (same zone as the home).
+function scheduleSpans(schedule: Schedule | null, a: number, z: number): (Span & { off: boolean; setpoint?: number })[] {
+  if (!schedule?.blocks.length) return [];
+  const out: (Span & { off: boolean; setpoint?: number })[] = [];
+  const day0 = new Date(a); day0.setHours(0, 0, 0, 0);
+  for (let d = new Date(day0.getTime() - 86400_000); d.getTime() <= z; d = new Date(d.getTime() + 86400_000)) {
+    for (const b of schedule.blocks.filter((x) => x.day === d.getDay())) {
+      const start = new Date(d); start.setHours(Number(b.start.slice(0, 2)), Number(b.start.slice(3, 5)), 0, 0);
+      const stop = new Date(d); stop.setHours(Number(b.stop.slice(0, 2)), Number(b.stop.slice(3, 5)), 0, 0);
+      if (stop <= start) stop.setDate(stop.getDate() + 1);
+      const sa = Math.max(a, start.getTime()), sz = Math.min(z, stop.getTime());
+      if (sz > sa) out.push({ a: sa, z: sz, off: b.command.mode === "off", setpoint: b.command.setpoint });
+    }
+  }
+  return out;
+}
+
+const tickTime = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric" });
+
+/** The Water tab's tank panel: level over time with heating, schedule and off lanes underneath. */
+function TankInsights({ series, schedule }: { series: HeaterPoint[]; schedule: Schedule | null }) {
+  const [hours, setHours] = useState<6 | 12 | 24>(24);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
+  const start = now - hours * 3600_000;
+  const pts = series.filter((p) => p.ts >= start);
+  const step = Math.max(1, Math.ceil(pts.length / 180));
+  const data = pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map((p) => ({ ts: p.ts, tank: p.tank }));
+  const last = pts[pts.length - 1];
+  const low = pts.reduce<HeaterPoint | null>((m, p) => (!m || p.tank < m.tank ? p : m), null);
+  const heat = spansOf(pts, (p) => p.heating, now);
+  const element = spansOf(pts, (p) => p.element, now);
+  const off = spansOf(pts, (p) => p.off, now);
+  const sched = scheduleSpans(schedule, start, now);
+  const heatedH = heat.reduce((t, x) => t + (x.z - x.a), 0) / 3600_000;
+  const elementH = element.reduce((t, x) => t + (x.z - x.a), 0) / 3600_000;
+  const avgCycle = heat.length ? (heatedH * 60) / heat.length : null;
+  const pctX = (ms: number) => `${((ms - start) / (now - start)) * 100}%`;
+  // Labels on round hours: every 3 hours for 24H, 2 for 12H, every hour for 6H.
+  const every = hours === 24 ? 3 : hours === 12 ? 2 : 1;
+  const ticks: number[] = [];
+  const firstHour = new Date(start);
+  firstHour.setMinutes(0, 0, 0);
+  for (let t = firstHour.getTime(); t <= now; t += 3600_000) {
+    if (t >= start && new Date(t).getHours() % every === 0) ticks.push(t);
+  }
+  const PLOT_L = 38, PLOT_R = 10; // chart plot inset, so the lanes line up with it
+
+  const lane = (label: string, spans: Span[], cls: string, title: (x: Span) => string) => (
+    <div className="flex items-center gap-0 h-3.5">
+      <span className="text-[9px] font-mono tracking-widest text-slate-500 shrink-0 text-right pr-2" style={{ width: PLOT_L }}>{label}</span>
+      <div className="relative flex-1 h-full rounded-sm bg-white/[0.04] overflow-hidden" style={{ marginRight: PLOT_R }}>
+        {spans.map((x, i) => <span key={i} title={title(x)} className={`absolute inset-y-0 rounded-sm ${cls}`} style={{ left: pctX(x.a), width: `calc(${pctX(x.z)} - ${pctX(x.a)})`, minWidth: 2 }} />)}
+      </div>
+    </div>
+  );
+  const range = (x: Span) => `${clockTime(new Date(x.a).toISOString())} to ${clockTime(new Date(x.z).toISOString())}`;
+
+  return (
+    <>
+      <PanelHead icon={Activity} tone={GREEN} title="Hot Water in Tank" sub="Level, heating and schedule"
+        right={
+          <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/10">
+            {([6, 12, 24] as const).map((h) => (
+              <button key={h} onClick={() => setHours(h)} aria-pressed={hours === h}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono transition-all ${hours === h ? "bg-violet-500 text-white" : "text-slate-400"}`}>{h}H</button>
+            ))}
+          </div>
+        } />
+      {pts.length < 3 ? (
+        <NotConnected icon={Activity} title="Collecting history" text="The tank chart fills in as readings arrive every 5 minutes." />
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-2 shrink-0">
+            <MiniStat label="NOW" value={`${last?.tank ?? "--"}%`} sub={last?.heating ? "Heating" : last?.off ? "Heater off" : "Holding"} tone="text-cyan-300" />
+            <MiniStat label={`LOW • ${hours}H`} value={low ? `${low.tank}%` : "--"} sub={low ? `at ${clockTime(new Date(low.ts).toISOString())}` : undefined} tone={low && low.tank < 25 ? "text-rose-300" : "text-amber-300"} />
+            <MiniStat label="HEATING" value={hoursText(heatedH)} sub={elementH > 0.05 ? `${hoursText(elementH)} on the element` : "All heat pump"} tone="text-rose-300" />
+            <MiniStat label="CYCLES" value={String(heat.length)} sub={avgCycle != null ? `About ${Math.round(avgCycle)} min each` : "None"} />
+          </div>
+          <div className="relative flex-1 min-h-[110px]">
+            <Sized>{(w, h) => {
+              const top = 10, bottom = h - 22; // plot area, for a gradient that follows the level
+              return (
+                <AreaChart width={w} height={h} data={data} margin={{ top, right: PLOT_R, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="tank-level-line" gradientUnits="userSpaceOnUse" x1="0" y1={top} x2="0" y2={bottom}>
+                      <stop offset="0%" stopColor="#22d3ee" /><stop offset="45%" stopColor="#fbbf24" /><stop offset="80%" stopColor="#f97316" /><stop offset="100%" stopColor="#f43f5e" />
+                    </linearGradient>
+                    <linearGradient id="tank-level-fill" gradientUnits="userSpaceOnUse" x1="0" y1={top} x2="0" y2={bottom}>
+                      <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.28} /><stop offset="50%" stopColor="#fbbf24" stopOpacity={0.14} /><stop offset="100%" stopColor="#f43f5e" stopOpacity={0.02} />
+                    </linearGradient>
+                    <filter id="tank-level-glow" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+                  </defs>
+                  {heat.map((x, i) => <ReferenceArea key={`h${i}`} x1={x.a} x2={x.z} fill="#f43f5e" fillOpacity={0.09} strokeOpacity={0} />)}
+                  <XAxis dataKey="ts" type="number" scale="time" domain={[start, now]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false}
+                    tickFormatter={tickTime} ticks={ticks} interval={0} />
+                  <YAxis width={PLOT_L} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} />
+                  <ReferenceLine y={25} stroke="#f43f5e" strokeDasharray="4 4" strokeOpacity={0.5}
+                    label={{ value: "LOW", position: "insideTopLeft", fill: "#f43f5e", fontSize: 9, opacity: 0.7 }} />
+                  <Tooltip {...TIP} labelFormatter={(v) => clockTime(new Date(Number(v)).toISOString())} formatter={(v) => [`${v}%`, "Hot water"]} />
+                  <Area type="monotone" dataKey="tank" stroke="url(#tank-level-line)" fill="url(#tank-level-fill)" strokeWidth={3} filter="url(#tank-level-glow)"
+                    isAnimationActive animationDuration={1100} animationEasing="ease-out" dot={false} activeDot={{ r: 5, fill: "#fbbf24", stroke: "#0e0c14", strokeWidth: 2 }} />
+                  {low && (
+                    <ReferenceDot x={low.ts} y={low.tank} r={4} fill="#0e0c14" stroke="#fbbf24" strokeWidth={2}
+                      label={{ value: `LOW ${low.tank}%`, position: low.tank < 20 ? "top" : "bottom", fill: "#fbbf24", fontSize: 10, fontFamily: "ui-monospace, monospace" }} />
+                  )}
+                  {last && (
+                    <ReferenceDot x={last.ts} y={last.tank} r={4} shape={(props: { cx?: number; cy?: number }) => (
+                      <g>
+                        <circle cx={props.cx} cy={props.cy} r={4} fill="#22d3ee" className="svg-ping" />
+                        <circle cx={props.cx} cy={props.cy} r={4.5} fill="#22d3ee" stroke="#0e0c14" strokeWidth={2} />
+                      </g>
+                    )} />
+                  )}
+                </AreaChart>
+              );
+            }}</Sized>
+          </div>
+          <div className="flex flex-col gap-1 shrink-0">
+            {lane("PLAN", sched, "bg-gradient-to-r from-violet-500/70 to-fuchsia-500/70", (x) => range(x))}
+            {lane("HEAT", heat, "bg-amber-500/80", (x) => `Heating ${range(x)}`)}
+            {lane("ELEM", element, "bg-rose-500/90 shadow-[0_0_6px_rgba(244,63,94,0.6)]", (x) => `Electric element ${range(x)}`)}
+            {lane("OFF", off, "bg-slate-500/50", (x) => `Off ${range(x)}`)}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -1744,8 +1891,8 @@ function TankChart({ points, legend }: { points: TankPoint[]; legend?: boolean }
             <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} />
             <Tooltip {...TIP} formatter={(v, _n, p) => [`${v}%${(p.payload as TankPoint).heating ? " • heating" : (p.payload as TankPoint).off ? " • off" : ""}`, "Hot water"]} />
             <Area type="monotone" dataKey="tank" stroke="url(#g-tank-line)" fill="url(#g-tank)" strokeWidth={2.5} filter="url(#tank-glow)" isAnimationActive animationDuration={900} animationEasing="ease-out"
-              dot={false} activeDot={{ r: 4, fill: "#fbbf24", stroke: "#110e0c", strokeWidth: 2 }} />
-            <ReferenceDot x={last.time} y={last.tank} r={4} fill="#fbbf24" stroke="#110e0c" strokeWidth={2} />
+              dot={false} activeDot={{ r: 4, fill: "#fbbf24", stroke: "#0e0c14", strokeWidth: 2 }} />
+            <ReferenceDot x={last.time} y={last.tank} r={4} fill="#fbbf24" stroke="#0e0c14" strokeWidth={2} />
           </AreaChart>
         )}</Sized>
       </div>
@@ -2016,6 +2163,16 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     }));
   }, [data.history, heater]);
 
+  // Every heater reading from the last 24 hours, for the Water tab's tank chart and timeline lanes.
+  const heaterSeries = useMemo<HeaterPoint[]>(() => {
+    const h = heater ? data.history?.[heater.id] ?? [] : [];
+    return h.filter((x) => typeof x.state?.tank_pct === "number").map((x) => ({
+      ts: Date.parse(x.t), tank: x.state.tank_pct as number,
+      heating: !!x.state.running, element: /element/i.test(x.state.running ?? ""),
+      off: x.state.mode === "off" || x.state.power === false,
+    }));
+  }, [data.history, heater]);
+
   // Alerts, compiled from the latest readings and their history.
   const alerts = useMemo(() => {
     const out: { id: string; level: "warn" | "info"; icon: LucideIcon; text: string; since?: string }[] = [];
@@ -2122,7 +2279,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <div className={`flex-1 min-h-[300px] ${PANEL} p-3.5 flex flex-col gap-2.5`}>
           <PanelHead icon={ShieldCheck} tone={AMBER} title="Security" sub="Camera and front door"
             right={cam ? <ModeChip cam={cam} onClick={() => setSection("security")} />
-              : <button onClick={() => setSection("security")} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300">Connect</button>} />
+              : <button onClick={() => setSection("security")} className="px-3 h-9 rounded-xl text-[11px] font-semibold bg-violet-500/15 border border-violet-500/30 text-violet-300">Connect</button>} />
           {cam ? <RingFeed key={cam.id} cam={cam} /> : <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>}
           {/* The lock row is its own positioned box so its "not connected" tag sits on the row, not on the camera. */}
           <div className="relative mt-1 pt-3 border-t border-white/10">
@@ -2168,7 +2325,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <PanelHead icon={Plug} tone={CYAN} title="Appliances & Tech" sub={items.length ? `${items.length} in the ${room === "living" ? "living room" : "bedroom"}` : "Nothing here yet"}
           right={roomCam ? (
             <button onClick={() => setSection("security")} aria-label={`Open the ${roomCam.name} camera`}
-              className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border bg-amber-500/10 border-amber-500/25 text-amber-300 active:scale-95">
+              className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[11px] font-medium border bg-violet-500/10 border-violet-500/25 text-violet-300 active:scale-95">
               <Video className="w-3.5 h-3.5" />Camera
               <span className={`w-1.5 h-1.5 rounded-full ${roomCam.state?.online === false ? "bg-rose-400" : "bg-emerald-400"}`} />
               <ChevronRight className="w-3.5 h-3.5" />
@@ -2279,7 +2436,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
                       const on = !off && hs?.mode === m;
                       return (
                         <button key={m} aria-pressed={on} onClick={() => !on && send(heater, { action: "set_mode", mode: m }, { mode: m, power: true })}
-                          className={`h-10 rounded-xl text-[11px] font-semibold border transition-all active:scale-95 ${on ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20" : "bg-white/5 border-white/10 text-slate-300"} ${modes.length % 2 && m === modes[modes.length - 1] ? "col-span-2" : ""}`}>
+                          className={`h-10 rounded-xl text-[11px] font-semibold border transition-all active:scale-95 ${on ? "bg-violet-500 text-white border-violet-400 shadow-md shadow-violet-500/20" : "bg-white/5 border-white/10 text-slate-300"} ${modes.length % 2 && m === modes[modes.length - 1] ? "col-span-2" : ""}`}>
                           {MODE_NAME[m] ?? m}
                         </button>
                       );
@@ -2289,7 +2446,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
                     <button onClick={() => off
                       ? send(heater, { action: "set_mode", mode: onMode }, { power: true, mode: onMode })
                       : send(heater, { action: "power", on: false }, { power: false, mode: "off" })}
-                      className={`h-11 rounded-xl border text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.99] ${off ? "bg-amber-500 text-slate-950 border-amber-400" : "bg-white/5 text-slate-200 border-white/10"}`}>
+                      className={`h-11 rounded-xl border text-[13px] font-semibold flex items-center justify-center gap-2 active:scale-[0.99] ${off ? "bg-violet-500 text-white border-violet-400" : "bg-white/5 text-slate-200 border-white/10"}`}>
                       <Power className="w-4 h-4" />{off ? "Turn on" : "Turn off"}
                     </button>
                   )}
@@ -2298,7 +2455,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
               <div className="grid grid-cols-3 gap-2 shrink-0">
                 <MiniStat label="HEATED • 24 H" value={heaterDay.readings ? hoursText(heaterDay.heatingH) : "--"} sub="Compressor and element" tone="text-rose-300" />
                 <MiniStat label="LOWEST • 24 H" value={heaterDay.low != null ? `${heaterDay.low}%` : "--"} sub="Hot water left" tone="text-cyan-300" />
-                <MiniStat label="SCHEDULE" value={schedule?.enabled ? "On" : "Off"} sub={next} tone={schedule?.enabled ? "text-amber-300" : "text-slate-400"} />
+                <MiniStat label="SCHEDULE" value={schedule?.enabled ? "On" : "Off"} sub={next} tone={schedule?.enabled ? "text-violet-300" : "text-slate-400"} />
               </div>
             </>
           );
@@ -2311,7 +2468,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             right={schedule && (
               <div className="flex items-center gap-2">
                 <button role="switch" aria-checked={schedule.enabled} aria-label="Follow schedule" onClick={toggleSchedule} disabled={!schedule.blocks.length}
-                  className={`relative w-[52px] h-8 rounded-full transition-colors ${schedule.enabled ? "bg-amber-500" : "bg-white/10"}`}>
+                  className={`relative w-[52px] h-8 rounded-full transition-colors ${schedule.enabled ? "bg-violet-500" : "bg-white/10"}`}>
                   <span className={`absolute top-1 left-1 w-6 h-6 rounded-full transition-transform ${schedule.enabled ? "translate-x-5 bg-slate-950" : "bg-slate-200"}`} />
                 </button>
                 <button onClick={() => setEditingSchedule(true)} className="px-3 h-9 rounded-xl text-xs text-slate-200 bg-white/5 border border-white/10 font-medium">Edit</button>
@@ -2320,8 +2477,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           {schedule && <WeekTimeline schedule={schedule} />}
         </div>
         <div className={`flex-1 min-h-[180px] ${PANEL} p-4 flex flex-col gap-2`}>
-          <PanelHead icon={Activity} tone={GREEN} title="Hot Water in Tank" sub="Last 24 hours, with when it was heating" />
-          <div className="relative flex-1 min-h-[160px] flex flex-col gap-2"><TankChart points={tankPoints} legend /></div>
+          <TankInsights series={heaterSeries} schedule={schedule} />
         </div>
       </div>
     </main>
@@ -2365,7 +2521,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <Preview className="flex-1 min-h-0" corner="tr">
             {[["Person detected", "10:02 PM", true], ["Motion", "08:15 PM", true], ["Motion", "01:22 PM", true]].map(([t, time]) => (
               <span key={`${t}${time}`} className="flex items-center gap-2.5 bg-black/30 p-2 rounded-xl border border-white/5">
-                <span className="w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center bg-[#2a211a]"><Footprints className="w-3.5 h-3.5 text-amber-400" /></span>
+                <span className="w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center bg-[#241c33]"><Footprints className="w-3.5 h-3.5 text-violet-400" /></span>
                 <span className="flex-1 text-[12px] text-slate-200 truncate">{t as string}</span>
                 <span className="text-[10px] font-mono text-slate-500">{time as string}</span>
               </span>
@@ -2381,7 +2537,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           sub={`Ring • ${cam.state?.online === false ? "offline" : "tap Live for real time video"}`}
           right={cams.length > 1 ? (
             <div className="flex gap-1">{cams.map((c) => (
-              <button key={c.id} onClick={() => setCamId(c.id)} className={`px-3 h-9 rounded-xl text-[11px] font-medium border ${c.id === cam.id ? "bg-white/10 border-amber-500/40 text-white" : "bg-white/5 border-white/10 text-slate-400"}`}>{c.name}</button>
+              <button key={c.id} onClick={() => setCamId(c.id)} className={`px-3 h-9 rounded-xl text-[11px] font-medium border ${c.id === cam.id ? "bg-white/10 border-violet-500/40 text-white" : "bg-white/5 border-white/10 text-slate-400"}`}>{c.name}</button>
             ))}</div>
           ) : undefined} />
         <RingFeed key={cam.id} cam={cam} big />
@@ -2412,8 +2568,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           <div className="space-y-1.5 overflow-hidden">
             {(cam.state?.events ?? []).filter((e) => e.t).slice(0, 6).map((e, i) => (
               <div key={`${e.t}${i}`} className="flex items-center gap-2.5 bg-black/30 p-2 rounded-xl border border-white/5">
-                <span className={`w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center ${e.person ? "bg-amber-500/10" : "bg-[#2a211a]"}`}>
-                  {e.kind === "ding" ? <BellRing className="w-3.5 h-3.5 text-amber-400" /> : e.person ? <UserRound className="w-3.5 h-3.5 text-amber-300" /> : e.kind === "on_demand" ? <Video className="w-3.5 h-3.5 text-cyan-400" /> : <Footprints className="w-3.5 h-3.5 text-amber-400" />}
+                <span className={`w-10 h-8 rounded-lg border border-white/10 flex items-center justify-center ${e.person ? "bg-violet-500/10" : "bg-[#241c33]"}`}>
+                  {e.kind === "ding" ? <BellRing className="w-3.5 h-3.5 text-violet-400" /> : e.person ? <UserRound className="w-3.5 h-3.5 text-violet-300" /> : e.kind === "on_demand" ? <Video className="w-3.5 h-3.5 text-cyan-400" /> : <Footprints className="w-3.5 h-3.5 text-violet-400" />}
                 </span>
                 <span className="flex-1 text-[12px] text-slate-200 truncate">{eventLabel(e)}</span>
                 <span className="text-[10px] font-mono text-slate-500">{clockTime(e.t!)}</span>
@@ -2429,22 +2585,22 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const activity = data.activity ?? [];
 
   return (
-    <div className={`${fit ? "fixed top-0 left-0 overflow-hidden" : "min-h-[100dvh] w-full relative"} bg-[#110e0c] text-slate-100 font-sans select-none flex flex-col gap-3 antialiased`}
+    <div className={`${fit ? "fixed top-0 left-0 overflow-hidden" : "min-h-[100dvh] w-full relative"} bg-[#0e0c14] text-slate-100 font-sans select-none flex flex-col gap-3 antialiased`}
       style={{
         padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
         ...(fit ? { width: DESIGN_WIDTH, height: `calc(100dvh / ${fit.z})`, transform: `scale(${fit.z})`, transformOrigin: "0 0" } : {}),
       }}>
-      <div className="fixed top-0 left-1/3 w-[600px] h-[600px] bg-amber-600/10 rounded-full blur-[180px] pointer-events-none" />
+      <div className="fixed top-0 left-1/3 w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-[180px] pointer-events-none" />
       <div className="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[180px] pointer-events-none" />
 
-      <header className="min-h-14 bg-[#1a1512]/80 backdrop-blur-2xl border border-white/10 rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xl relative z-30">
+      <header className="min-h-14 bg-[#17131f]/80 backdrop-blur-2xl border border-white/10 rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xl relative z-30">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/apple-icon.png" alt="" width={32} height={32} className="w-8 h-8 rounded-xl shadow-lg shadow-violet-500/25 ring-1 ring-white/10" />
             <div className="hidden sm:block">
               <h1 className="text-sm font-semibold text-white leading-tight">Home Command Center</h1>
-              <p className="text-[9px] text-amber-400/80 font-mono tracking-wider">{data.mock ? "SAMPLE DATA" : `UPDATED ${ago(lastUpdate).toUpperCase() || "NOW"}${ago(lastUpdate) && ago(lastUpdate) !== "now" ? " AGO" : ""}`}</p>
+              <p className="text-[9px] text-violet-400/80 font-mono tracking-wider">{data.mock ? "SAMPLE DATA" : `UPDATED ${ago(lastUpdate).toUpperCase() || "NOW"}${ago(lastUpdate) && ago(lastUpdate) !== "now" ? " AGO" : ""}`}</p>
             </div>
           </div>
           <div className="h-5 w-px bg-white/10 hidden sm:block" />
@@ -2459,7 +2615,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
               <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${alertsOpen ? "rotate-180" : ""}`} />
             </button>
             {alertsOpen && (
-              <div className="absolute left-0 top-11 w-80 max-w-[calc(100vw-32px)] bg-[#1c1613] border border-white/15 rounded-2xl p-2 shadow-2xl z-40">
+              <div className="absolute left-0 top-11 w-80 max-w-[calc(100vw-32px)] bg-[#1a1622] border border-white/15 rounded-2xl p-2 shadow-2xl z-40">
                 <p className="text-[10px] font-mono text-slate-500 tracking-wider px-2 py-1">ALERTS</p>
                 {alerts.length === 0 && <p className="px-2 py-2 text-[12px] text-slate-400">Nothing needs attention.</p>}
                 {alerts.map((a) => (
@@ -2491,22 +2647,22 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
             const active = scene === id;
             return (
               <button key={id} onClick={() => applyScene(id)}
-                className={`flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-medium transition-all active:scale-95 ${active ? "bg-amber-500 text-slate-950 font-semibold shadow-lg shadow-amber-500/20" : "bg-white/5 text-slate-400 border border-white/5"}`}>
-                <Icon className={`w-3.5 h-3.5 ${active ? "text-slate-950 scene-run" : "text-slate-400"}`} />{id}
+                className={`flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-medium transition-all active:scale-95 ${active ? "bg-violet-500 text-white font-semibold shadow-lg shadow-violet-500/20" : "bg-white/5 text-slate-400 border border-white/5"}`}>
+                <Icon className={`w-3.5 h-3.5 ${active ? "text-white scene-run" : "text-slate-400"}`} />{id}
               </button>
             );
           })}
         </div>
       </header>
 
-      <nav className="bg-[#1a1512]/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 flex gap-1.5 shrink-0 z-10 overflow-x-auto scrollbar-none" aria-label="Sections">
+      <nav className="bg-[#17131f]/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 flex gap-1.5 shrink-0 z-10 overflow-x-auto scrollbar-none" aria-label="Sections">
         {tabs.map(({ id, label, icon: Icon, meta }) => {
           const active = section === id;
           return (
             <button key={id} onClick={() => setSection(id)} aria-current={active ? "page" : undefined}
-              className={`flex-1 min-w-[96px] h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-all ${active ? "bg-white/10 text-white border border-amber-500/40 shadow-lg shadow-amber-950/30" : "text-slate-400 border border-transparent"}`}>
-              <Icon key={active ? `${id}-on` : id} className={`w-4 h-4 ${active ? "text-amber-400 icon-pop" : "text-slate-500"}`} />{label}
-              {meta && <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${active ? "bg-amber-500/15 text-amber-300" : "bg-white/5 text-slate-500"}`}>{meta}</span>}
+              className={`flex-1 min-w-[96px] h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-all ${active ? "bg-white/10 text-white border border-violet-500/40 shadow-lg shadow-violet-950/30" : "text-slate-400 border border-transparent"}`}>
+              <Icon key={active ? `${id}-on` : id} className={`w-4 h-4 ${active ? "text-violet-400 icon-pop" : "text-slate-500"}`} />{label}
+              {meta && <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${active ? "bg-violet-500/15 text-violet-300" : "bg-white/5 text-slate-500"}`}>{meta}</span>}
             </button>
           );
         })}
@@ -2553,7 +2709,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
         <ScheduleEditor heater={heater} schedule={schedule} notify={setToast}
           onClose={() => setEditingSchedule(false)} onSaved={(s) => { setSchedule(s); setEditingSchedule(false); setToast("Schedule saved."); }} />
       )}
-      {toast && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 max-w-[calc(100vw-32px)] px-4 py-3 rounded-2xl bg-[#1c1613] border border-white/15 text-[13px] text-slate-100 shadow-2xl">{toast}</div>}
+      {toast && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 max-w-[calc(100vw-32px)] px-4 py-3 rounded-2xl bg-[#1a1622] border border-white/15 text-[13px] text-slate-100 shadow-2xl">{toast}</div>}
     </div>
   );
 }

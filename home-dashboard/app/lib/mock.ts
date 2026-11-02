@@ -76,12 +76,25 @@ function light(id: string, name: string, state: any, room: string): Device {
 
 export function mockData(): HomeData {
   const heater = devices.find((d) => d.kind === "water_heater")!;
-  const history = {
-    [heater.id]: Array.from({ length: 48 }, (_, i) => ({
-      t: new Date(Date.now() - (47 - i) * 30 * 60_000).toISOString(),
-      state: { ...heater.state, tank_pct: Math.round(55 + 40 * Math.abs(Math.sin(i / 7))) },
-    })),
-  };
+  // A simulated day of readings every 5 minutes: on 7 to 9 AM and 6 to 10 PM (off otherwise),
+  // showers draining the tank, the heat pump refilling it, and a short element boost when it runs low.
+  const history = { [heater.id]: (() => {
+    const out: { t: string; state: any }[] = [];
+    let tank = 92;
+    for (let i = 0; i < 288; i++) {
+      const at = new Date(Date.now() - (287 - i) * 5 * 60_000);
+      const h = at.getHours() + at.getMinutes() / 60;
+      const on = (h >= 7 && h < 9) || (h >= 18 && h < 22);
+      const use = (h >= 7.2 && h < 7.6) || (h >= 19.5 && h < 19.9) ? 4.5 : h >= 12 && h < 12.3 ? 1.5 : 0.08;
+      tank = Math.max(8, tank - use);
+      const heating = on && tank < 97;
+      const element = heating && tank < 45;
+      if (heating) tank = Math.min(100, tank + (element ? 3.2 : 1.6));
+      out.push({ t: at.toISOString(), state: { ...heater.state, tank_pct: Math.round(tank), mode: on ? "energy_saver" : "off", power: on,
+        running: heating ? (element ? "Compressor and Element Running" : "Compressor Running") : null } });
+    }
+    return out;
+  })() };
   const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
   const activity = [
     { id: 5, device_id: "govee_kl", device_name: "Kitchen Left", command: { action: "brightness", value: 40 }, source: "ui", status: "done", t: ago(35) },
