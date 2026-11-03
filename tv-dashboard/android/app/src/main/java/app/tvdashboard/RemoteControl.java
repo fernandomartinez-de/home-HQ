@@ -224,6 +224,14 @@ final class RemoteControl {
             case "back":
                 return service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) ? null : "the TV didn't accept Back";
             case "volume": {
+                if (cmd.has("level")) {
+                    // An exact level, like 5 for the morning routine (no volume bar shown).
+                    int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                    int level = Math.max(0, Math.min(max, cmd.optInt("level")));
+                    audio.setStreamVolume(AudioManager.STREAM_MUSIC, level, 0);
+                    dirty = true;
+                    return null;
+                }
                 String dir = cmd.optString("dir");
                 int adj = "up".equals(dir) ? AudioManager.ADJUST_RAISE
                         : "down".equals(dir) ? AudioManager.ADJUST_LOWER

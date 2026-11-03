@@ -9,7 +9,7 @@
 //                  {"action":"home"} {"action":"back"} {"action":"sleep"}
 //                  {"action":"wake"}                            (turns the screen on; works while the TV sleeps)
 //                  {"action":"open","name":"CBS News"}         (an installed app whose name contains this)
-//                  {"action":"volume","dir":"up"|"down"|"mute"}
+//                  {"action":"volume","dir":"up"|"down"|"mute"} or {"action":"volume","level":5}
 //   POST /tv {"action":"poll"}                                        nothing to poll; the TV reports itself
 //
 // TV app (header x-tv-key, checked against tv_config.config.tv_key_sha256):
@@ -60,7 +60,9 @@ async function command(id: string, cmd: any, source = "ui") {
   if (id !== DEVICE) throw new Error("unknown TV");
   if (!ACTIONS.has(cmd?.action)) throw new Error("unknown command; use launch, open, home, back, volume, wake or sleep");
   if (cmd.action === "open" && (typeof cmd.name !== "string" || cmd.name.trim().length < 2)) throw new Error("open needs an app name, like CBS News");
-  if (cmd.action === "volume" && !["up", "down", "mute"].includes(cmd.dir)) throw new Error("volume needs dir up, down or mute");
+  if (cmd.action === "volume" && !["up", "down", "mute"].includes(cmd.dir) && !(Number.isInteger(cmd.level) && cmd.level >= 0 && cmd.level <= 100)) {
+    throw new Error("volume needs dir up, down or mute, or a level from 0 to 100");
+  }
   if (cmd.action === "launch") {
     const { data: dev } = await db.from("home_devices").select("capabilities").eq("id", DEVICE).single();
     const apps: { pkg: string }[] = dev?.capabilities?.apps ?? [];
