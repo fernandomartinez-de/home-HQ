@@ -2287,8 +2287,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       if (/coffee/i.test(l.name)) return { on: true, brightness: 15, color: "#ff8448" };
       return { on: false }; // kitchen, closet and the rest off
     }
-    if (name === "Sleep") return room === "bedroom" ? { on: true, brightness: 20 } : { on: false };
-    return { on: false }; // Everything off, Out for the day, Vacation
+    return { on: false }; // Sleep, Out for the day, Vacation: everything off
   };
 
   const applyLight = async (l: Light, t: Target) => {
