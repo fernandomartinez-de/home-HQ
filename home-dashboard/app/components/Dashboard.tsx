@@ -2275,7 +2275,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   // heater join in: Sleep, Out for the day and Vacation put the TV to sleep, Vacation shuts the heater
   // off and pauses its schedule, and any other mode resumes the schedule (which sets the heater for the
   // current slot). Morning and Night run the routines of the same name in Supabase.
-  type Target = { on: boolean; brightness?: number | "min"; scene?: string };
+  type Target = { on: boolean; brightness?: number | "min"; scene?: string; color?: string };
   const isTvLight = (l: Light) => /tv|backlight|65/i.test(l.name);
   const isFloorLamp = (l: Light) => /lamp/i.test(l.name);
   const sceneTarget = (name: string, l: Light): Target => {
@@ -2284,7 +2284,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     if (name === "Movie") {
       if (room === "living" && isTvLight(l)) return { on: true, scene: "Movie" };
       if (room === "living" && isFloorLamp(l)) return { on: true, brightness: "min" };
-      if (/coffee/i.test(l.name)) return { on: true, brightness: 15 };
+      if (/coffee/i.test(l.name)) return { on: true, brightness: 15, color: "#ff8448" };
       return { on: false }; // kitchen, closet and the rest off
     }
     if (name === "Sleep") return room === "bedroom" ? { on: true, brightness: 20 } : { on: false };
@@ -2299,6 +2299,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       const value = t.brightness === "min" ? l.capabilities?.brightness?.min ?? 1 : t.brightness;
       if (l.state?.brightness !== value) await send(l, { action: "brightness", value }, { brightness: value, power: true });
     }
+    if (t.color && (l.state?.color ?? "").toLowerCase() !== t.color) await send(l, { action: "color", hex: t.color }, { color: t.color, color_temp_k: null, power: true });
     if (t.scene) await send(l, { action: "scene", name: t.scene }, { power: true });
   };
 
