@@ -1845,14 +1845,14 @@ function ScheduleButton({ deviceId, name, notify }: { deviceId: string; name: st
   );
 }
 
-// The header's modes. Home and Away open a menu of choices; Movie and Sleep run straight away.
+// The header's modes. Home and Away open a menu of choices; Sleep runs straight away.
 const MODES: { id: string; icon: LucideIcon; options?: { id: string; label: string; sub: string; icon: LucideIcon }[] }[] = [
   { id: "Home", icon: Sun, options: [
     { id: "Morning", label: "Morning", sub: "Kitchen, closet and coffee lamp in a soft warm glow, TV on with ABC News", icon: Sun },
     { id: "Day", label: "Day", sub: "Very warm orange: floor lamp, coffee lamp and TV strip bright, kitchen low", icon: Lightbulb },
     { id: "Night", label: "Night", sub: "Every light a warm orange red, dimmed to wind down", icon: Moon },
+    { id: "Movie", label: "Movie", sub: "TV backlight on its Movie scene, floor lamp at its lowest, everything else off", icon: Tv },
   ] },
-  { id: "Movie", icon: Tv },
   { id: "Sleep", icon: Moon },
   { id: "Away", icon: ShieldCheck, options: [
     { id: "Out", label: "Out for the day", sub: "Lights off and TV asleep; the water heater keeps its schedule", icon: DoorClosed },
