@@ -1725,7 +1725,7 @@ function ApplianceRow({ dev, send, notify, narrow }: { dev: Light; send: Send; n
       setBusy(false);
     }
   };
-  const s = dev.state as (Light["state"] & { battery?: number | null; mode?: string | null; on_since?: string | null; auto_off_min?: number | null }) | null;
+  const s = dev.state as (Light["state"] & { battery?: number | null; mode?: string | null; on_since?: string | null; auto_off_min?: number | null; watts?: number | null }) | null;
   const towel = /towel/i.test(dev.name);
   const Icon = towel ? TowelRack : /espresso|coffee/i.test(dev.name) ? Coffee : Plug;
   const onWord = towel ? "Warming" : "On";
@@ -1766,6 +1766,7 @@ function ApplianceRow({ dev, send, notify, narrow }: { dev: Light; send: Send; n
                 <span className="text-[14px] font-semibold text-white truncate">{dev.name}</span>
                 <span className={`text-[11px] font-medium ${offline ? "text-rose-400" : on ? "text-rose-200" : "text-slate-500"}`}>{offline ? "Offline" : on ? onWord : "Off"}</span>
                 {s?.battery != null && <span className="text-[10px] font-mono text-slate-500">BOT {s.battery}%</span>}
+                {s?.watts != null && on && <span className="text-[10px] font-mono text-amber-300/80">{Math.round(s.watts).toLocaleString()} W</span>}
               </div>
               {!narrow && <div className="text-[11px] text-slate-400 truncate">{plan}</div>}
             </div>
