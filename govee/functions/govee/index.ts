@@ -5,6 +5,7 @@
 //
 //   GET  /govee                     live state of every light (nothing stored)
 //   POST /govee {"action":"poll"}   sync devices into home_devices and store home_readings
+//   POST /govee {"action":"list"}   every device on the account, including ones poll skips
 //   POST /govee {"action":"command","device_id":"govee_<id>","command":{...}}
 //        commands: {"action":"power","on":true}
 //                  {"action":"brightness","value":60}         (percent)
@@ -206,6 +207,11 @@ Deno.serve(async (req) => {
     if (req.method === "GET") return json({ lights: await live() });
     const body = await req.json().catch(() => ({}));
     if (body.action === "poll") return json({ polled: await poll() });
+    if (body.action === "list") {
+      // Everything on the account, including what poll skips (groups, unsupported types).
+      const all: Device[] = (await govee("/user/devices")).data ?? [];
+      return json({ devices: all.map((d) => ({ name: d.deviceName, sku: d.sku, type: d.type ?? null, caps: d.capabilities.map((c) => c.instance) })) });
+    }
     if (body.action === "command") return json(await command(body.device_id, body.command, body.source ?? "ui"));
     return json({ error: "use GET, or POST with action poll or command" }, 400);
   } catch (err) {
