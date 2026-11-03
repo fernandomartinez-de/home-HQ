@@ -1851,6 +1851,7 @@ const MODES: { id: string; icon: LucideIcon; options?: { id: string; label: stri
     { id: "Home", label: "Everything on", sub: "Every light on", icon: Lightbulb },
     { id: "Morning", label: "Morning", sub: "Kitchen and closet warm white, coffee lamp, TV on with CBS News", icon: Sun },
     { id: "Night", label: "Night", sub: "Every light a warm orange red, dimmed to wind down", icon: Moon },
+    { id: "Off", label: "Everything off", sub: "Every light off and the TV asleep; the morning routine brings them back in white", icon: Power },
   ] },
   { id: "Movie", icon: Tv },
   { id: "Sleep", icon: Moon },
@@ -2259,7 +2260,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       return { on: false };
     }
     if (name === "Sleep") return room === "bedroom" ? { on: true, brightness: 20 } : { on: false };
-    return { on: false }; // Out for the day, Vacation
+    return { on: false }; // Everything off, Out for the day, Vacation
   };
 
   const applyLight = async (l: Light, t: Target) => {
@@ -2298,7 +2299,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       return;
     }
     const jobs: Promise<unknown>[] = lights.filter((l) => l.state?.online !== false).map((l) => applyLight(l, sceneTarget(name, l)));
-    if ((name === "Sleep" || name === "Out" || name === "Vacation") && tv && tvOn) jobs.push(Promise.resolve(send(tv, { action: "sleep" }, { screen: "off" })));
+    if ((name === "Sleep" || name === "Off" || name === "Out" || name === "Vacation") && tv && tvOn) jobs.push(Promise.resolve(send(tv, { action: "sleep" }, { screen: "off" })));
     if (heater) {
       jobs.push((async () => {
         try {
