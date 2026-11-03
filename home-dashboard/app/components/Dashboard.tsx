@@ -1848,10 +1848,9 @@ function ScheduleButton({ deviceId, name, notify }: { deviceId: string; name: st
 // The header's modes. Home and Away open a menu of choices; Movie and Sleep run straight away.
 const MODES: { id: string; icon: LucideIcon; options?: { id: string; label: string; sub: string; icon: LucideIcon }[] }[] = [
   { id: "Home", icon: Sun, options: [
-    { id: "Home", label: "Everything on", sub: "Every light on", icon: Lightbulb },
     { id: "Morning", label: "Morning", sub: "Kitchen, closet and coffee lamp in a soft warm glow, TV on with ABC News", icon: Sun },
+    { id: "Day", label: "Day", sub: "Very warm orange: floor lamp, coffee lamp and TV strip bright, kitchen low", icon: Lightbulb },
     { id: "Night", label: "Night", sub: "Every light a warm orange red, dimmed to wind down", icon: Moon },
-    { id: "Off", label: "Everything off", sub: "Every light off and the TV asleep; the morning routine brings them back in white", icon: Power },
   ] },
   { id: "Movie", icon: Tv },
   { id: "Sleep", icon: Moon },
@@ -2285,7 +2284,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const applyScene = async (name: string) => {
     setScene(name);
     setModeMenu(null);
-    if (name === "Morning" || name === "Night") {
+    if (name === "Morning" || name === "Day" || name === "Night") {
       try {
         const r = await fetch("/api/routine", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
         const body = await r.json();
