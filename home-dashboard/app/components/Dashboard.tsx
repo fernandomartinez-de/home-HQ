@@ -1850,7 +1850,7 @@ const MODES: { id: string; icon: LucideIcon; options?: { id: string; label: stri
   { id: "Home", icon: Sun, options: [
     { id: "Home", label: "Everything on", sub: "Every light on", icon: Lightbulb },
     { id: "Morning", label: "Morning", sub: "Kitchen and closet warm white, coffee lamp, TV on with CBS News", icon: Sun },
-    { id: "Night", label: "Night", sub: "Every light soft red at 1%", icon: Moon },
+    { id: "Night", label: "Night", sub: "Every light a warm orange red, dimmed to wind down", icon: Moon },
   ] },
   { id: "Movie", icon: Tv },
   { id: "Sleep", icon: Moon },
