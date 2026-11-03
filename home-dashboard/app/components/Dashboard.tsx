@@ -1849,7 +1849,7 @@ function ScheduleButton({ deviceId, name, notify }: { deviceId: string; name: st
 const MODES: { id: string; icon: LucideIcon; options?: { id: string; label: string; sub: string; icon: LucideIcon }[] }[] = [
   { id: "Home", icon: Sun, options: [
     { id: "Home", label: "Everything on", sub: "Every light on", icon: Lightbulb },
-    { id: "Morning", label: "Morning", sub: "Kitchen and closet warm white, coffee lamp, TV on with CBS News", icon: Sun },
+    { id: "Morning", label: "Morning", sub: "Kitchen, closet and coffee lamp in a soft warm glow, TV on with CBS News", icon: Sun },
     { id: "Night", label: "Night", sub: "Every light a warm orange red, dimmed to wind down", icon: Moon },
     { id: "Off", label: "Everything off", sub: "Every light off and the TV asleep; the morning routine brings them back in white", icon: Power },
   ] },
