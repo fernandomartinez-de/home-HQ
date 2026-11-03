@@ -1845,6 +1845,21 @@ function ScheduleButton({ deviceId, name, notify }: { deviceId: string; name: st
   );
 }
 
+// The header's modes. Home and Away open a menu of choices; Movie and Sleep run straight away.
+const MODES: { id: string; icon: LucideIcon; options?: { id: string; label: string; sub: string; icon: LucideIcon }[] }[] = [
+  { id: "Home", icon: Sun, options: [
+    { id: "Home", label: "Everything on", sub: "Every light on", icon: Lightbulb },
+    { id: "Morning", label: "Morning", sub: "Kitchen and closet warm white, coffee lamp, TV on with CBS News", icon: Sun },
+    { id: "Night", label: "Night", sub: "Every light soft red at 1%", icon: Moon },
+  ] },
+  { id: "Movie", icon: Tv },
+  { id: "Sleep", icon: Moon },
+  { id: "Away", icon: ShieldCheck, options: [
+    { id: "Out", label: "Out for the day", sub: "Lights off and TV asleep; the water heater keeps its schedule", icon: DoorClosed },
+    { id: "Vacation", label: "Vacation", sub: "Lights off, TV asleep, water heater off until you pick another mode", icon: ShieldCheck },
+  ] },
+];
+
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const clock12 = (t: string) => { const [h, m] = t.split(":").map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; };
 
@@ -2062,6 +2077,14 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const [section, setSection] = useState("overview");
   const [unit, setUnit] = useState<Unit>("F");
   const [scene, setScene] = useState<string | null>(null);
+  const [modeMenu, setModeMenu] = useState<string | null>(null);
+  // A tap anywhere outside an open mode menu closes it.
+  useEffect(() => {
+    if (!modeMenu) return;
+    const close = (e: PointerEvent) => { if (!(e.target as Element)?.closest?.("[data-mode-menu]")) setModeMenu(null); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [modeMenu]);
   const [lightId, setLightId] = useState<string | null>(null);
   const [conedOpen, setConedOpen] = useState(false);
   const [energyOpen, setEnergyOpen] = useState(false);
@@ -2221,8 +2244,9 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     lightsIn(roomId).filter((l) => l.state?.online !== false && !!l.state?.power !== on).forEach((l) => send(l, { action: "power", on }, { power: on }));
 
   // Modes. Each light gets a target; a light already there is left alone. The TV and the water
-  // heater join in: Sleep and Away put the TV to sleep, Away shuts the heater off and pauses its
-  // schedule, and any other mode resumes the schedule (which sets the heater for the current slot).
+  // heater join in: Sleep, Out for the day and Vacation put the TV to sleep, Vacation shuts the heater
+  // off and pauses its schedule, and any other mode resumes the schedule (which sets the heater for the
+  // current slot). Morning and Night run the routines of the same name in Supabase.
   type Target = { on: boolean; brightness?: number | "min"; scene?: string };
   const isTvLight = (l: Light) => /tv|backlight|65/i.test(l.name);
   const isFloorLamp = (l: Light) => /lamp/i.test(l.name);
@@ -2235,7 +2259,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       return { on: false };
     }
     if (name === "Sleep") return room === "bedroom" ? { on: true, brightness: 20 } : { on: false };
-    return { on: false }; // Away
+    return { on: false }; // Out for the day, Vacation
   };
 
   const applyLight = async (l: Light, t: Target) => {
@@ -2259,12 +2283,26 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
 
   const applyScene = async (name: string) => {
     setScene(name);
+    setModeMenu(null);
+    if (name === "Morning" || name === "Night") {
+      try {
+        const r = await fetch("/api/routine", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error);
+        setToast(`${name} started.`);
+        setTimeout(refresh, 8000);
+      } catch (e) {
+        setToast(`Couldn't start ${name}: ${(e as Error).message}`);
+      }
+      setTimeout(() => setScene(null), 2000);
+      return;
+    }
     const jobs: Promise<unknown>[] = lights.filter((l) => l.state?.online !== false).map((l) => applyLight(l, sceneTarget(name, l)));
-    if ((name === "Sleep" || name === "Away") && tv && tvOn) jobs.push(Promise.resolve(send(tv, { action: "sleep" }, { screen: "off" })));
+    if ((name === "Sleep" || name === "Out" || name === "Vacation") && tv && tvOn) jobs.push(Promise.resolve(send(tv, { action: "sleep" }, { screen: "off" })));
     if (heater) {
       jobs.push((async () => {
         try {
-          if (name === "Away") {
+          if (name === "Vacation") {
             if (schedule?.enabled !== false) await setHeaterSchedule(false);
             if (heater.state?.power !== false) await send(heater, { action: "power", on: false }, { power: false, mode: "off" });
           } else if (schedule && !schedule.enabled) {
@@ -2780,13 +2818,32 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           </button>
         </div>
         <div className="flex items-center gap-1.5">
-          {([["Home", Sun], ["Movie", Tv], ["Sleep", Moon], ["Away", ShieldCheck]] as [string, LucideIcon][]).map(([id, Icon]) => {
-            const active = scene === id;
+          {MODES.map(({ id, icon: Icon, options }) => {
+            const active = scene === id || !!options?.some((o) => o.id === scene);
             return (
-              <button key={id} onClick={() => applyScene(id)}
-                className={`flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-medium transition-all active:scale-95 ${active ? "bg-violet-400/15 text-violet-100 border border-violet-300/30 font-semibold" : "bg-white/5 text-slate-400 border border-white/5"}`}>
-                <Icon className={`w-3.5 h-3.5 ${active ? "text-white scene-run" : "text-slate-400"}`} />{id}
-              </button>
+              <div key={id} className="relative" data-mode-menu>
+                <button onClick={() => options ? setModeMenu(modeMenu === id ? null : id) : applyScene(id)} aria-haspopup={options ? "menu" : undefined} aria-expanded={options ? modeMenu === id : undefined}
+                  className={`flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-medium transition-all active:scale-95 ${active || modeMenu === id ? "bg-violet-400/15 text-violet-100 border border-violet-300/30 font-semibold" : "bg-white/5 text-slate-400 border border-white/5"}`}>
+                  <Icon className={`w-3.5 h-3.5 ${active ? "text-white scene-run" : "text-slate-400"}`} />{id}
+                  {options && <ChevronDown className={`w-3 h-3 transition-transform ${modeMenu === id ? "rotate-180" : ""}`} />}
+                </button>
+                {options && modeMenu === id && (
+                  <>
+                    <div role="menu" className="absolute right-0 top-11 z-50 w-72 p-1.5 rounded-2xl bg-[#1a1920] border border-white/10 shadow-2xl shadow-black/60 panel-in">
+                      {options.map((o) => (
+                        <button key={o.id} role="menuitem" onClick={() => applyScene(o.id)}
+                          className="w-full text-left flex items-start gap-3 p-2.5 rounded-xl active:bg-white/10 transition-colors">
+                          <o.icon className="w-4 h-4 mt-0.5 text-violet-200 shrink-0" />
+                          <span className="min-w-0">
+                            <span className="block text-[13px] font-semibold text-white">{o.label}</span>
+                            <span className="block text-[11px] text-slate-400 leading-snug">{o.sub}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             );
           })}
         </div>

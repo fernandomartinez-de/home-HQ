@@ -14,7 +14,8 @@
 //   POST /schedules {"action":"tick"}    run every start and stop that just came due (pg_cron, every minute),
 //                                        and every routine that came due
 //   GET  /schedules?routines=1           the routines
-//   POST /schedules {"action":"routine","id":1}   run a routine now (to try it)
+//   POST /schedules {"action":"routine","id":1}   run a routine now; or "name":"Morning" (first match);
+//                                        "background":true answers right away and runs it after
 //
 // Routines (home_routines) are lists of actions that run once at a time on chosen days, with no stop:
 // the weekday morning routine turns on the kitchen ceiling lights and wakes the TV to the news. Each
@@ -295,9 +296,14 @@ Deno.serve(async (req) => {
     if (body.action === "enable") return json(await setEnabled(body.device_id, !!body.enabled, !!body.apply_now, key!));
     if (body.action === "tick") return json(await tick(key!));
     if (body.action === "routine") {
-      const { data: r, error } = await db.from("home_routines").select("*").eq("id", Number(body.id)).single();
-      if (error || !r) return json({ error: "unknown routine" }, 404);
-      return json({ ran: r.name, results: await runRoutine(r as Routine, key!) });
+      // By id, or by name: "Morning" picks the first routine whose name starts with it.
+      const q = db.from("home_routines").select("*");
+      const { data: found } = body.id ? await q.eq("id", Number(body.id)).limit(1)
+        : await q.ilike("name", `${String(body.name ?? "").replace(/[%_]/g, "")}%`).order("id").limit(1);
+      const r = found?.[0] as Routine | undefined;
+      if (!r) return json({ error: "unknown routine" }, 404);
+      if (body.background) { EdgeRuntime.waitUntil(runRoutine(r, key!)); return json({ started: r.name }); }
+      return json({ ran: r.name, results: await runRoutine(r, key!) });
     }
     return json({ error: "use GET, PUT, or POST with action enable or tick" }, 400);
   } catch (err) {

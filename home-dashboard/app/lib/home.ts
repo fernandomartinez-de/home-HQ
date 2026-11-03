@@ -79,6 +79,12 @@ export async function enableSchedule(deviceId: string, enabled: boolean): Promis
   return call("schedules", { method: "POST", body: JSON.stringify({ action: "enable", device_id: deviceId, enabled, apply_now: enabled }) });
 }
 
+// Run a routine now by name (Morning, Night): it finishes in the background.
+export async function runRoutine(name: string) {
+  if (useMock()) return { started: name };
+  return call("schedules", { method: "POST", body: JSON.stringify({ action: "routine", name, background: true }) });
+}
+
 // ---------- Ring ----------
 
 export async function ringLogin(email: string, password: string, code?: string) {
