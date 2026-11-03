@@ -1462,6 +1462,33 @@ function RoomRow({ room, lights, onOpen, onAll, extra }: { room: { id: string; n
   );
 }
 
+// The light's color code, big enough to read off and tell someone ("#FF6A00"), with a copy button.
+// Typing a code and pressing Go sets the light to exactly that color.
+function ColorCode({ hex, kelvin, onSet }: { hex: string; kelvin: number | null; onSet: (hex: string) => void }) {
+  const [text, setText] = useState(hex.toUpperCase());
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { setText(hex.toUpperCase()); }, [hex]);
+  const clean = (t: string) => { const v = t.trim().replace(/^#?/, "#").toUpperCase(); return /^#[0-9A-F]{6}$/.test(v) ? v : null; };
+  const valid = clean(text);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(hex.toUpperCase()); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* not allowed here */ }
+  };
+  return (
+    <div className="w-full flex items-center gap-2">
+      <span className="w-10 h-10 shrink-0 rounded-xl border border-white/20" style={{ backgroundColor: hex }} />
+      <div className="flex-1 min-w-0">
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && valid) onSet(valid.toLowerCase()); }}
+          aria-label="Color code" spellCheck={false} autoCapitalize="characters" maxLength={7}
+          className="w-full h-10 px-3 rounded-xl bg-black/40 border border-white/10 text-[15px] font-mono font-semibold tracking-wider text-white outline-none focus:border-violet-300/40" />
+        {kelvin && <span className="block mt-0.5 text-[10px] text-slate-500">White at {kelvin}K</span>}
+      </div>
+      {valid && valid !== hex.toUpperCase()
+        ? <button onClick={() => onSet(valid.toLowerCase())} className="shrink-0 px-3 h-10 rounded-xl text-xs font-semibold bg-violet-400/15 text-violet-100 border border-violet-300/30">Go</button>
+        : <button onClick={copy} className="shrink-0 px-3 h-10 rounded-xl text-xs font-medium bg-white/5 text-slate-200 border border-white/10">{copied ? "Copied" : "Copy"}</button>}
+    </div>
+  );
+}
+
 const PRESETS = ["#f59e0b", "#60a5fa", "#f43f5e", "#a855f7", "#10b981", "#06b6d4"];
 const WHITES = [2700, 4000, 6500];
 
@@ -1521,7 +1548,8 @@ function LightSheet({ light, send, onClose, title, sub, footer }: { light: Light
               onPointerUp={() => { dragging.current = false; if (preview) setColor(preview); }}>
               <canvas ref={canvas} width={180} height={180} className="rounded-full block" />
             </div>
-            <span className="text-[10px] font-mono text-violet-400 uppercase bg-black/40 px-3 py-1 rounded-xl border border-white/10">{hex}</span>
+            <ColorCode hex={hex} kelvin={!preview && s?.color_temp_k && !s?.color ? s.color_temp_k : null}
+              onSet={(c) => { setPreview(c); setColor(c); }} />
           </div>
         )}
 
