@@ -1851,7 +1851,7 @@ const MODES: { id: string; icon: LucideIcon; options?: { id: string; label: stri
     { id: "Morning", label: "Morning", sub: "Kitchen, closet and coffee lamp in a soft warm glow, TV on with ABC News", icon: Sun },
     { id: "Day", label: "Day", sub: "Very warm orange: floor lamp, coffee lamp and TV strip bright, kitchen low", icon: Lightbulb },
     { id: "Night", label: "Night", sub: "Every light a warm orange red, dimmed to wind down", icon: Moon },
-    { id: "Movie", label: "Movie", sub: "TV backlight on its Movie scene, floor lamp at its lowest, everything else off", icon: Tv },
+    { id: "Movie", label: "Movie", sub: "TV strip on its Movie scene, floor lamp 1%, coffee lamp 15%, kitchen and closet off", icon: Tv },
   ] },
   { id: "Sleep", icon: Moon },
   { id: "Away", icon: ShieldCheck, options: [
@@ -2256,7 +2256,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
     if (name === "Movie") {
       if (room === "living" && isTvLight(l)) return { on: true, scene: "Movie" };
       if (room === "living" && isFloorLamp(l)) return { on: true, brightness: "min" };
-      return { on: false };
+      if (/coffee/i.test(l.name)) return { on: true, brightness: 15 };
+      return { on: false }; // kitchen, closet and the rest off
     }
     if (name === "Sleep") return room === "bedroom" ? { on: true, brightness: 20 } : { on: false };
     return { on: false }; // Everything off, Out for the day, Vacation
