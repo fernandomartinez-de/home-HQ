@@ -126,37 +126,79 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
     }
   };
 
+  // Fetch and play the time-based greeting, then start listening once the audio ends.
+  const greet = async (startListeningAfter: () => void) => {
+    try {
+      const r = await fetch("/api/jarvis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ greet: true }),
+      });
+      const body = await r.json().catch(() => ({}));
+      const text = String(body.reply ?? "");
+      if (text) {
+        setReply(text);
+        setPhase("reply");
+        if (body.audio) {
+          // Play greeting audio, then start listening when it finishes
+          try { currentAudio?.pause(); currentAudio = null; } catch { /* fine */ }
+          const audio = new Audio(`data:audio/mpeg;base64,${body.audio}`);
+          currentAudio = audio;
+          audio.onended = () => { setReply(""); startListeningAfter(); };
+          audio.onerror = () => { startListeningAfter(); };
+          audio.play().catch(() => { speakBrowserFallback(text); setTimeout(startListeningAfter, 1500); });
+          return;
+        }
+        speakBrowserFallback(text);
+        setTimeout(startListeningAfter, 1500);
+        return;
+      }
+    } catch { /* greeting failed, just start listening */ }
+    startListeningAfter();
+  };
+
   const listen = () => {
     // iPad Safari only lets a page talk after a tap, so prime speech now with a silent utterance.
     try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* fine */ }
     setOpen(true);
     setReply("");
     setHeard("");
-    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-    if (!SR) { setPhase("idle"); return; }
-    window.speechSynthesis?.cancel();
-    const r = new SR();
-    r.lang = "en-US";
-    r.interimResults = true;
-    r.continuous = false;
-    let final = "";
-    r.onresult = (ev: any) => {
-      let interim = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const t = ev.results[i][0].transcript;
-        if (ev.results[i].isFinal) final += t; else interim += t;
-      }
-      setHeard((final + interim).trim());
+
+    const startRecognition = () => {
+      const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+      if (!SR) { setPhase("idle"); return; }
+      window.speechSynthesis?.cancel();
+      const r = new SR();
+      r.lang = "en-US";
+      r.interimResults = true;
+      r.continuous = false;
+      let final = "";
+      r.onresult = (ev: any) => {
+        let interim = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const t = ev.results[i][0].transcript;
+          if (ev.results[i].isFinal) final += t; else interim += t;
+        }
+        setHeard((final + interim).trim());
+      };
+      r.onerror = (ev: any) => {
+        if (ev.error === "no-speech" || ev.error === "aborted") { setPhase("idle"); return; }
+        setReply(ev.error === "not-allowed" ? "Allow the microphone for this site in Safari settings, or type below." : `Couldn't listen: ${ev.error}`);
+        setPhase("error");
+      };
+      r.onend = () => { rec.current = null; if (final.trim()) ask(final); else setPhase((p) => (p === "listening" ? "idle" : p)); };
+      rec.current = r;
+      setPhase("listening");
+      try { r.start(); } catch { setPhase("idle"); }
     };
-    r.onerror = (ev: any) => {
-      if (ev.error === "no-speech" || ev.error === "aborted") { setPhase("idle"); return; }
-      setReply(ev.error === "not-allowed" ? "Allow the microphone for this site in Safari settings, or type below." : `Couldn't listen: ${ev.error}`);
-      setPhase("error");
-    };
-    r.onend = () => { rec.current = null; if (final.trim()) ask(final); else setPhase((p) => (p === "listening" ? "idle" : p)); };
-    rec.current = r;
-    setPhase("listening");
-    try { r.start(); } catch { setPhase("idle"); }
+
+    // Greet first, then start listening after the greeting finishes playing.
+    // On follow-ups (panel already open, re-tap), skip the greeting.
+    if (!history.current.turns.length || Date.now() - history.current.at >= FOLLOW_UP_MS) {
+      greet(startRecognition);
+    } else {
+      startRecognition();
+    }
   };
 
   const status = phase === "listening" ? "Listening…" : phase === "thinking" ? "On it…" : phase === "error" ? "Something went wrong" : phase === "reply" ? "Jarvis" : canListen ? "Tap the mic and speak" : "Type a request";

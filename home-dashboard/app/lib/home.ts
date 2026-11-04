@@ -92,6 +92,14 @@ export async function askJarvis(text: string, history: { role: string; content: 
   return call("jarvis", { method: "POST", body: JSON.stringify({ text, history }) });
 }
 
+export async function greetJarvis() {
+  if (useMock()) {
+    const h = new Date().getHours();
+    return { reply: h < 12 ? "Good morning, sir." : h < 17 ? "Good afternoon, sir." : "Good evening, sir.", did: [] };
+  }
+  return call("jarvis", { method: "POST", body: JSON.stringify({ greet: true }) });
+}
+
 // ---------- Ring ----------
 
 export async function ringLogin(email: string, password: string, code?: string) {
