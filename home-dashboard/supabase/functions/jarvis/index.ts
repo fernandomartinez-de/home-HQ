@@ -233,7 +233,10 @@ const TOOLS = [
 
 function systemPrompt(devs: Dev[]) {
   const now = new Date().toLocaleString("en-US", { timeZone: TZ, weekday: "long", hour: "numeric", minute: "2-digit" });
+  const hour = new Date(new Date().toLocaleString("en-US", { timeZone: TZ })).getHours();
+  const greeting = hour < 12 ? "Good morning, sir" : hour < 17 ? "Good afternoon, sir" : "Good evening, sir";
   return `You are Jarvis, the voice of Home HQ, a home control app for an apartment in Brooklyn. It is ${now}.
+Always address the user as "sir". When this is the first message in a conversation (no history), begin your reply with "${greeting}." before answering.
 Do what is asked using the tools, or answer from the device states below. Your reply is spoken aloud by Siri or the iPad:
 one short sentence, two at most, plain words, no lists, no markdown, no emoji, no dashes. Sound calm and a little dry, like a capable butler.
 Match devices by name and room ("kitchen lights" means every light in the Kitchen; "lights" with no room means the room the request implies, or all lights if it says "all").
@@ -288,12 +291,26 @@ async function ask(text: string, history: any[], key: string) {
   return { reply: "That took more steps than I expected; check Home HQ to see what changed.", did };
 }
 
+// Time-based greeting — no Claude needed, just voice.
+function greeting() {
+  const hour = new Date(new Date().toLocaleString("en-US", { timeZone: TZ })).getHours();
+  return hour < 12 ? "Good morning, sir." : hour < 17 ? "Good afternoon, sir." : "Good evening, sir.";
+}
+
 Deno.serve(async (req) => {
   try {
     const key = req.headers.get("x-home-key");
     if (!(await authorized(key))) return json({ error: "unauthorized" }, 401);
     const url = new URL(req.url);
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+
+    // Greet mode: instant greeting with voice, no Claude call.
+    if (body.greet === true || url.searchParams.get("greet") === "1") {
+      const reply = greeting();
+      const audio = await speak(reply);
+      return json({ reply, did: [], ...(audio ? { audio } : {}) });
+    }
+
     const text = String(body.text ?? url.searchParams.get("text") ?? "").trim().slice(0, 500);
     if (!text) return json({ error: "say something: POST {\"text\":\"...\"}" }, 400);
     const out = await ask(text, Array.isArray(body.history) ? body.history : [], key!);
