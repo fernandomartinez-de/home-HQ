@@ -187,7 +187,7 @@ function kelvinRgb(k: number) {
   return [r, g, bl].map((v) => Math.max(0, Math.min(255, Math.round(v))));
 }
 
-// Models differ in how they take brightness (0 to 255 or 0 to 100) and color (mode 0x02 or 0x0D);
+// Models differ in how they take brightness (0 to 255 or 0 to 100) and color (mode 0x02, 0x0D or 0x15);
 // provider_ref.bright_max and provider_ref.color_mode pin them once known, otherwise both color modes are sent.
 function blePackets(ref: any, cmd: any) {
   if (cmd?.action === "power") return { packets: [packet([0x33, 0x01, cmd.on ? 1 : 0])], patch: { power: !!cmd.on } };
@@ -209,8 +209,12 @@ function blePackets(ref: any, cmd: any) {
     patch = { color: null, color_temp_k: k, power: true };
   }
   if (!rgb) throw new Error("this light takes power, brightness, color or color_temp");
-  const modes: number[] = ref?.color_mode ? [Number(ref.color_mode)] : [0x02, 0x0d];
-  return { packets: modes.map((m) => packet([0x33, 0x05, m, ...rgb!])), patch };
+  // 0x02 and 0x0D are whole strip color modes; 0x15 is the RGBIC one (all segments, like the H617A).
+  const modes: number[] = ref?.color_mode ? [Number(ref.color_mode)] : [0x02, 0x0d, 0x15];
+  const colorPacket = (m: number) => m === 0x15
+    ? packet([0x33, 0x05, 0x15, 0x01, ...rgb!, 0, 0, 0, 0, 0, 0xff, 0x7f])
+    : packet([0x33, 0x05, m, ...rgb!]);
+  return { packets: modes.map(colorPacket), patch };
 }
 
 async function relay(id: string, ref: any, cmd: any, source: string) {
