@@ -12,6 +12,11 @@
 //                  {"action":"color","hex":"#ff8800"}
 //                  {"action":"color_temp","kelvin":3000}
 //                  {"action":"scene","name":"Movie"}             (any scene the light offers in the Govee app)
+//
+// Bluetooth-only Govee lights (the bedframe strip) aren't in the Govee cloud. The TV app reaches
+// them over Bluetooth instead (provider_ref {mac, via: "tv"}): commands become Govee's 20 byte
+// Bluetooth packets, queued for the TV like the SwitchBot relay. They can't report state, so the
+// dashboard shows what was last asked for.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -164,7 +169,68 @@ async function poll() {
   return out;
 }
 
+// ---------- Bluetooth-only lights, through the TV ----------
+
+// 0x33 command packets, zero padded to 19 bytes, XOR checksum last.
+function packet(bytes: number[]) {
+  const b = new Array(20).fill(0);
+  bytes.forEach((v, i) => { b[i] = v & 0xff; });
+  b[19] = b.slice(0, 19).reduce((x, y) => x ^ y, 0);
+  return b.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
+function kelvinRgb(k: number) {
+  const t = k / 100;
+  const r = t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592);
+  const g = t <= 66 ? 99.4708025861 * Math.log(t) - 161.1195681661 : 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+  const bl = t >= 66 ? 255 : t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+  return [r, g, bl].map((v) => Math.max(0, Math.min(255, Math.round(v))));
+}
+
+// Models differ in how they take brightness (0 to 255 or 0 to 100) and color (mode 0x02 or 0x0D);
+// provider_ref.bright_max and provider_ref.color_mode pin them once known, otherwise both color modes are sent.
+function blePackets(ref: any, cmd: any) {
+  if (cmd?.action === "power") return { packets: [packet([0x33, 0x01, cmd.on ? 1 : 0])], patch: { power: !!cmd.on } };
+  if (cmd?.action === "brightness") {
+    const pct = Math.min(100, Math.max(1, Math.round(Number(cmd.value))));
+    const max = Number(ref?.bright_max) || 255;
+    return { packets: [packet([0x33, 0x04, Math.max(1, Math.round((pct * max) / 100))])], patch: { brightness: pct, power: true } };
+  }
+  let rgb: number[] | null = null;
+  let patch: Record<string, unknown> = {};
+  if (cmd?.action === "color") {
+    const hex = String(cmd.hex ?? "").replace("#", "");
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) throw new Error("color needs hex like #ff8800");
+    rgb = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    patch = { color: `#${hex.toLowerCase()}`, color_temp_k: null, power: true };
+  } else if (cmd?.action === "color_temp") {
+    const k = Math.min(9000, Math.max(2000, Math.round(Number(cmd.kelvin))));
+    rgb = kelvinRgb(k);
+    patch = { color: null, color_temp_k: k, power: true };
+  }
+  if (!rgb) throw new Error("this light takes power, brightness, color or color_temp");
+  const modes: number[] = ref?.color_mode ? [Number(ref.color_mode)] : [0x02, 0x0d];
+  return { packets: modes.map((m) => packet([0x33, 0x05, m, ...rgb!])), patch };
+}
+
+async function relay(id: string, ref: any, cmd: any, source: string) {
+  const { packets, patch } = blePackets(ref, cmd);
+  const command = { ...cmd, ble: { mac: ref.mac, packets }, patch };
+  const { data: row, error } = await db.from("home_commands").insert({ device_id: id, command, source, status: "pending" }).select("id").single();
+  if (error) throw error;
+  for (let i = 0; i < 16; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const { data: c } = await db.from("home_commands").select("status, result").eq("id", row.id).single();
+    if (c?.status === "done") return { ok: true, command_id: row.id };
+    if (c?.status === "failed") throw new Error(c.result?.error ?? "the TV couldn't reach the light");
+    if (c?.status === "expired") throw new Error("the TV didn't pick it up (is it unplugged?)");
+  }
+  return { ok: true, command_id: row.id, queued: true };
+}
+
 async function command(id: string, cmd: any, source = "ui") {
+  const { data: dev } = await db.from("home_devices").select("provider_ref").eq("id", id).maybeSingle();
+  if (dev?.provider_ref?.via === "tv") return relay(id, dev.provider_ref, cmd, source);
   const { data: row, error } = await db.from("home_commands")
     .insert({ device_id: id, command: cmd, source, status: "pending" }).select("id").single();
   if (error) throw error;

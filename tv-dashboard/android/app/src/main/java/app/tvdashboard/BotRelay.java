@@ -21,6 +21,8 @@ import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,25 +30,29 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Stands in for a SwitchBot Hub: finds SwitchBot Bots over Bluetooth and presses them, so a Bot
- * with no hub (like the one on the towel warmer) still works from the home dashboard.
+ * Stands in for a hub over Bluetooth, for devices Home HQ can't reach through a cloud:
  *
- * Scanning reads each Bot's advertisement (mode, on or off, battery). Commands connect, write
- * one of the Bot's three commands, and disconnect. This uses SwitchBot's open Bluetooth protocol
- * (OpenWonderLabs/SwitchBotAPI-BLE) and works for Bots without a password.
+ *  - SwitchBot Bots with no SwitchBot Hub (the towel warmer before its hub). Scanning reads each
+ *    Bot's advertisement (mode, on or off, battery); commands connect, write one of the Bot's three
+ *    commands and disconnect. SwitchBot's open Bluetooth protocol, for Bots without a password.
+ *  - Govee lights that only have Bluetooth (the bedframe strip). Scanning lists the Govee lights it
+ *    hears with their names (which carry the model, like "ihoment_H6125_1A2B"); commands write the
+ *    20 byte packets the server builds for that model.
  */
 final class BotRelay {
     private static final String TAG = "TvDashBot";
     private static final ParcelUuid SERVICE_DATA_NEW = ParcelUuid.fromString("0000fd3d-0000-1000-8000-00805f9b34fb");
     private static final ParcelUuid SERVICE_DATA_OLD = ParcelUuid.fromString("00000d00-0000-1000-8000-00805f9b34fb");
-    private static final UUID SERVICE = UUID.fromString("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
-    private static final UUID WRITE = UUID.fromString("cba20002-224d-11e6-9fb8-0002a5d5c51b");
+    private static final UUID BOT_SERVICE = UUID.fromString("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
+    private static final UUID BOT_WRITE = UUID.fromString("cba20002-224d-11e6-9fb8-0002a5d5c51b");
+    private static final UUID GOVEE_SERVICE = UUID.fromString("00010203-0405-0607-0809-0a0b0c0d1910");
+    private static final UUID GOVEE_WRITE = UUID.fromString("00010203-0405-0607-0809-0a0b0c0d2b11");
+    private static final int GOVEE_COMPANY = 0x88EC;
     private static final byte BOT = 0x48; // 'H'
 
     private final Context context;
-    /** Bots seen by the last scans, by MAC: the device and its last advertisement. */
+    /** Devices seen by the last scans, by MAC. */
     private final Map<String, BluetoothDevice> devices = new ConcurrentHashMap<>();
-    private final Map<String, JSONObject> seen = new ConcurrentHashMap<>();
 
     BotRelay(Context context) { this.context = context.getApplicationContext(); }
 
@@ -56,7 +62,10 @@ final class BotRelay {
         return a != null && a.isEnabled() ? a : null;
     }
 
-    /** Listens for Bots for a few seconds; returns what it heard: [{mac, mode, on, battery, rssi}]. */
+    /**
+     * Listens for a few seconds. Returns what it heard: Bots as {mac, mode, on, battery, rssi} and
+     * Govee lights as {mac, govee: true, name, rssi}.
+     */
     JSONArray scan(long ms) {
         JSONArray out = new JSONArray();
         BluetoothAdapter a = adapter();
@@ -67,10 +76,10 @@ final class BotRelay {
             @Override
             public void onScanResult(int type, ScanResult r) {
                 try {
-                    JSONObject bot = parse(r);
-                    if (bot != null) {
-                        found.put(bot.getString("mac"), bot);
-                        devices.put(bot.getString("mac"), r.getDevice());
+                    JSONObject heard = parse(r);
+                    if (heard != null) {
+                        found.put(heard.getString("mac"), heard);
+                        devices.put(heard.getString("mac"), r.getDevice());
                     }
                 } catch (Exception ignored) { }
             }
@@ -88,24 +97,32 @@ final class BotRelay {
         } finally {
             try { scanner.stopScan(cb); } catch (Exception ignored) { }
         }
-        seen.putAll(found);
-        for (JSONObject bot : found.values()) out.put(bot);
+        for (JSONObject heard : found.values()) out.put(heard);
         return out;
     }
 
     private static JSONObject parse(ScanResult r) throws Exception {
         ScanRecord rec = r.getScanRecord();
         if (rec == null) return null;
+        String mac = r.getDevice().getAddress();
         byte[] d = rec.getServiceData(SERVICE_DATA_NEW);
         if (d == null) d = rec.getServiceData(SERVICE_DATA_OLD);
-        if (d == null || d.length < 3 || (d[0] & 0x7F) != BOT) return null;
-        boolean switchMode = (d[1] & 0x80) != 0;
-        return new JSONObject()
-                .put("mac", r.getDevice().getAddress())
-                .put("mode", switchMode ? "switchMode" : "pressMode")
-                .put("on", (d[1] & 0x40) == 0) // the Bot sends 0 for on
-                .put("battery", d[2] & 0x7F)
-                .put("rssi", r.getRssi());
+        if (d != null && d.length >= 3 && (d[0] & 0x7F) == BOT) {
+            boolean switchMode = (d[1] & 0x80) != 0;
+            return new JSONObject()
+                    .put("mac", mac)
+                    .put("mode", switchMode ? "switchMode" : "pressMode")
+                    .put("on", (d[1] & 0x40) == 0) // the Bot sends 0 for on
+                    .put("battery", d[2] & 0x7F)
+                    .put("rssi", r.getRssi());
+        }
+        String name = rec.getDeviceName();
+        boolean goveeName = name != null && name.matches("(?i)^(govee|ihoment|gbk|minger)_.*");
+        if (goveeName || rec.getManufacturerSpecificData(GOVEE_COMPANY) != null) {
+            return new JSONObject().put("mac", mac).put("govee", true)
+                    .put("name", name == null ? JSONObject.NULL : name).put("rssi", r.getRssi());
+        }
+        return null;
     }
 
     /** Sends press, on or off to the Bot at mac. Returns null when it worked, or what went wrong. */
@@ -114,47 +131,77 @@ final class BotRelay {
                 : "on".equals(op) ? new byte[]{0x57, 0x01, 0x01}
                 : "off".equals(op) ? new byte[]{0x57, 0x01, 0x02} : null;
         if (value == null) return "unknown Bot command " + op;
-        if (mac == null || !BluetoothAdapter.checkBluetoothAddress(mac)) return "the Bot's address is missing";
+        List<byte[]> packets = new ArrayList<>();
+        packets.add(value);
+        return withRetries(mac, BOT_SERVICE, BOT_WRITE, packets, "the Bot");
+    }
+
+    /** Writes the given packets (hex strings, built by the server for the model) to a Govee light. */
+    String sendGovee(String mac, JSONArray hex) {
+        List<byte[]> packets = new ArrayList<>();
+        for (int i = 0; i < hex.length(); i++) {
+            String h = hex.optString(i).replaceAll("[^0-9A-Fa-f]", "");
+            if (h.length() != 40) return "each Govee packet must be 20 bytes";
+            byte[] b = new byte[20];
+            for (int j = 0; j < 20; j++) b[j] = (byte) Integer.parseInt(h.substring(j * 2, j * 2 + 2), 16);
+            packets.add(b);
+        }
+        if (packets.isEmpty()) return "no Govee packets";
+        return withRetries(mac, GOVEE_SERVICE, GOVEE_WRITE, packets, "the light");
+    }
+
+    private String withRetries(String mac, UUID service, UUID characteristic, List<byte[]> packets, String what) {
+        if (mac == null || !BluetoothAdapter.checkBluetoothAddress(mac)) return what + "'s address is missing";
         if (adapter() == null) return "Bluetooth is off on the TV";
         String err = null;
         for (int attempt = 0; attempt < 3; attempt++) {
             if (attempt > 0 || !devices.containsKey(mac)) scan(4000); // find it (or refresh a stale address)
-            err = write(mac, value);
+            err = write(mac, service, characteristic, packets, what);
             if (err == null) return null;
-            Log.w(TAG, "Bot " + op + " attempt " + (attempt + 1) + ": " + err);
+            Log.w(TAG, what + " attempt " + (attempt + 1) + ": " + err);
         }
         return err;
     }
 
-    private String write(String mac, byte[] value) {
+    /** Connects, writes each packet in turn (waiting for each to land), and disconnects. */
+    private String write(String mac, UUID serviceId, UUID charId, List<byte[]> packets, String what) {
         BluetoothAdapter a = adapter();
         if (a == null) return "Bluetooth is off on the TV";
         BluetoothDevice dev = devices.get(mac);
         if (dev == null) dev = a.getRemoteDevice(mac);
-        final String[] err = {"the Bot didn't answer (out of range?)"};
+        final String[] err = {what + " didn't answer (out of range, or connected to a phone?)"};
+        final int[] next = {0};
         CountDownLatch done = new CountDownLatch(1);
         BluetoothGattCallback cb = new BluetoothGattCallback() {
+            private BluetoothGattCharacteristic target;
+
+            private void writeNext(BluetoothGatt g) {
+                if (next[0] >= packets.size()) { err[0] = null; done.countDown(); return; }
+                target.setValue(packets.get(next[0]++));
+                if (!g.writeCharacteristic(target)) { err[0] = what + " refused the command"; done.countDown(); }
+            }
+
             @Override
             public void onConnectionStateChange(BluetoothGatt g, int status, int state) {
                 if (state == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
-                    if (!g.discoverServices()) { err[0] = "couldn't read the Bot"; done.countDown(); }
+                    if (!g.discoverServices()) { err[0] = "couldn't read " + what; done.countDown(); }
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                     done.countDown();
                 }
             }
             @Override
             public void onServicesDiscovered(BluetoothGatt g, int status) {
-                BluetoothGattService s = g.getService(SERVICE);
-                BluetoothGattCharacteristic c = s == null ? null : s.getCharacteristic(WRITE);
-                if (c == null) { err[0] = "that isn't a SwitchBot Bot"; done.countDown(); return; }
-                c.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-                c.setValue(value);
-                if (!g.writeCharacteristic(c)) { err[0] = "the Bot refused the command"; done.countDown(); }
+                BluetoothGattService s = g.getService(serviceId);
+                target = s == null ? null : s.getCharacteristic(charId);
+                if (target == null) { err[0] = what + " isn't the expected device"; done.countDown(); return; }
+                boolean noResponse = (target.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) == 0;
+                target.setWriteType(noResponse ? BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE : BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                writeNext(g);
             }
             @Override
             public void onCharacteristicWrite(BluetoothGatt g, BluetoothGattCharacteristic c, int status) {
-                err[0] = status == BluetoothGatt.GATT_SUCCESS ? null : "the Bot refused the command (" + status + ")";
-                done.countDown();
+                if (status != BluetoothGatt.GATT_SUCCESS) { err[0] = what + " refused the command (" + status + ")"; done.countDown(); return; }
+                writeNext(g);
             }
         };
         BluetoothGatt gatt = null;
@@ -162,8 +209,8 @@ final class BotRelay {
             gatt = Build.VERSION.SDK_INT >= 23
                     ? dev.connectGatt(context, false, cb, BluetoothDevice.TRANSPORT_LE)
                     : dev.connectGatt(context, false, cb);
-            if (gatt == null) return "couldn't connect to the Bot";
-            if (!done.await(12, TimeUnit.SECONDS)) return "the Bot didn't answer in time (out of range?)";
+            if (gatt == null) return "couldn't connect to " + what;
+            if (!done.await(15, TimeUnit.SECONDS)) return what + " didn't answer in time (out of range?)";
             return err[0];
         } catch (SecurityException e) {
             return "the TV app needs Bluetooth permission";

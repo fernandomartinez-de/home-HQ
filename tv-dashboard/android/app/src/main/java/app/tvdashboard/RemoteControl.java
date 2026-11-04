@@ -117,7 +117,10 @@ final class RemoteControl {
                         JSONObject ble = cmd == null ? null : cmd.optJSONObject("ble");
                         String err;
                         if (ble != null) {
-                            err = bots.send(ble.optString("mac", null), ble.optString("op"));
+                            JSONArray packets = ble.optJSONArray("packets");
+                            err = packets != null
+                                    ? bots.sendGovee(ble.optString("mac", null), packets)
+                                    : bots.send(ble.optString("mac", null), ble.optString("op"));
                             botRan = true;
                         } else {
                             err = run(cmd);

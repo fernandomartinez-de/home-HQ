@@ -84,9 +84,10 @@ async function command(id: string, cmd: any, source = "ui") {
 
 // ---------- TV side ----------
 
-// The devices whose commands the TV runs: itself (unless asleep) and every Bot it relays for.
+// The devices whose commands the TV runs: itself (unless asleep) and every Bluetooth device it relays
+// for (SwitchBot Bots with no hub, Govee lights with no Wi-Fi).
 async function relayed(): Promise<string[]> {
-  const { data } = await db.from("home_devices").select("id").eq("provider", "switchbot").eq("provider_ref->>via", "tv");
+  const { data } = await db.from("home_devices").select("id").eq("provider_ref->>via", "tv");
   return (data ?? []).map((d) => d.id);
 }
 
@@ -134,6 +135,21 @@ async function lastState(id: string) {
 // press mode the Bot can't know if the appliance is on, so power carries over from the last reading,
 // until the appliance's own timer would have turned it off (auto_off_min, carried in the readings;
 // the towel warmer shuts itself off after 2 hours).
+// Govee lights the TV hears, kept in tv_config.config.ble_govee (mac: {name, rssi, t}) so one can be
+// picked and added as a light (provider govee, provider_ref {mac, via: "tv", model}).
+async function goveeHeard(list: any[]) {
+  if (!list.length) return;
+  const { data } = await db.from("tv_config").select("config").eq("id", 1).single();
+  const config = data?.config ?? {};
+  const seen = { ...(config.ble_govee ?? {}) };
+  const t = new Date().toISOString();
+  for (const g of list) {
+    if (typeof g?.mac !== "string" || !/^[0-9A-Fa-f:]{17}$/.test(g.mac)) continue;
+    seen[g.mac.toUpperCase()] = { name: typeof g.name === "string" ? g.name.slice(0, 60) : null, rssi: Number.isFinite(g.rssi) ? g.rssi : null, t };
+  }
+  await db.from("tv_config").update({ config: { ...config, ble_govee: seen } }).eq("id", 1);
+}
+
 async function botHeard(b: any) {
   if (typeof b?.mac !== "string" || !/^[0-9A-Fa-f:]{17}$/.test(b.mac)) return;
   const id = botId(b.mac);
@@ -173,6 +189,12 @@ async function report(body: any) {
       result: r.ok ? { ok: true } : { error: String(r.error ?? "failed") },
       completed_at: new Date().toISOString(),
     }).eq("id", r.id).in("device_id", ids).select("device_id, command").maybeSingle();
+    // A Govee light over Bluetooth can't report back, so it is now what the dashboard asked for.
+    if (r.ok && row?.command?.ble?.packets && row.command.patch && typeof row.command.patch === "object") {
+      const last = await lastState(row.device_id);
+      await db.from("home_readings").insert({ device_id: row.device_id, source: "command", state: { ...last, online: true, ...row.command.patch } });
+      continue;
+    }
     // A Bot that just tapped (press mode): the appliance is now what the dashboard asked for.
     if (r.ok && row?.command?.ble && typeof row.command.on === "boolean") {
       const last = await lastState(row.device_id);
@@ -180,7 +202,9 @@ async function report(body: any) {
         state: { ...last, online: true, power: row.command.on, on_since: row.command.on ? new Date().toISOString() : null } });
     }
   }
-  for (const b of Array.isArray(body.ble) ? body.ble.slice(0, 20) : []) await botHeard(b);
+  const heard = Array.isArray(body.ble) ? body.ble.slice(0, 40) : [];
+  for (const b of heard.filter((x: any) => !x?.govee)) await botHeard(b);
+  await goveeHeard(heard.filter((x: any) => x?.govee));
   if (body.state && typeof body.state === "object") {
     const s = body.state;
     const state = {
