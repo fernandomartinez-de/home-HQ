@@ -5,7 +5,31 @@
 // the iPad); the understanding happens in the jarvis function. Typing works too.
 
 import { useEffect, useRef, useState } from "react";
-import { Mic, Send as SendIcon, X, Loader2 } from "lucide-react";
+import { Send as SendIcon, X, Loader2 } from "lucide-react";
+
+// Arc reactor / orb icon — the Jarvis core. Concentric rings with a glowing center.
+function ArcReactor({ size = 20, active = false }: { size?: number; active?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* outer glow when active */}
+      {active && <circle cx="16" cy="16" r="15" fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1" className="jarvis-ring-outer" />}
+      {/* outer ring */}
+      <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
+      {/* middle ring with notches */}
+      <circle cx="16" cy="16" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.7" />
+      {/* small accent lines radiating out (like the arc reactor segments) */}
+      {[0, 60, 120, 180, 240, 300].map((deg) => (
+        <line key={deg} x1="16" y1="4.5" x2="16" y2="6.5" stroke="currentColor" strokeWidth="1" opacity="0.5"
+          transform={`rotate(${deg} 16 16)`} />
+      ))}
+      {/* inner ring */}
+      <circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.8" />
+      {/* glowing core — the bright center dot */}
+      <circle cx="16" cy="16" r="3" fill={active ? "rgba(167,139,250,0.9)" : "rgba(167,139,250,0.5)"} className={active ? "jarvis-core-glow" : ""} />
+      <circle cx="16" cy="16" r="1.5" fill="white" opacity={active ? "0.95" : "0.6"} />
+    </svg>
+  );
+}
 
 type Phase = "idle" | "listening" | "thinking" | "reply" | "error";
 type Turn = { role: "user" | "assistant"; content: string };
@@ -140,16 +164,16 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
   return (
     <>
       <button onClick={() => (phase === "listening" ? rec.current?.stop() : listen())} aria-label="Talk to Jarvis"
-        className={`w-9 h-9 flex items-center justify-center rounded-xl border active:scale-95 transition-colors ${phase === "listening" ? "bg-violet-500/30 border-violet-300/50 text-white jarvis-pulse" : "bg-white/5 border-white/10 text-violet-300"}`}>
-        <Mic className="w-4 h-4" />
+        className={`w-9 h-9 flex items-center justify-center rounded-full border active:scale-95 transition-colors ${phase === "listening" ? "bg-violet-500/30 border-violet-300/50 text-white jarvis-pulse" : "bg-white/5 border-white/10 text-violet-300"}`}>
+        <ArcReactor size={18} active={phase === "listening"} />
       </button>
       {open && (
         <div className="fixed inset-x-0 top-[84px] z-[60] flex justify-center px-4 pointer-events-none">
           <div role="dialog" aria-label="Jarvis" className="pointer-events-auto w-full max-w-[560px] rounded-3xl bg-[#17161d]/95 backdrop-blur border border-violet-300/20 shadow-2xl shadow-black/60 p-4 panel-in">
             <div className="flex items-center gap-3">
               <button onClick={() => (phase === "listening" ? rec.current?.stop() : listen())} disabled={!canListen || phase === "thinking"} aria-label={phase === "listening" ? "Stop listening" : "Speak again"}
-                className={`relative w-12 h-12 shrink-0 rounded-full flex items-center justify-center border disabled:opacity-50 ${phase === "listening" ? "bg-violet-500 border-violet-300 text-white jarvis-pulse" : "bg-violet-500/15 border-violet-400/30 text-violet-200"}`}>
-                {phase === "thinking" ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
+                className={`relative w-12 h-12 shrink-0 rounded-full flex items-center justify-center border disabled:opacity-50 ${phase === "listening" ? "bg-violet-500/20 border-violet-300 text-white jarvis-pulse" : "bg-violet-500/10 border-violet-400/30 text-violet-200"}`}>
+                {phase === "thinking" ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArcReactor size={28} active={phase === "listening"} />}
               </button>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-mono tracking-wider uppercase text-violet-300/80">{status}</div>
