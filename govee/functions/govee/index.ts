@@ -222,13 +222,26 @@ async function relay(id: string, ref: any, cmd: any, source: string) {
   const command = { ...cmd, ble: { mac: ref.mac, packets }, patch };
   const { data: row, error } = await db.from("home_commands").insert({ device_id: id, command, source, status: "pending" }).select("id").single();
   if (error) throw error;
+
+  // Merge patch with last known state so we preserve fields like brightness when toggling power.
+  const mergedPatch = async () => {
+    const { data: prev } = await db.from("home_readings").select("state").eq("device_id", id).order("recorded_at", { ascending: false }).limit(1).maybeSingle();
+    return { ...(prev?.state ?? {}), ...patch };
+  };
+
   for (let i = 0; i < 16; i++) {
     await new Promise((r) => setTimeout(r, 500));
     const { data: c } = await db.from("home_commands").select("status, result").eq("id", row.id).single();
-    if (c?.status === "done") return { ok: true, command_id: row.id };
+    if (c?.status === "done") {
+      // Store the assumed state so Jarvis and the dashboard know what was last commanded.
+      await db.from("home_readings").insert({ device_id: id, source: "command", state: await mergedPatch() }).catch(() => null);
+      return { ok: true, command_id: row.id };
+    }
     if (c?.status === "failed") throw new Error(c.result?.error ?? "the TV couldn't reach the light");
     if (c?.status === "expired") throw new Error("the TV didn't pick it up (is it unplugged?)");
   }
+  // Queued but not confirmed yet — still store the assumed state as best effort.
+  await db.from("home_readings").insert({ device_id: id, source: "command", state: await mergedPatch() }).catch(() => null);
   return { ok: true, command_id: row.id, queued: true };
 }
 
@@ -245,25 +258,40 @@ async function command(id: string, cmd: any, source = "ui") {
     const d = (await devices()).find((x) => deviceId(x) === id);
     if (!d) throw new Error(`device ${id} not found on the Govee account`);
     let res;
+    let patch: Record<string, unknown> = {};
     if (cmd?.action === "power") {
       res = await control(d, "powerSwitch", cmd.on ? 1 : 0);
+      patch = { power: !!cmd.on };
     } else if (cmd?.action === "brightness") {
       const r = range(cap(d, "brightness")) ?? { min: 1, max: 100 };
-      res = await control(d, "brightness", Math.min(r.max, Math.max(r.min, Math.round(Number(cmd.value)))));
+      const val = Math.min(r.max, Math.max(r.min, Math.round(Number(cmd.value))));
+      res = await control(d, "brightness", val);
+      patch = { brightness: val, power: true };
     } else if (cmd?.action === "color") {
       const hex = String(cmd.hex ?? "").replace("#", "");
       if (!/^[0-9a-fA-F]{6}$/.test(hex)) throw new Error("color needs hex like #ff8800");
       res = await control(d, "colorRgb", parseInt(hex, 16));
+      patch = { color: `#${hex.toLowerCase()}`, color_temp_k: null, power: true };
     } else if (cmd?.action === "color_temp") {
       const r = range(cap(d, "colorTemperatureK")) ?? { min: 2000, max: 9000 };
-      res = await control(d, "colorTemperatureK", Math.min(r.max, Math.max(r.min, Math.round(Number(cmd.kelvin)))));
+      const val = Math.min(r.max, Math.max(r.min, Math.round(Number(cmd.kelvin))));
+      res = await control(d, "colorTemperatureK", val);
+      patch = { color: null, color_temp_k: val, power: true };
     } else if (cmd?.action === "scene") {
       if (!cmd.name) throw new Error("scene needs a name, like Movie");
       res = await scene(d, String(cmd.name));
+      patch = { power: true };
     } else {
       throw new Error("unknown command; use power, brightness, color, color_temp or scene");
     }
     await finish("done", { govee: res?.capability ?? res });
+    // Store the assumed state so the dashboard and Jarvis reflect the change immediately.
+    // Merge with the last known state so we don't lose fields like brightness when toggling power.
+    if (Object.keys(patch).length) {
+      const { data: prev } = await db.from("home_readings").select("state").eq("device_id", id).order("recorded_at", { ascending: false }).limit(1).maybeSingle();
+      const merged = { ...(prev?.state ?? {}), ...patch };
+      await db.from("home_readings").insert({ device_id: id, source: "command", state: merged }).catch(() => null);
+    }
     return { ok: true, command_id: row.id };
   } catch (err) {
     await finish("failed", { error: String((err as Error).message ?? err) });
