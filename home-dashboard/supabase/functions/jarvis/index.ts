@@ -3,8 +3,9 @@
 //
 // Auth: header x-home-key (checked against home_config.api_key_sha256).
 // Secret: ANTHROPIC_API_KEY (console.anthropic.com, API keys). Optional JARVIS_MODEL.
+// Secret: CARTESIA_API_KEY (cartesia.ai, API keys). Optional CARTESIA_VOICE_ID.
 //
-//   POST /jarvis {"text":"movie mode"}            -> {"reply":"Movie mode is on.","did":[...]}
+//   POST /jarvis {"text":"movie mode"}            -> {"reply":"Movie mode is on.","did":[...],"audio":"base64..."}
 //   POST /jarvis {"text":"...","history":[...]}   history: earlier {role, content} turns, for follow ups
 //   GET  /jarvis?text=movie%20mode                 same, handy for a quick test
 //
@@ -19,6 +20,41 @@ const db = createClient(URL_BASE, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const MODEL = Deno.env.get("JARVIS_MODEL") ?? "claude-haiku-5-5";
 const TZ = "America/New_York";
 const MAX_TURNS = 4;
+
+// Cartesia Sonic TTS — "British Butler" voice: warm, authoritative, Jarvis-like.
+const CARTESIA_VOICE = Deno.env.get("CARTESIA_VOICE_ID") ?? "a0e99841-438c-4a64-b679-ae501e7d6091";
+
+async function speak(text: string): Promise<string | null> {
+  const key = Deno.env.get("CARTESIA_API_KEY");
+  if (!key) return null; // fall back to browser speech if no key
+  try {
+    const r = await fetch("https://api.cartesia.ai/tts/bytes", {
+      method: "POST",
+      headers: {
+        "X-API-Key": key,
+        "Cartesia-Version": "2024-06-10",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model_id: "sonic",
+        transcript: text,
+        voice: { mode: "id", id: CARTESIA_VOICE },
+        output_format: { container: "mp3", sample_rate: 24000, encoding: "mp3" },
+        language: "en",
+      }),
+    });
+    if (!r.ok) { console.error(`Cartesia ${r.status}: ${await r.text().catch(() => "")}`); return null; }
+    const buf = await r.arrayBuffer();
+    // base64-encode for inline JSON delivery
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  } catch (err) {
+    console.error("Cartesia TTS failed:", err);
+    return null;
+  }
+}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -261,7 +297,9 @@ Deno.serve(async (req) => {
     const text = String(body.text ?? url.searchParams.get("text") ?? "").trim().slice(0, 500);
     if (!text) return json({ error: "say something: POST {\"text\":\"...\"}" }, 400);
     const out = await ask(text, Array.isArray(body.history) ? body.history : [], key!);
-    return json({ text, ...out });
+    // Synthesize voice reply with Cartesia TTS (non-blocking failure: falls back to browser speech)
+    const audio = await speak(out.reply);
+    return json({ text, ...out, ...(audio ? { audio } : {}) });
   } catch (err) {
     const msg = String((err as Error).message ?? err);
     return json({ error: msg, reply: /ANTHROPIC_API_KEY/.test(msg) ? "My Claude key isn't set up yet." : "Sorry, something went wrong on my end." }, 502);

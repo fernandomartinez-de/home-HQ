@@ -13,6 +13,7 @@ type Turn = { role: "user" | "assistant"; content: string };
 const FOLLOW_UP_MS = 2 * 60_000; // a request within 2 minutes can refer back ("now make them red")
 
 // A British voice if the device has one, for the Jarvis feel; otherwise the default English voice.
+// Used as fallback when the Cartesia audio isn't available.
 function pickVoice() {
   if (typeof window === "undefined" || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
@@ -21,7 +22,7 @@ function pickVoice() {
     ?? voices.find((v) => /^en/i.test(v.lang)) ?? null;
 }
 
-function speak(text: string) {
+function speakBrowserFallback(text: string) {
   try {
     const synth = window.speechSynthesis;
     if (!synth) return;
@@ -32,6 +33,24 @@ function speak(text: string) {
     u.rate = 1.02;
     synth.speak(u);
   } catch { /* speech is a nicety */ }
+}
+
+// Play Cartesia TTS audio (base64 MP3), or fall back to browser speech.
+let currentAudio: HTMLAudioElement | null = null;
+function speak(text: string, audioBase64?: string) {
+  // Stop any playing audio
+  try { currentAudio?.pause(); currentAudio = null; } catch { /* fine */ }
+  try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
+
+  if (audioBase64) {
+    try {
+      const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
+      currentAudio = audio;
+      audio.play().catch(() => speakBrowserFallback(text));
+      return;
+    } catch { /* fall through to browser */ }
+  }
+  speakBrowserFallback(text);
 }
 
 export default function Jarvis({ onDone }: { onDone?: () => void }) {
@@ -52,6 +71,7 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
 
   const close = () => {
     try { rec.current?.abort(); } catch { /* already stopped */ }
+    try { currentAudio?.pause(); currentAudio = null; } catch { /* fine */ }
     window.speechSynthesis?.cancel();
     setOpen(false);
     setPhase("idle");
@@ -73,7 +93,7 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
       const answer = String(body.reply ?? body.error ?? "Sorry, I didn't catch that.");
       setReply(answer);
       setPhase(r.ok ? "reply" : "error");
-      speak(answer);
+      speak(answer, body.audio);
       history.current = { turns: [...h, { role: "user" as const, content: said }, { role: "assistant" as const, content: answer }].slice(-6), at: Date.now() };
       if (r.ok && Array.isArray(body.did) && body.did.length) setTimeout(() => onDone?.(), 2500);
     } catch (e) {
