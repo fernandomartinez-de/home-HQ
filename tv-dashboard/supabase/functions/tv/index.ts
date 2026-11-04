@@ -131,10 +131,6 @@ async function lastState(id: string) {
   return (data?.state ?? {}) as Record<string, unknown>;
 }
 
-// A Bot the TV heard: add it the first time (named later in Supabase), then store its state. In
-// press mode the Bot can't know if the appliance is on, so power carries over from the last reading,
-// until the appliance's own timer would have turned it off (auto_off_min, carried in the readings;
-// the towel warmer shuts itself off after 2 hours).
 // Govee lights the TV hears, kept in tv_config.config.ble_govee (mac: {name, rssi, t}) so one can be
 // picked and added as a light (provider govee, provider_ref {mac, via: "tv", model}).
 async function goveeHeard(list: any[]) {
@@ -150,6 +146,10 @@ async function goveeHeard(list: any[]) {
   await db.from("tv_config").update({ config: { ...config, ble_govee: seen } }).eq("id", 1);
 }
 
+// A Bot the TV heard: add it the first time (named later in Supabase), then store its state. In
+// press mode the Bot can't know if the appliance is on, so power carries over from the last reading,
+// until the appliance's own timer would have turned it off (auto_off_min, carried in the readings;
+// the towel warmer shuts itself off after 2 hours).
 async function botHeard(b: any) {
   if (typeof b?.mac !== "string" || !/^[0-9A-Fa-f:]{17}$/.test(b.mac)) return;
   const id = botId(b.mac);
