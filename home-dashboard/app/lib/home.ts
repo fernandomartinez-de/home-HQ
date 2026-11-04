@@ -85,6 +85,13 @@ export async function runRoutine(name: string) {
   return call("schedules", { method: "POST", body: JSON.stringify({ action: "routine", name, background: true }) });
 }
 
+// ---------- Jarvis ----------
+
+export async function askJarvis(text: string, history: { role: string; content: string }[]) {
+  if (useMock()) return { text, reply: `Sample mode: I heard "${text}".`, did: [] };
+  return call("jarvis", { method: "POST", body: JSON.stringify({ text, history }) });
+}
+
 // ---------- Ring ----------
 
 export async function ringLogin(email: string, password: string, code?: string) {

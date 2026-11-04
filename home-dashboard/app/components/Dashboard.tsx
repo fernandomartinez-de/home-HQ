@@ -7,6 +7,7 @@ import {
   AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, Sunset, Coffee, CalendarClock, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, Cell, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
+import Jarvis from "./Jarvis";
 import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, SmartLock, TV } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
@@ -2901,6 +2902,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
               </div>
             )}
           </div>
+          <Jarvis onDone={refresh} />
           <button onClick={refresh} disabled={refreshing} aria-label="Refresh now"
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 active:scale-95">
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
