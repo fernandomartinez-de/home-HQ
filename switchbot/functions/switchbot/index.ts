@@ -16,7 +16,8 @@
 // commands are queued for the TV with a "ble" part; see the tv function and the TV app's BotRelay.
 //
 // A Bot in press mode only taps its button, so SwitchBot can't say whether the appliance is on.
-// For those, power is what the dashboard last asked for, carried from reading to reading.
+// For those, power is what the dashboard last asked for, carried from reading to reading. Once a Bot
+// is linked to a SwitchBot Hub, the poll moves it from the TV relay to the cloud on its own (same id).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -80,27 +81,46 @@ const isBot = (d: Dev) => /^bot$/i.test(d.deviceType);
 const hubless = (d: Dev) => !d.hubDeviceId || /^0+$/.test(d.hubDeviceId);
 const macOf = (d: Dev) => d.deviceId.replace(/[^0-9A-Fa-f]/g, "").toUpperCase().match(/.{2}/g)?.join(":") ?? "";
 
-async function lastPower(id: string): Promise<boolean | null> {
+async function lastState(id: string): Promise<Record<string, any>> {
   const { data } = await db.from("home_readings").select("state").eq("device_id", id)
     .order("recorded_at", { ascending: false }).limit(1).maybeSingle();
-  const p = data?.state?.power;
-  return typeof p === "boolean" ? p : null;
+  return (data?.state ?? {}) as Record<string, any>;
+}
+
+// In press mode the Bot can't tell if the appliance is on, so power is what Home HQ last asked for,
+// until the appliance's own timer (auto_off_min, carried in the readings; the towel warmer's 2 hours)
+// would have turned it off.
+function trackedPower(last: Record<string, any>): boolean | null {
+  if (typeof last.power !== "boolean") return null;
+  if (last.power && last.auto_off_min && last.on_since && Date.now() - Date.parse(last.on_since) >= (last.auto_off_min - 1) * 60_000) return false;
+  return last.power;
+}
+
+async function lastPower(id: string): Promise<boolean | null> {
+  return trackedPower(await lastState(id));
 }
 
 async function state(d: Dev) {
   try {
     const s = await sb(`/devices/${d.deviceId}/status`);
     const press = isBot(d) && s.deviceMode === "pressMode";
+    const last = await lastState(deviceId(d));
+    const power = press ? trackedPower(last) : s.power === "on";
     return {
       online: true,
-      power: press ? await lastPower(deviceId(d)) : s.power === "on",
+      power,
+      on_since: press && power ? last.on_since ?? null : null,
+      auto_off_min: last.auto_off_min ?? null,
       mode: s.deviceMode ?? null,
       battery: typeof s.battery === "number" ? s.battery : null,
       watts: typeof s.weight === "number" ? s.weight : typeof s.power === "number" ? s.power : null,
       brightness: null, color: null, color_temp_k: null,
     };
   } catch (err) {
-    return { online: false, power: await lastPower(deviceId(d)), brightness: null, color: null, color_temp_k: null, error: String((err as Error).message ?? err) };
+    const last = await lastState(deviceId(d));
+    const power = trackedPower(last);
+    return { online: false, power, on_since: power ? last.on_since ?? null : null, auto_off_min: last.auto_off_min ?? null,
+      brightness: null, color: null, color_temp_k: null, error: String((err as Error).message ?? err) };
   }
 }
 
@@ -131,7 +151,7 @@ async function poll() {
       continue;
     }
     const { error: e1 } = await db.from("home_devices").upsert({
-      id, kind: "switch", provider: "switchbot", name: d.deviceName,
+      id, kind: "switch", provider: "switchbot", name: d.deviceName.trim(),
       provider_ref: { device: d.deviceId, type: d.deviceType, hub: d.hubDeviceId ?? null }, capabilities: capabilities(d),
       updated_at: new Date().toISOString(),
     });
@@ -202,7 +222,8 @@ async function command(id: string, cmd: any, source = "ui") {
         res = await send(cmd.on ? "turnOn" : "turnOff");
       }
       if (s?.deviceMode === "pressMode") {
-        await db.from("home_readings").insert({ device_id: id, source: "command", state: { ...(await state(d)), power: !!cmd.on } });
+        await db.from("home_readings").insert({ device_id: id, source: "command",
+          state: { ...(await state(d)), power: !!cmd.on, on_since: cmd.on ? new Date().toISOString() : null } });
       }
     } else if (cmd?.action === "press") {
       if (!isBot(d)) throw new Error("press is for a Bot");
