@@ -81,7 +81,10 @@ export type MeterState = {
 export type Meter = Base & { kind: "meter"; state: MeterState | null; capabilities: { live?: boolean; cost_by_day?: boolean } };
 // A plug, relay or SwitchBot Bot: on and off only. Shaped like a light so it can share the light tile.
 export type Switch = Base & { kind: "switch"; state: (LightState & { mode?: string | null; battery?: number | null; watts?: number | null }) | null; capabilities: LightCaps & { press?: boolean; type?: string } };
-export type Device = Light | Heater | AC | TV | Camera | Meter | Switch;
+// A smart lock (the front door, through the SwitchBot hub).
+export type LockState = { online?: boolean; locked: boolean | null; lock_state: string | null; door: string | null; battery: number | null };
+export type SmartLock = Base & { kind: "lock"; state: LockState | null; capabilities: { lock?: boolean; unlock?: boolean; door?: boolean; battery?: boolean } };
+export type Device = Light | Heater | AC | TV | Camera | Meter | Switch | SmartLock;
 
 // One command from the home_commands log, newest first.
 export type Activity = {
@@ -126,7 +129,8 @@ export type Command =
   | { action: "back" }
   | { action: "sleep" }
   | { action: "volume"; dir: "up" | "down" | "mute" }
-  | { action: "set_mode"; mode: string };
+  | { action: "lock" }
+  | { action: "unlock" };
 
 export type ScheduleBlock = {
   id?: number;

@@ -42,6 +42,9 @@ let devices: Device[] = [
   { id: "switchbot_towel", kind: "switch", provider: "switchbot", name: "Towel Warmer", room: "Bathroom", enabled: true, recorded_at: now(),
     state: { online: true, power: true, brightness: null, color: null, color_temp_k: null, mode: "pressMode", battery: 92 },
     capabilities: { power: true, color: false, brightness: null, color_temp_k: null, press: true, type: "Bot" } } as Device,
+  { id: "switchbot_lock", kind: "lock", provider: "switchbot", name: "Front Door", room: "Entry", enabled: true, recorded_at: now(),
+    state: { online: true, locked: true, lock_state: "locked", door: "closed", battery: 64 },
+    capabilities: { lock: true, unlock: true, door: true, battery: true } } as Device,
 ];
 
 // A sample Con Edison meter shaped like a real account: a cycle that just started (no cost so far or

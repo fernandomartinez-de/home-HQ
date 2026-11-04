@@ -10,6 +10,7 @@
 //   POST /switchbot {"action":"command","device_id":"switchbot_<id>","command":{...}}
 //        commands: {"action":"power","on":true}
 //                  {"action":"press"}                         (Bot only)
+//                  {"action":"lock"} {"action":"unlock"}       (a Smart Lock, through the hub)
 //   POST /switchbot {"action":"list"}   every device and remote on the account, supported or not
 //
 // Bots with no hub: the TV app stands in for the hub over Bluetooth (provider_ref.via "tv"). Their
@@ -69,8 +70,9 @@ async function sb(path: string, body?: unknown) {
 
 type Dev = { deviceId: string; deviceName: string; deviceType: string; hubDeviceId?: string; enableCloudService?: boolean };
 
-// Devices that switch something on and off.
-const SUPPORTED = /^(Bot|Plug|Plug Mini.*|Relay Switch.*)$/i;
+// Devices that switch something on and off, and smart locks.
+const SUPPORTED = /^(Bot|Plug|Plug Mini.*|Relay Switch.*|Smart Lock.*)$/i;
+const isLock = (d: Dev) => /^smart lock/i.test(d.deviceType);
 const devices = async (): Promise<Dev[]> =>
   ((await sb("/devices")).deviceList ?? []).filter((d: Dev) => SUPPORTED.test(d.deviceType));
 
@@ -98,6 +100,22 @@ function trackedPower(last: Record<string, any>): boolean | null {
 
 async function lastPower(id: string): Promise<boolean | null> {
   return trackedPower(await lastState(id));
+}
+
+async function lockState(d: Dev) {
+  try {
+    const s = await sb(`/devices/${d.deviceId}/status`);
+    return {
+      online: true,
+      locked: s.lockState === "locked" ? true : s.lockState === "unlocked" ? false : null,
+      lock_state: s.lockState ?? null,          // locked, unlocked, jammed
+      door: s.doorState ?? null,                // open, closed (when the door sensor is calibrated)
+      battery: typeof s.battery === "number" ? s.battery : null,
+    };
+  } catch (err) {
+    const last = await lastState(deviceId(d));
+    return { ...last, online: false, error: String((err as Error).message ?? err) };
+  }
 }
 
 async function state(d: Dev) {
@@ -138,6 +156,21 @@ async function poll() {
   const out = [];
   for (const d of await devices()) {
     const id = deviceId(d);
+    if (isLock(d)) {
+      if (hubless(d)) continue; // a lock needs the hub; there's no TV relay for it
+      // Named "Front Door" in Home HQ the first time; a name or room set later is kept.
+      await db.from("home_devices").upsert({
+        id, kind: "lock", provider: "switchbot", name: "Front Door", room: "Entry",
+        provider_ref: { device: d.deviceId, type: d.deviceType, hub: d.hubDeviceId ?? null },
+        capabilities: { lock: true, unlock: true, door: true, battery: true },
+      }, { onConflict: "id", ignoreDuplicates: true });
+      await db.from("home_devices").update({ updated_at: new Date().toISOString() }).eq("id", id);
+      const s = await lockState(d);
+      const { error } = await db.from("home_readings").insert({ device_id: id, source: "poll", state: s });
+      if (error) throw error;
+      out.push({ id, state: s });
+      continue;
+    }
     if (hubless(d)) {
       // Hand it to the TV relay: same id the TV uses, its name from the SwitchBot app. The TV reports its state.
       if (!isBot(d)) continue;
@@ -212,6 +245,15 @@ async function command(id: string, cmd: any, source = "ui") {
     if (!d) throw new Error(`device ${id} not found on the SwitchBot account`);
     const send = (command: string) => sb(`/devices/${d.deviceId}/commands`, { command, parameter: "default", commandType: "command" });
     let res;
+    if (isLock(d)) {
+      if (cmd?.action !== "lock" && cmd?.action !== "unlock") throw new Error("a lock takes lock or unlock");
+      res = await send(cmd.action);
+      // The lock takes a few seconds to turn; read it back so the dashboard shows the real result.
+      await sleep(4000);
+      await db.from("home_readings").insert({ device_id: id, source: "command", state: await lockState(d) });
+      await finish("done", { switchbot: res ?? null });
+      return { ok: true, command_id: row.id };
+    }
     if (cmd?.action === "power") {
       const s = isBot(d) ? await sb(`/devices/${d.deviceId}/status`) : null;
       // A Bot in press mode can only tap; tap only when it changes what the dashboard thinks is on.

@@ -7,7 +7,7 @@ import {
   AlertTriangle, WifiOff, Video, Lock, LockOpen, DoorClosed, Fan, ChartColumn, Lightbulb, Calendar as CalendarIcon, RefreshCw, Plug, Home as HomeIcon, Undo2, Volume1, Volume2, VolumeX, Footprints, ZoomIn, ZoomOut, UserRound, BellRing, LogOut, ExternalLink, TowelRack, Bath, Sunset, Coffee, CalendarClock, type LucideIcon,
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, Cell, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts";
-import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, TV } from "@/lib/types";
+import type { Activity as ActivityItem, Analytics, Camera, CameraEvent, Command, Device, Heater, HomeData, Light, Meter, Schedule, SmartLock, TV } from "@/lib/types";
 import { ScheduleEditor } from "./HeaterSchedule";
 
 const POLL_MS = 30_000;
@@ -1307,6 +1307,64 @@ function LockPanelSample() {
   );
 }
 
+// The real front door lock: state, door and battery, with Lock and Unlock (unlock asks first).
+function lockText(l: SmartLock) {
+  const st = l.state;
+  if (!st || st.online === false) return { label: "Offline", tone: "slate" as const };
+  if (st.lock_state === "jammed") return { label: "Jammed", tone: "amber" as const };
+  if (st.locked === true) return { label: "Locked", tone: "green" as const };
+  if (st.locked === false) return { label: "Unlocked", tone: "amber" as const };
+  return { label: "Unknown", tone: "slate" as const };
+}
+function useLockActions(lock: SmartLock, send: Send) {
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => { if (!confirm) return; const t = setTimeout(() => setConfirm(false), 4000); return () => clearTimeout(t); }, [confirm]);
+  const doLock = () => { setConfirm(false); send(lock, { action: "lock" }, { locked: true, lock_state: "locked" }); };
+  const doUnlock = () => { if (!confirm) { setConfirm(true); return; } setConfirm(false); send(lock, { action: "unlock" }, { locked: false, lock_state: "unlocked" }); };
+  return { confirm, doLock, doUnlock };
+}
+function LockRow({ lock, send, noButton }: { lock: SmartLock; send: Send; noButton?: boolean }) {
+  const { label, tone } = lockText(lock);
+  const { confirm, doLock, doUnlock } = useLockActions(lock, send);
+  const st = lock.state;
+  const box = tone === "green" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+    : tone === "amber" ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-white/5 border-white/10 text-slate-400";
+  const door = st?.door ? `Door ${st.door}` : "Door unknown";
+  const Icon = st?.locked === false ? LockOpen : Lock;
+  return (
+    <div className="flex items-center gap-3">
+      <span className={`w-12 h-12 shrink-0 rounded-2xl border flex items-center justify-center ${box}`}><Icon className="w-5 h-5" /></span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[17px] font-bold text-white leading-tight">{label}</span>
+        <span className="block text-[11px] text-slate-400 truncate">{lock.name} • {door}</span>
+      </span>
+      <span className="flex flex-col items-end gap-1.5 shrink-0">
+        {typeof st?.battery === "number" && <span className={`text-[10px] font-mono ${st.battery <= 20 ? "text-amber-400" : "text-slate-400"}`}>BATTERY {st.battery}%</span>}
+        {!noButton && (st?.locked === false
+          ? <button onClick={doLock} className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl bg-emerald-500 text-slate-950 text-[12px] font-bold"><Lock className="w-4 h-4" />Lock</button>
+          : <button onClick={doUnlock} disabled={st?.online === false} className={`flex items-center gap-1.5 px-3.5 h-10 rounded-xl border text-[12px] font-semibold disabled:opacity-40 ${confirm ? "bg-amber-500/20 border-amber-500/50 text-amber-200" : "bg-white/5 border-white/10 text-slate-200"}`}><LockOpen className="w-4 h-4 text-violet-400" />{confirm ? "Tap to confirm" : "Unlock"}</button>)}
+      </span>
+    </div>
+  );
+}
+function LockPanel({ lock, send }: { lock: SmartLock; send: Send }) {
+  const { confirm, doLock, doUnlock } = useLockActions(lock, send);
+  const st = lock.state;
+  const off = st?.online === false;
+  return (
+    <>
+      <LockRow lock={lock} send={send} noButton />
+      <div className="grid grid-cols-2 gap-1.5">
+        <button onClick={doLock} disabled={off} className={`h-11 rounded-xl text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-40 ${st?.locked === true ? "bg-emerald-500 text-slate-950" : "bg-white/5 border border-white/10 text-slate-200"}`}><Lock className="w-4 h-4" />Lock</button>
+        <button onClick={doUnlock} disabled={off} className={`h-11 rounded-xl text-[12px] font-semibold flex items-center justify-center gap-1.5 border disabled:opacity-40 ${confirm ? "bg-amber-500/20 border-amber-500/50 text-amber-200" : st?.locked === false ? "bg-amber-500/15 border-amber-500/40 text-amber-200" : "bg-white/5 border-white/10 text-slate-200"}`}><LockOpen className="w-4 h-4 text-violet-400" />{confirm ? "Tap again to unlock" : "Unlock"}</button>
+      </div>
+      <span className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+        <span>{st?.lock_state === "jammed" ? "The bolt is jammed, check the door" : "SwitchBot • through the Hub Mini"}</span><span className="font-mono text-slate-500">{st?.door ? `DOOR ${st.door.toUpperCase()}` : ""}</span>
+      </span>
+    </>
+  );
+}
+
 /** Little bouncing bars while the TV is playing. */
 function Equalizer() {
   return (
@@ -2221,6 +2279,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
   const kitchenSwitches = switches.filter((d) => (d.room ?? "").toLowerCase().startsWith("kitchen"));
   const bathSwitches = switches.filter((d) => !kitchenSwitches.includes(d));
   const tv = data.devices.find((d): d is TV => d.kind === "tv");
+  const lock = data.devices.find((d): d is SmartLock => d.kind === "lock");
   const cams = data.devices.filter((d): d is Camera => d.kind === "camera");
   const meter = data.devices.find((d): d is Meter => d.kind === "meter");
   const disconnectConed = async () => {
@@ -2492,7 +2551,7 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
           {cam ? <RingFeed key={cam.id} cam={cam} /> : <Preview className="flex-1 min-h-0" corner="tr"><CamStandIn /></Preview>}
           {/* The lock row is its own positioned box so its "not connected" tag sits on the row, not on the camera. */}
           <div className="relative mt-1 pt-3 border-t border-white/10">
-            <Preview corner="tr" label="LOCK • NOT CONNECTED"><LockSample /></Preview>
+            {lock ? <LockRow lock={lock} send={send} /> : <Preview corner="tr" label="LOCK • NOT CONNECTED"><LockSample /></Preview>}
           </div>
         </div>
         <div className={`${PANEL} p-3.5 flex flex-col gap-2.5 shrink-0`}>
@@ -2710,8 +2769,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 flex flex-col gap-3 shrink-0`}>
-          <PanelHead icon={DoorClosed} tone={GREEN} title="Front Door Lock" sub="Smart lock" />
-          <Preview corner="tr"><LockPanelSample /></Preview>
+          <PanelHead icon={DoorClosed} tone={GREEN} title="Front Door Lock" sub={lock ? "SwitchBot Lock Ultra" : "Smart lock"} />
+          {lock ? <LockPanel lock={lock} send={send} /> : <Preview corner="tr"><LockPanelSample /></Preview>}
         </div>
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub="Same modes as the Ring app" />
@@ -2749,8 +2808,8 @@ export default function Dashboard({ initial, initialError }: { initial: HomeData
       </div>
       <div className="lg:col-span-4 flex flex-col gap-3 min-h-0">
         <div className={`${PANEL} p-4 flex flex-col gap-3 shrink-0`}>
-          <PanelHead icon={DoorClosed} tone={GREEN} title="Front Door Lock" sub="Smart lock" />
-          <Preview corner="tr"><LockPanelSample /></Preview>
+          <PanelHead icon={DoorClosed} tone={GREEN} title="Front Door Lock" sub={lock ? "SwitchBot Lock Ultra" : "Smart lock"} />
+          {lock ? <LockPanel lock={lock} send={send} /> : <Preview corner="tr"><LockPanelSample /></Preview>}
         </div>
         <div className={`${PANEL} p-4 space-y-3`}>
           <PanelHead icon={ShieldCheck} tone={GREEN} title="Ring Mode" sub={cam.state?.mode && MODE_LABEL[cam.state.mode] ? "Same modes as the Ring app" : "Turn on Modes in the Ring app to use these"} />
