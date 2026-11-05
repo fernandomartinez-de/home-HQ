@@ -414,7 +414,7 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
           style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            background: "rgba(2, 6, 23, 0.92)",
+            background: "rgba(2, 6, 23, 0.78)",
             backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
             cursor: "pointer",
             animation: "jarvis-fade-in 0.3s ease-out",
