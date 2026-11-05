@@ -1,144 +1,222 @@
 "use client";
 
 // Jarvis: tap the arc reactor, speak, and Jarvis does it and answers out loud.
-// The reactor starts small in the header; on tap it expands into a centered floating
-// orb with animated concentric rings, a breathing core, and phase-driven visuals.
+// The reactor starts small in the header; on tap it expands into a fullscreen
+// 3D wireframe sphere — nodes connected by lines, glowing core, slow rotation.
 // Everything is voice-in, voice-out — no dialog, no text.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /* ------------------------------------------------------------------ */
-/*  Arc Reactor SVG                                                    */
+/*  Small idle icon — flat SVG for the header button                   */
 /* ------------------------------------------------------------------ */
 
-function ArcReactor({ size = 20, phase = "idle" }: { size?: number; phase?: string }) {
-  const active = phase === "listening" || phase === "reply";
-  const thinking = phase === "thinking";
-  const expanded = phase !== "idle";
-  // More ring segments when expanded for detail
-  const segments = expanded ? 12 : 6;
-  const segAngle = 360 / segments;
-
+function ArcReactorMini({ size = 18 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ overflow: "visible" }}
-    >
-      <defs>
-        <radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#c4b5fd" stopOpacity={active || thinking ? "1" : "0.6"} />
-          <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
-        </radialGradient>
-        <filter id="blur-glow">
-          <feGaussianBlur stdDeviation={expanded ? "4" : "2"} />
-        </filter>
-      </defs>
-
-      {/* ambient glow behind everything */}
-      {expanded && (
-        <circle cx="50" cy="50" r="48" fill="url(#core-glow)" opacity="0.35" filter="url(#blur-glow)" />
-      )}
-
-      {/* outermost dashed ring — slow counter-rotate */}
-      {expanded && (
-        <circle
-          cx="50" cy="50" r="46"
-          fill="none"
-          stroke="rgba(167,139,250,0.2)"
-          strokeWidth="0.5"
-          strokeDasharray="4 8"
-          className="jarvis-ring-ccw"
-        />
-      )}
-
-      {/* outer ring */}
-      <circle
-        cx="50" cy="50" r={expanded ? 42 : 40}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={expanded ? "1" : "1.5"}
-        opacity={active ? "0.7" : "0.4"}
-        className={active ? "jarvis-ring-outer-lg" : ""}
-      />
-
-      {/* segment tick marks */}
-      {Array.from({ length: segments }).map((_, i) => {
-        const deg = i * segAngle;
-        return (
-          <line
-            key={deg}
-            x1="50" y1={expanded ? "10" : "12"}
-            x2="50" y2={expanded ? "16" : "17"}
-            stroke="currentColor"
-            strokeWidth={expanded ? "0.8" : "1"}
-            opacity={active ? "0.7" : "0.4"}
-            transform={`rotate(${deg} 50 50)`}
-          />
-        );
-      })}
-
-      {/* middle ring */}
-      <circle
-        cx="50" cy="50" r={expanded ? 30 : 28}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={expanded ? "0.8" : "1.2"}
-        opacity="0.5"
-        className={thinking ? "jarvis-ring-think" : ""}
-      />
-
-      {/* inner dashed ring — visible when expanded */}
-      {expanded && (
-        <circle
-          cx="50" cy="50" r="22"
-          fill="none"
-          stroke="rgba(167,139,250,0.3)"
-          strokeWidth="0.6"
-          strokeDasharray="3 6"
-          className="jarvis-ring-cw"
-        />
-      )}
-
-      {/* inner ring */}
-      <circle
-        cx="50" cy="50" r={expanded ? 16 : 17}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={expanded ? "0.8" : "1"}
-        opacity="0.7"
-      />
-
-      {/* core glow */}
-      <circle
-        cx="50" cy="50"
-        r={expanded ? 10 : 9}
-        fill={active || thinking ? "rgba(167,139,250,0.85)" : "rgba(167,139,250,0.45)"}
-        className={active ? "jarvis-core-glow" : thinking ? "jarvis-core-think" : ""}
-      />
-
-      {/* bright center */}
-      <circle
-        cx="50" cy="50"
-        r={expanded ? 5 : 4.5}
-        fill="white"
-        opacity={active || thinking ? "0.95" : "0.55"}
-      />
-
-      {/* tiny center pip */}
-      {expanded && (
-        <circle cx="50" cy="50" r="2" fill="rgba(167,139,250,1)" opacity="0.9" />
-      )}
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
+      <circle cx="16" cy="16" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.7" />
+      {[0, 60, 120, 180, 240, 300].map((deg) => (
+        <line key={deg} x1="16" y1="4.5" x2="16" y2="6.5" stroke="currentColor" strokeWidth="1" opacity="0.5"
+          transform={`rotate(${deg} 16 16)`} />
+      ))}
+      <circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.8" />
+      <circle cx="16" cy="16" r="3" fill="rgba(167,139,250,0.5)" />
+      <circle cx="16" cy="16" r="1.5" fill="white" opacity="0.6" />
     </svg>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Phase label shown below the expanded orb                           */
+/*  3D wireframe sphere — canvas-based                                 */
+/* ------------------------------------------------------------------ */
+
+// Fibonacci sphere: distribute N points evenly on a sphere surface.
+function fibSphere(n: number): [number, number, number][] {
+  const pts: [number, number, number][] = [];
+  const golden = (1 + Math.sqrt(5)) / 2;
+  for (let i = 0; i < n; i++) {
+    const theta = Math.acos(1 - (2 * (i + 0.5)) / n);
+    const phi = (2 * Math.PI * i) / golden;
+    pts.push([Math.sin(theta) * Math.cos(phi), Math.sin(theta) * Math.sin(phi), Math.cos(theta)]);
+  }
+  return pts;
+}
+
+// Pre-compute which pairs of points are close enough to draw a line.
+function buildEdges(pts: [number, number, number][], threshold: number): [number, number][] {
+  const edges: [number, number][] = [];
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const dx = pts[i][0] - pts[j][0];
+      const dy = pts[i][1] - pts[j][1];
+      const dz = pts[i][2] - pts[j][2];
+      if (dx * dx + dy * dy + dz * dz < threshold * threshold) {
+        edges.push([i, j]);
+      }
+    }
+  }
+  return edges;
+}
+
+const NUM_POINTS = 180;
+const EDGE_THRESHOLD = 0.55;
+const SPHERE_PTS = fibSphere(NUM_POINTS);
+const SPHERE_EDGES = buildEdges(SPHERE_PTS, EDGE_THRESHOLD);
+
+// Inner core sphere — fewer, tighter points
+const CORE_PTS = fibSphere(40);
+const CORE_EDGES = buildEdges(CORE_PTS, 0.75);
+
+interface SphereProps {
+  phase: string;
+}
+
+function WireframeSphere({ phase }: SphereProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef(0);
+  const angleRef = useRef({ x: 0, y: 0 });
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const radius = Math.min(w, h) * 0.42;
+    const coreRadius = radius * 0.32;
+
+    // Rotation speed varies by phase
+    const speed = phase === "thinking" ? 0.012 : phase === "listening" ? 0.004 : phase === "reply" ? 0.003 : 0.002;
+    angleRef.current.y += speed;
+    angleRef.current.x += speed * 0.3;
+
+    const ax = angleRef.current.x;
+    const ay = angleRef.current.y;
+    const cosX = Math.cos(ax), sinX = Math.sin(ax);
+    const cosY = Math.cos(ay), sinY = Math.sin(ay);
+
+    // Breathing pulse for listening
+    const t = Date.now() / 1000;
+    const breathe = phase === "listening" ? 1 + 0.04 * Math.sin(t * 2.5) : 1;
+    const coreBreathe = phase === "listening" ? 1 + 0.08 * Math.sin(t * 2.5) : phase === "reply" ? 1 + 0.03 * Math.sin(t * 1.5) : 1;
+
+    // Project a 3D point to 2D
+    const project = (p: [number, number, number], r: number): { x: number; y: number; z: number } => {
+      let [x, y, z] = p;
+      // Rotate Y
+      const x1 = x * cosY - z * sinY;
+      const z1 = x * sinY + z * cosY;
+      // Rotate X
+      const y1 = y * cosX - z1 * sinX;
+      const z2 = y * sinX + z1 * cosX;
+      return { x: cx + x1 * r * breathe, y: cy + y1 * r * breathe, z: z2 };
+    };
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Core glow — radial gradient
+    const glowIntensity = phase === "reply" ? 0.5 : phase === "listening" ? 0.3 + 0.1 * Math.sin(t * 2.5) : phase === "thinking" ? 0.35 : 0.15;
+    const glowR = radius * (phase === "reply" ? 0.7 : 0.5) * coreBreathe;
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+    glow.addColorStop(0, `rgba(167, 139, 250, ${glowIntensity})`);
+    glow.addColorStop(0.4, `rgba(139, 92, 246, ${glowIntensity * 0.5})`);
+    glow.addColorStop(1, "rgba(139, 92, 246, 0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+
+    // --- Outer sphere ---
+    const projected = SPHERE_PTS.map((p) => project(p, radius));
+
+    // Draw edges
+    for (const [i, j] of SPHERE_EDGES) {
+      const a = projected[i];
+      const b = projected[j];
+      // Depth-based opacity: front edges brighter, back edges dimmer
+      const avgZ = (a.z + b.z) / 2;
+      const depthAlpha = 0.08 + 0.22 * ((avgZ + 1) / 2);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = `rgba(167, 139, 250, ${depthAlpha})`;
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    }
+
+    // Draw nodes
+    for (const p of projected) {
+      const depthAlpha = 0.2 + 0.8 * ((p.z + 1) / 2);
+      const dotR = 1 + 0.8 * ((p.z + 1) / 2);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(196, 181, 253, ${depthAlpha})`;
+      ctx.fill();
+    }
+
+    // --- Inner core sphere ---
+    const coreProjected = CORE_PTS.map((p) => project(p, coreRadius * coreBreathe));
+
+    for (const [i, j] of CORE_EDGES) {
+      const a = coreProjected[i];
+      const b = coreProjected[j];
+      const avgZ = (a.z + b.z) / 2;
+      const depthAlpha = 0.15 + 0.45 * ((avgZ + 1) / 2);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = `rgba(221, 214, 254, ${depthAlpha})`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    for (const p of coreProjected) {
+      const depthAlpha = 0.3 + 0.7 * ((p.z + 1) / 2);
+      const dotR = 1.2 + 1.0 * ((p.z + 1) / 2);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(237, 233, 254, ${depthAlpha})`;
+      ctx.fill();
+    }
+
+    // Bright center point
+    const centerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius * 0.35 * coreBreathe);
+    centerGlow.addColorStop(0, `rgba(255, 255, 255, ${phase === "reply" ? 0.95 : 0.8})`);
+    centerGlow.addColorStop(0.3, `rgba(221, 214, 254, ${phase === "reply" ? 0.5 : 0.3})`);
+    centerGlow.addColorStop(1, "rgba(167, 139, 250, 0)");
+    ctx.fillStyle = centerGlow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, coreRadius * 0.35 * coreBreathe, 0, Math.PI * 2);
+    ctx.fill();
+
+    frameRef.current = requestAnimationFrame(draw);
+  }, [phase]);
+
+  useEffect(() => {
+    frameRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [draw]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: "min(80vw, 80vh)", height: "min(80vw, 80vh)" }}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Phase label                                                        */
 /* ------------------------------------------------------------------ */
 
 function PhaseLabel({ phase }: { phase: string }) {
@@ -151,7 +229,7 @@ function PhaseLabel({ phase }: { phase: string }) {
   const label = labels[phase];
   if (!label) return null;
   return (
-    <span className="text-[11px] font-medium tracking-widest uppercase text-violet-300/70 mt-3 select-none">
+    <span className="text-[11px] font-medium tracking-widest uppercase text-violet-300/70 mt-4 select-none">
       {label}
     </span>
   );
@@ -318,7 +396,7 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
 
   return (
     <>
-      {/* small header button — always rendered for layout, invisible when expanded */}
+      {/* small header button */}
       <button
         onClick={handleClick}
         aria-label="Talk to Jarvis"
@@ -326,34 +404,26 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
         className={`relative w-9 h-9 flex items-center justify-center rounded-full border active:scale-95 transition-all duration-300 disabled:opacity-40
           ${expanded ? "opacity-0 pointer-events-none" : "bg-white/5 border-white/10 text-violet-300"}`}
       >
-        <ArcReactor size={18} phase="idle" />
+        <ArcReactorMini size={18} />
       </button>
 
-      {/* expanded overlay — portaled to body, inline styles guarantee centering */}
+      {/* expanded overlay — portaled to body */}
       {expanded && createPortal(
         <div
           onClick={handleClick}
           style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(0,0,0,0.75)",
-            backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            background: "rgba(2, 6, 23, 0.92)",
+            backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
             cursor: "pointer",
+            animation: "jarvis-fade-in 0.3s ease-out",
           }}
-          className="jarvis-overlay"
         >
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
-            {/* outer pulse rings */}
-            <div className={`jarvis-pulse-ring ${phase === "listening" ? "jarvis-pulse-ring-active" : ""}`} />
-            <div className={`jarvis-pulse-ring jarvis-pulse-ring-delayed ${phase === "listening" ? "jarvis-pulse-ring-active" : ""}`} />
-
-            {/* the reactor itself */}
-            <div className={`jarvis-orb jarvis-orb-${phase}`}>
-              <ArcReactor size={360} phase={phase} />
-            </div>
-
-            <PhaseLabel phase={phase} />
+          <div style={{ animation: "jarvis-expand 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both" }}>
+            <WireframeSphere phase={phase} />
           </div>
+          <PhaseLabel phase={phase} />
         </div>,
         document.body
       )}
