@@ -1,44 +1,44 @@
-“use client”;
+"use client";
 
 // Jarvis: tap the arc reactor, speak, and Jarvis does it and answers out loud.
 // No dialog box — just the icon. It glows when listening, spins when thinking,
 // and pulses when replying. Everything is voice-in, voice-out.
 
-import { useEffect, useRef, useState } from “react”;
+import { useEffect, useRef, useState } from "react";
 
 // Arc reactor / orb icon — the Jarvis core. Concentric rings with a glowing center.
 function ArcReactor({ size = 20, active = false, thinking = false }: { size?: number; active?: boolean; thinking?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox=”0 0 32 32” fill=”none” xmlns=”http://www.w3.org/2000/svg”
-      className={thinking ? “jarvis-spin” : “”}>
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"
+      className={thinking ? "jarvis-spin" : ""}>
       {/* outer glow when active */}
-      {active && <circle cx=”16” cy=”16” r=”15” fill=”none” stroke=”rgba(167,139,250,0.3)” strokeWidth=”1” className=”jarvis-ring-outer” />}
+      {active && <circle cx="16" cy="16" r="15" fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1" className="jarvis-ring-outer" />}
       {/* outer ring */}
-      <circle cx=”16” cy=”16” r=”13” fill=”none” stroke=”currentColor” strokeWidth=”1.5” opacity=”0.5” />
+      <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
       {/* middle ring with notches */}
-      <circle cx=”16” cy=”16” r=”9.5” fill=”none” stroke=”currentColor” strokeWidth=”1.2” opacity=”0.7” />
+      <circle cx="16" cy="16" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.7" />
       {/* small accent lines radiating out (like the arc reactor segments) */}
       {[0, 60, 120, 180, 240, 300].map((deg) => (
-        <line key={deg} x1=”16” y1=”4.5” x2=”16” y2=”6.5” stroke=”currentColor” strokeWidth=”1” opacity=”0.5”
+        <line key={deg} x1="16" y1="4.5" x2="16" y2="6.5" stroke="currentColor" strokeWidth="1" opacity="0.5"
           transform={`rotate(${deg} 16 16)`} />
       ))}
       {/* inner ring */}
-      <circle cx=”16” cy=”16” r=”6” fill=”none” stroke=”currentColor” strokeWidth=”1” opacity=”0.8” />
+      <circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.8" />
       {/* glowing core — the bright center dot */}
-      <circle cx=”16” cy=”16” r=”3” fill={active || thinking ? “rgba(167,139,250,0.9)” : “rgba(167,139,250,0.5)”} className={active ? “jarvis-core-glow” : “”} />
-      <circle cx=”16” cy=”16” r=”1.5” fill=”white” opacity={active || thinking ? “0.95” : “0.6”} />
+      <circle cx="16" cy="16" r="3" fill={active || thinking ? "rgba(167,139,250,0.9)" : "rgba(167,139,250,0.5)"} className={active ? "jarvis-core-glow" : ""} />
+      <circle cx="16" cy="16" r="1.5" fill="white" opacity={active || thinking ? "0.95" : "0.6"} />
     </svg>
   );
 }
 
-type Phase = “idle” | “listening” | “thinking” | “reply” | “error”;
-type Turn = { role: “user” | “assistant”; content: string };
+type Phase = "idle" | "listening" | "thinking" | "reply" | "error";
+type Turn = { role: "user" | "assistant"; content: string };
 
 const FOLLOW_UP_MS = 2 * 60_000;
 
 // Browser speech fallback when Cartesia audio isn't available.
 function pickVoice() {
-  if (typeof window === “undefined” || !window.speechSynthesis) return null;
+  if (typeof window === "undefined" || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
   return voices.find((v) => /Daniel|Arthur|Oliver/i.test(v.name) && /en-GB/i.test(v.lang))
     ?? voices.find((v) => /en-GB/i.test(v.lang))
@@ -77,7 +77,7 @@ function speak(text: string, audioBase64?: string, onEnded?: () => void) {
 }
 
 export default function Jarvis({ onDone }: { onDone?: () => void }) {
-  const [phase, setPhase] = useState<Phase>(“idle”);
+  const [phase, setPhase] = useState<Phase>("idle");
   const [canListen, setCanListen] = useState(true);
   const rec = useRef<any>(null);
   const history = useRef<{ turns: Turn[]; at: number }>({ turns: [], at: 0 });
@@ -92,68 +92,68 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
     try { rec.current?.abort(); } catch { /* already stopped */ }
     try { currentAudio?.pause(); currentAudio = null; } catch { /* fine */ }
     window.speechSynthesis?.cancel();
-    setPhase(“idle”);
+    setPhase("idle");
   };
 
   const ask = async (text: string) => {
     const said = text.trim();
-    if (!said) { setPhase(“idle”); return; }
-    setPhase(“thinking”);
+    if (!said) { setPhase("idle"); return; }
+    setPhase("thinking");
     const h = Date.now() - history.current.at < FOLLOW_UP_MS ? history.current.turns : [];
     try {
-      const r = await fetch(“/api/jarvis”, {
-        method: “POST”,
-        headers: { “Content-Type”: “application/json” },
+      const r = await fetch("/api/jarvis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: said, history: h }),
       });
       const body = await r.json().catch(() => ({}));
-      const answer = String(body.reply ?? body.error ?? “Sorry, I didn't catch that.”);
-      setPhase(r.ok ? “reply” : “error”);
-      speak(answer, body.audio, () => setPhase(“idle”));
-      history.current = { turns: [...h, { role: “user” as const, content: said }, { role: “assistant” as const, content: answer }].slice(-6), at: Date.now() };
+      const answer = String(body.reply ?? body.error ?? "Sorry, I didn't catch that.");
+      setPhase(r.ok ? "reply" : "error");
+      speak(answer, body.audio, () => setPhase("idle"));
+      history.current = { turns: [...h, { role: "user" as const, content: said }, { role: "assistant" as const, content: answer }].slice(-6), at: Date.now() };
       if (r.ok && Array.isArray(body.did) && body.did.length) setTimeout(() => onDone?.(), 2500);
     } catch {
-      setPhase(“error”);
-      speak(“Sorry, I couldn't reach the house.”, undefined, () => setPhase(“idle”));
+      setPhase("error");
+      speak("Sorry, I couldn't reach the house.", undefined, () => setPhase("idle"));
     }
   };
 
   const startRecognition = () => {
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-    if (!SR) { setPhase(“idle”); return; }
+    if (!SR) { setPhase("idle"); return; }
     window.speechSynthesis?.cancel();
     const r = new SR();
-    r.lang = “en-US”;
+    r.lang = "en-US";
     r.interimResults = false;
     r.continuous = false;
-    let final = “”;
+    let final = "";
     r.onresult = (ev: any) => {
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
         if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
       }
     };
     r.onerror = (ev: any) => {
-      if (ev.error === “no-speech” || ev.error === “aborted”) { setPhase(“idle”); return; }
-      setPhase(“error”);
-      speak(ev.error === “not-allowed” ? “Allow the microphone in Safari settings.” : “Couldn't listen.”, undefined, () => setPhase(“idle”));
+      if (ev.error === "no-speech" || ev.error === "aborted") { setPhase("idle"); return; }
+      setPhase("error");
+      speak(ev.error === "not-allowed" ? "Allow the microphone in Safari settings." : "Couldn't listen.", undefined, () => setPhase("idle"));
     };
-    r.onend = () => { rec.current = null; if (final.trim()) ask(final); else setPhase(“idle”); };
+    r.onend = () => { rec.current = null; if (final.trim()) ask(final); else setPhase("idle"); };
     rec.current = r;
-    setPhase(“listening”);
-    try { r.start(); } catch { setPhase(“idle”); }
+    setPhase("listening");
+    try { r.start(); } catch { setPhase("idle"); }
   };
 
   const greet = async (then: () => void) => {
     try {
-      const r = await fetch(“/api/jarvis”, {
-        method: “POST”,
-        headers: { “Content-Type”: “application/json” },
+      const r = await fetch("/api/jarvis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ greet: true }),
       });
       const body = await r.json().catch(() => ({}));
-      const text = String(body.reply ?? “”);
+      const text = String(body.reply ?? "");
       if (text) {
-        setPhase(“reply”);
+        setPhase("reply");
         speak(text, body.audio, then);
         return;
       }
@@ -163,7 +163,7 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
 
   const activate = () => {
     // iPad Safari: prime speech with a silent utterance so Cartesia audio can play.
-    try { const u = new SpeechSynthesisUtterance(“ “); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* fine */ }
+    try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* fine */ }
 
     // Greet on first activation or after the follow-up window expires.
     if (!history.current.turns.length || Date.now() - history.current.at >= FOLLOW_UP_MS) {
@@ -174,21 +174,21 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
   };
 
   const handleClick = () => {
-    if (phase === “listening”) { rec.current?.stop(); return; }
-    if (phase === “thinking”) return; // wait for the answer
-    if (phase === “reply” || phase === “error”) { stop(); return; } // tap to dismiss
+    if (phase === "listening") { rec.current?.stop(); return; }
+    if (phase === "thinking") return; // wait for the answer
+    if (phase === "reply" || phase === "error") { stop(); return; } // tap to dismiss
     activate();
   };
 
-  const isActive = phase === “listening” || phase === “reply”;
+  const isActive = phase === "listening" || phase === "reply";
 
   return (
-    <button onClick={handleClick} aria-label=”Talk to Jarvis” disabled={!canListen && phase === “idle”}
+    <button onClick={handleClick} aria-label="Talk to Jarvis" disabled={!canListen && phase === "idle"}
       className={`relative w-9 h-9 flex items-center justify-center rounded-full border active:scale-95 transition-all disabled:opacity-40
-        ${isActive ? “bg-violet-500/30 border-violet-300/50 text-white jarvis-pulse” :
-          phase === “thinking” ? “bg-violet-500/20 border-violet-400/40 text-violet-200” :
-          “bg-white/5 border-white/10 text-violet-300”}`}>
-      <ArcReactor size={18} active={isActive} thinking={phase === “thinking”} />
+        ${isActive ? "bg-violet-500/30 border-violet-300/50 text-white jarvis-pulse" :
+          phase === "thinking" ? "bg-violet-500/20 border-violet-400/40 text-violet-200" :
+          "bg-white/5 border-white/10 text-violet-300"}`}>
+      <ArcReactor size={18} active={isActive} thinking={phase === "thinking"} />
     </button>
   );
 }
