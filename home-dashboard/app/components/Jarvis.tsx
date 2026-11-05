@@ -6,6 +6,7 @@
 // Everything is voice-in, voice-out — no dialog, no text.
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /* ------------------------------------------------------------------ */
 /*  Arc Reactor SVG                                                    */
@@ -328,8 +329,8 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
         <ArcReactor size={18} phase="idle" />
       </button>
 
-      {/* expanded overlay — the full reactor orb */}
-      {expanded && (
+      {/* expanded overlay — portaled to body so no parent transform traps it */}
+      {expanded && createPortal(
         <div className="jarvis-overlay" onClick={handleClick}>
           <div className="jarvis-orb-wrap">
             {/* outer pulse rings */}
@@ -343,7 +344,8 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
 
             <PhaseLabel phase={phase} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
