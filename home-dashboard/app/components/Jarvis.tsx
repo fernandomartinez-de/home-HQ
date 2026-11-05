@@ -329,10 +329,20 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
         <ArcReactor size={18} phase="idle" />
       </button>
 
-      {/* expanded overlay — portaled to body so no parent transform traps it */}
+      {/* expanded overlay — portaled to body, inline styles guarantee centering */}
       {expanded && createPortal(
-        <div className="jarvis-overlay" onClick={handleClick}>
-          <div className="jarvis-orb-wrap">
+        <div
+          onClick={handleClick}
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+            cursor: "pointer",
+          }}
+          className="jarvis-overlay"
+        >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
             {/* outer pulse rings */}
             <div className={`jarvis-pulse-ring ${phase === "listening" ? "jarvis-pulse-ring-active" : ""}`} />
             <div className={`jarvis-pulse-ring jarvis-pulse-ring-delayed ${phase === "listening" ? "jarvis-pulse-ring-active" : ""}`} />
