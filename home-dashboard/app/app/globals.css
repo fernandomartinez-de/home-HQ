@@ -560,16 +560,16 @@ main > :nth-child(3).panel-in, main > :nth-child(3) .panel-in { animation-delay:
 @keyframes jarvis-expand { from { transform: scale(0.15); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* Phase-specific orb styles */
-.jarvis-orb-listening { filter: drop-shadow(0 0 24px rgba(167, 139, 250, 0.5)); }
-.jarvis-orb-thinking  { filter: drop-shadow(0 0 16px rgba(139, 92, 246, 0.4)); }
-.jarvis-orb-reply     { filter: drop-shadow(0 0 30px rgba(167, 139, 250, 0.6)); }
-.jarvis-orb-error     { filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.4)); color: rgba(239, 68, 68, 0.7); }
+.jarvis-orb-listening { filter: drop-shadow(0 0 40px rgba(167, 139, 250, 0.5)); }
+.jarvis-orb-thinking  { filter: drop-shadow(0 0 30px rgba(139, 92, 246, 0.4)); }
+.jarvis-orb-reply     { filter: drop-shadow(0 0 50px rgba(167, 139, 250, 0.6)); }
+.jarvis-orb-error     { filter: drop-shadow(0 0 35px rgba(239, 68, 68, 0.4)); color: rgba(239, 68, 68, 0.7); }
 
 /* Expanding pulse rings behind the orb */
 .jarvis-pulse-ring {
   position: absolute; top: 50%; left: 50%;
-  width: 160px; height: 160px;
-  margin: -80px 0 0 -80px;
+  width: 420px; height: 420px;
+  margin: -210px 0 0 -210px;
   border-radius: 50%;
   border: 1px solid rgba(167, 139, 250, 0.15);
   z-index: 1; pointer-events: none;

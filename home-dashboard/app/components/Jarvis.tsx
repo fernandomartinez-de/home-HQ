@@ -349,7 +349,7 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
 
             {/* the reactor itself */}
             <div className={`jarvis-orb jarvis-orb-${phase}`}>
-              <ArcReactor size={120} phase={phase} />
+              <ArcReactor size={360} phase={phase} />
             </div>
 
             <PhaseLabel phase={phase} />
