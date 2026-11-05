@@ -1,42 +1,174 @@
 "use client";
 
 // Jarvis: tap the arc reactor, speak, and Jarvis does it and answers out loud.
-// No dialog box — just the icon. It glows when listening, spins when thinking,
-// and pulses when replying. Everything is voice-in, voice-out.
+// The reactor starts small in the header; on tap it expands into a centered floating
+// orb with animated concentric rings, a breathing core, and phase-driven visuals.
+// Everything is voice-in, voice-out — no dialog, no text.
 
 import { useEffect, useRef, useState } from "react";
 
-// Arc reactor / orb icon — the Jarvis core. Concentric rings with a glowing center.
-function ArcReactor({ size = 20, active = false, thinking = false }: { size?: number; active?: boolean; thinking?: boolean }) {
+/* ------------------------------------------------------------------ */
+/*  Arc Reactor SVG                                                    */
+/* ------------------------------------------------------------------ */
+
+function ArcReactor({ size = 20, phase = "idle" }: { size?: number; phase?: string }) {
+  const active = phase === "listening" || phase === "reply";
+  const thinking = phase === "thinking";
+  const expanded = phase !== "idle";
+  // More ring segments when expanded for detail
+  const segments = expanded ? 12 : 6;
+  const segAngle = 360 / segments;
+
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"
-      className={thinking ? "jarvis-spin" : ""}>
-      {/* outer glow when active */}
-      {active && <circle cx="16" cy="16" r="15" fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1" className="jarvis-ring-outer" />}
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ overflow: "visible" }}
+    >
+      <defs>
+        <radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#c4b5fd" stopOpacity={active || thinking ? "1" : "0.6"} />
+          <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
+        </radialGradient>
+        <filter id="blur-glow">
+          <feGaussianBlur stdDeviation={expanded ? "4" : "2"} />
+        </filter>
+      </defs>
+
+      {/* ambient glow behind everything */}
+      {expanded && (
+        <circle cx="50" cy="50" r="48" fill="url(#core-glow)" opacity="0.35" filter="url(#blur-glow)" />
+      )}
+
+      {/* outermost dashed ring — slow counter-rotate */}
+      {expanded && (
+        <circle
+          cx="50" cy="50" r="46"
+          fill="none"
+          stroke="rgba(167,139,250,0.2)"
+          strokeWidth="0.5"
+          strokeDasharray="4 8"
+          className="jarvis-ring-ccw"
+        />
+      )}
+
       {/* outer ring */}
-      <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
-      {/* middle ring with notches */}
-      <circle cx="16" cy="16" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.7" />
-      {/* small accent lines radiating out (like the arc reactor segments) */}
-      {[0, 60, 120, 180, 240, 300].map((deg) => (
-        <line key={deg} x1="16" y1="4.5" x2="16" y2="6.5" stroke="currentColor" strokeWidth="1" opacity="0.5"
-          transform={`rotate(${deg} 16 16)`} />
-      ))}
+      <circle
+        cx="50" cy="50" r={expanded ? 42 : 40}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={expanded ? "1" : "1.5"}
+        opacity={active ? "0.7" : "0.4"}
+        className={active ? "jarvis-ring-outer-lg" : ""}
+      />
+
+      {/* segment tick marks */}
+      {Array.from({ length: segments }).map((_, i) => {
+        const deg = i * segAngle;
+        return (
+          <line
+            key={deg}
+            x1="50" y1={expanded ? "10" : "12"}
+            x2="50" y2={expanded ? "16" : "17"}
+            stroke="currentColor"
+            strokeWidth={expanded ? "0.8" : "1"}
+            opacity={active ? "0.7" : "0.4"}
+            transform={`rotate(${deg} 50 50)`}
+          />
+        );
+      })}
+
+      {/* middle ring */}
+      <circle
+        cx="50" cy="50" r={expanded ? 30 : 28}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={expanded ? "0.8" : "1.2"}
+        opacity="0.5"
+        className={thinking ? "jarvis-ring-think" : ""}
+      />
+
+      {/* inner dashed ring — visible when expanded */}
+      {expanded && (
+        <circle
+          cx="50" cy="50" r="22"
+          fill="none"
+          stroke="rgba(167,139,250,0.3)"
+          strokeWidth="0.6"
+          strokeDasharray="3 6"
+          className="jarvis-ring-cw"
+        />
+      )}
+
       {/* inner ring */}
-      <circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.8" />
-      {/* glowing core — the bright center dot */}
-      <circle cx="16" cy="16" r="3" fill={active || thinking ? "rgba(167,139,250,0.9)" : "rgba(167,139,250,0.5)"} className={active ? "jarvis-core-glow" : ""} />
-      <circle cx="16" cy="16" r="1.5" fill="white" opacity={active || thinking ? "0.95" : "0.6"} />
+      <circle
+        cx="50" cy="50" r={expanded ? 16 : 17}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={expanded ? "0.8" : "1"}
+        opacity="0.7"
+      />
+
+      {/* core glow */}
+      <circle
+        cx="50" cy="50"
+        r={expanded ? 10 : 9}
+        fill={active || thinking ? "rgba(167,139,250,0.85)" : "rgba(167,139,250,0.45)"}
+        className={active ? "jarvis-core-glow" : thinking ? "jarvis-core-think" : ""}
+      />
+
+      {/* bright center */}
+      <circle
+        cx="50" cy="50"
+        r={expanded ? 5 : 4.5}
+        fill="white"
+        opacity={active || thinking ? "0.95" : "0.55"}
+      />
+
+      {/* tiny center pip */}
+      {expanded && (
+        <circle cx="50" cy="50" r="2" fill="rgba(167,139,250,1)" opacity="0.9" />
+      )}
     </svg>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Phase label shown below the expanded orb                           */
+/* ------------------------------------------------------------------ */
+
+function PhaseLabel({ phase }: { phase: string }) {
+  const labels: Record<string, string> = {
+    listening: "Listening...",
+    thinking: "Processing...",
+    reply: "Speaking...",
+    error: "Error",
+  };
+  const label = labels[phase];
+  if (!label) return null;
+  return (
+    <span className="text-[11px] font-medium tracking-widest uppercase text-violet-300/70 mt-3 select-none">
+      {label}
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Types & constants                                                  */
+/* ------------------------------------------------------------------ */
 
 type Phase = "idle" | "listening" | "thinking" | "reply" | "error";
 type Turn = { role: "user" | "assistant"; content: string };
 
 const FOLLOW_UP_MS = 2 * 60_000;
 
-// Browser speech fallback when Cartesia audio isn't available.
+/* ------------------------------------------------------------------ */
+/*  TTS helpers                                                        */
+/* ------------------------------------------------------------------ */
+
 function pickVoice() {
   if (typeof window === "undefined" || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
@@ -75,6 +207,10 @@ function speak(text: string, audioBase64?: string, onEnded?: () => void) {
   speakBrowserFallback(text);
   if (onEnded) setTimeout(onEnded, 1500);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Main component                                                     */
+/* ------------------------------------------------------------------ */
 
 export default function Jarvis({ onDone }: { onDone?: () => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -162,10 +298,7 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
   };
 
   const activate = () => {
-    // iPad Safari: prime speech with a silent utterance so Cartesia audio can play.
     try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* fine */ }
-
-    // Greet on first activation or after the follow-up window expires.
     if (!history.current.turns.length || Date.now() - history.current.at >= FOLLOW_UP_MS) {
       greet(startRecognition);
     } else {
@@ -175,20 +308,43 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
 
   const handleClick = () => {
     if (phase === "listening") { rec.current?.stop(); return; }
-    if (phase === "thinking") return; // wait for the answer
-    if (phase === "reply" || phase === "error") { stop(); return; } // tap to dismiss
+    if (phase === "thinking") return;
+    if (phase === "reply" || phase === "error") { stop(); return; }
     activate();
   };
 
-  const isActive = phase === "listening" || phase === "reply";
+  const expanded = phase !== "idle";
 
   return (
-    <button onClick={handleClick} aria-label="Talk to Jarvis" disabled={!canListen && phase === "idle"}
-      className={`relative w-9 h-9 flex items-center justify-center rounded-full border active:scale-95 transition-all disabled:opacity-40
-        ${isActive ? "bg-violet-500/30 border-violet-300/50 text-white jarvis-pulse" :
-          phase === "thinking" ? "bg-violet-500/20 border-violet-400/40 text-violet-200" :
-          "bg-white/5 border-white/10 text-violet-300"}`}>
-      <ArcReactor size={18} active={isActive} thinking={phase === "thinking"} />
-    </button>
+    <>
+      {/* small header button — always rendered for layout, invisible when expanded */}
+      <button
+        onClick={handleClick}
+        aria-label="Talk to Jarvis"
+        disabled={!canListen && phase === "idle"}
+        className={`relative w-9 h-9 flex items-center justify-center rounded-full border active:scale-95 transition-all duration-300 disabled:opacity-40
+          ${expanded ? "opacity-0 pointer-events-none" : "bg-white/5 border-white/10 text-violet-300"}`}
+      >
+        <ArcReactor size={18} phase="idle" />
+      </button>
+
+      {/* expanded overlay — the full reactor orb */}
+      {expanded && (
+        <div className="jarvis-overlay" onClick={handleClick}>
+          <div className="jarvis-orb-wrap">
+            {/* outer pulse rings */}
+            <div className={`jarvis-pulse-ring ${phase === "listening" ? "jarvis-pulse-ring-active" : ""}`} />
+            <div className={`jarvis-pulse-ring jarvis-pulse-ring-delayed ${phase === "listening" ? "jarvis-pulse-ring-active" : ""}`} />
+
+            {/* the reactor itself */}
+            <div className={`jarvis-orb jarvis-orb-${phase}`}>
+              <ArcReactor size={120} phase={phase} />
+            </div>
+
+            <PhaseLabel phase={phase} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

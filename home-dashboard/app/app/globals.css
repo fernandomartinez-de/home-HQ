@@ -533,16 +533,87 @@ main > :nth-child(3).panel-in, main > :nth-child(3) .panel-in { animation-delay:
 .svg-ping { transform-box: fill-box; transform-origin: center; animation: svg-ping 1.8s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .svg-ping { animation: none; opacity: 0; } }
 
-@keyframes jarvis-pulse { 0% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.55); } 70%, 100% { box-shadow: 0 0 0 12px rgba(0, 0, 0, 0); } }
-.jarvis-pulse { animation: jarvis-pulse 1.4s ease-out infinite; }
+/* ===== Jarvis expanding reactor ===== */
 
-/* Arc reactor core glow — pulses brighter when Jarvis is listening */
-@keyframes jarvis-core { 0%, 100% { opacity: 0.9; filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.8)); } 50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(167, 139, 250, 1)) drop-shadow(0 0 16px rgba(139, 92, 246, 0.5)); } }
-.jarvis-core-glow { animation: jarvis-core 1.4s ease-in-out infinite; }
+/* Fullscreen overlay — dark tinted backdrop */
+.jarvis-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  animation: jarvis-fade-in 0.3s ease-out;
+  cursor: pointer;
+}
+@keyframes jarvis-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-/* Outer ring rotation when active */
-@keyframes jarvis-ring { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.jarvis-ring-outer { transform-origin: 16px 16px; animation: jarvis-ring 8s linear infinite; }
+/* Centered wrapper — holds the orb, pulse rings, and label */
+.jarvis-orb-wrap {
+  display: flex; flex-direction: column; align-items: center; position: relative;
+}
 
-/* Whole icon spins when Jarvis is thinking */
-.jarvis-spin { animation: jarvis-ring 1.5s linear infinite; }
+/* The reactor orb container — scales up on enter */
+.jarvis-orb {
+  position: relative; z-index: 2;
+  animation: jarvis-expand 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  color: rgba(196, 181, 253, 0.85); /* violet-300 */
+}
+@keyframes jarvis-expand { from { transform: scale(0.15); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Phase-specific orb styles */
+.jarvis-orb-listening { filter: drop-shadow(0 0 24px rgba(167, 139, 250, 0.5)); }
+.jarvis-orb-thinking  { filter: drop-shadow(0 0 16px rgba(139, 92, 246, 0.4)); }
+.jarvis-orb-reply     { filter: drop-shadow(0 0 30px rgba(167, 139, 250, 0.6)); }
+.jarvis-orb-error     { filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.4)); color: rgba(239, 68, 68, 0.7); }
+
+/* Expanding pulse rings behind the orb */
+.jarvis-pulse-ring {
+  position: absolute; top: 50%; left: 50%;
+  width: 160px; height: 160px;
+  margin: -80px 0 0 -80px;
+  border-radius: 50%;
+  border: 1px solid rgba(167, 139, 250, 0.15);
+  z-index: 1; pointer-events: none;
+  opacity: 0;
+}
+.jarvis-pulse-ring-active {
+  animation: jarvis-ring-pulse 2.4s ease-out infinite;
+}
+.jarvis-pulse-ring-delayed {
+  animation-delay: 1.2s;
+}
+@keyframes jarvis-ring-pulse {
+  0%   { transform: scale(0.6); opacity: 0.6; border-color: rgba(167, 139, 250, 0.4); }
+  100% { transform: scale(2.2); opacity: 0; border-color: rgba(167, 139, 250, 0); }
+}
+
+/* Ring rotations — large reactor uses 50,50 origin */
+@keyframes jarvis-rotate-cw  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes jarvis-rotate-ccw { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+
+.jarvis-ring-outer-lg { transform-origin: 50px 50px; animation: jarvis-rotate-cw 8s linear infinite; }
+.jarvis-ring-cw       { transform-origin: 50px 50px; animation: jarvis-rotate-cw 12s linear infinite; }
+.jarvis-ring-ccw      { transform-origin: 50px 50px; animation: jarvis-rotate-ccw 20s linear infinite; }
+.jarvis-ring-think    { transform-origin: 50px 50px; animation: jarvis-rotate-cw 2s linear infinite; }
+
+/* Core glow — breathes when listening */
+@keyframes jarvis-core-breathe {
+  0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.8)); }
+  50%      { opacity: 1;    filter: drop-shadow(0 0 12px rgba(167, 139, 250, 1)) drop-shadow(0 0 24px rgba(139, 92, 246, 0.5)); }
+}
+.jarvis-core-glow  { animation: jarvis-core-breathe 1.4s ease-in-out infinite; }
+
+/* Core when thinking — faster, tighter pulse */
+@keyframes jarvis-core-pulse {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.9)); }
+}
+.jarvis-core-think { animation: jarvis-core-pulse 0.8s ease-in-out infinite; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .jarvis-overlay { animation: none; }
+  .jarvis-orb { animation: none; }
+  .jarvis-pulse-ring-active { animation: none; }
+  .jarvis-ring-outer-lg, .jarvis-ring-cw, .jarvis-ring-ccw, .jarvis-ring-think { animation: none; }
+  .jarvis-core-glow, .jarvis-core-think { animation: none; }
+}
