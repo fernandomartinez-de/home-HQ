@@ -1,45 +1,44 @@
-"use client";
+“use client”;
 
-// Jarvis: tap the mic, say what you want ("movie mode", "kitchen lights to 40 percent", "is the door
-// locked?"), and Home HQ does it and answers out loud. Speech to text is the browser's own (Safari on
-// the iPad); the understanding happens in the jarvis function. Typing works too.
+// Jarvis: tap the arc reactor, speak, and Jarvis does it and answers out loud.
+// No dialog box — just the icon. It glows when listening, spins when thinking,
+// and pulses when replying. Everything is voice-in, voice-out.
 
-import { useEffect, useRef, useState } from "react";
-import { Send as SendIcon, X, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from “react”;
 
 // Arc reactor / orb icon — the Jarvis core. Concentric rings with a glowing center.
-function ArcReactor({ size = 20, active = false }: { size?: number; active?: boolean }) {
+function ArcReactor({ size = 20, active = false, thinking = false }: { size?: number; active?: boolean; thinking?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox=”0 0 32 32” fill=”none” xmlns=”http://www.w3.org/2000/svg”
+      className={thinking ? “jarvis-spin” : “”}>
       {/* outer glow when active */}
-      {active && <circle cx="16" cy="16" r="15" fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1" className="jarvis-ring-outer" />}
+      {active && <circle cx=”16” cy=”16” r=”15” fill=”none” stroke=”rgba(167,139,250,0.3)” strokeWidth=”1” className=”jarvis-ring-outer” />}
       {/* outer ring */}
-      <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
+      <circle cx=”16” cy=”16” r=”13” fill=”none” stroke=”currentColor” strokeWidth=”1.5” opacity=”0.5” />
       {/* middle ring with notches */}
-      <circle cx="16" cy="16" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.7" />
+      <circle cx=”16” cy=”16” r=”9.5” fill=”none” stroke=”currentColor” strokeWidth=”1.2” opacity=”0.7” />
       {/* small accent lines radiating out (like the arc reactor segments) */}
       {[0, 60, 120, 180, 240, 300].map((deg) => (
-        <line key={deg} x1="16" y1="4.5" x2="16" y2="6.5" stroke="currentColor" strokeWidth="1" opacity="0.5"
+        <line key={deg} x1=”16” y1=”4.5” x2=”16” y2=”6.5” stroke=”currentColor” strokeWidth=”1” opacity=”0.5”
           transform={`rotate(${deg} 16 16)`} />
       ))}
       {/* inner ring */}
-      <circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.8" />
+      <circle cx=”16” cy=”16” r=”6” fill=”none” stroke=”currentColor” strokeWidth=”1” opacity=”0.8” />
       {/* glowing core — the bright center dot */}
-      <circle cx="16" cy="16" r="3" fill={active ? "rgba(167,139,250,0.9)" : "rgba(167,139,250,0.5)"} className={active ? "jarvis-core-glow" : ""} />
-      <circle cx="16" cy="16" r="1.5" fill="white" opacity={active ? "0.95" : "0.6"} />
+      <circle cx=”16” cy=”16” r=”3” fill={active || thinking ? “rgba(167,139,250,0.9)” : “rgba(167,139,250,0.5)”} className={active ? “jarvis-core-glow” : “”} />
+      <circle cx=”16” cy=”16” r=”1.5” fill=”white” opacity={active || thinking ? “0.95” : “0.6”} />
     </svg>
   );
 }
 
-type Phase = "idle" | "listening" | "thinking" | "reply" | "error";
-type Turn = { role: "user" | "assistant"; content: string };
+type Phase = “idle” | “listening” | “thinking” | “reply” | “error”;
+type Turn = { role: “user” | “assistant”; content: string };
 
-const FOLLOW_UP_MS = 2 * 60_000; // a request within 2 minutes can refer back ("now make them red")
+const FOLLOW_UP_MS = 2 * 60_000;
 
-// A British voice if the device has one, for the Jarvis feel; otherwise the default English voice.
-// Used as fallback when the Cartesia audio isn't available.
+// Browser speech fallback when Cartesia audio isn't available.
 function pickVoice() {
-  if (typeof window === "undefined" || !window.speechSynthesis) return null;
+  if (typeof window === “undefined” || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
   return voices.find((v) => /Daniel|Arthur|Oliver/i.test(v.name) && /en-GB/i.test(v.lang))
     ?? voices.find((v) => /en-GB/i.test(v.lang))
@@ -59,10 +58,8 @@ function speakBrowserFallback(text: string) {
   } catch { /* speech is a nicety */ }
 }
 
-// Play Cartesia TTS audio (base64 MP3), or fall back to browser speech.
 let currentAudio: HTMLAudioElement | null = null;
-function speak(text: string, audioBase64?: string) {
-  // Stop any playing audio
+function speak(text: string, audioBase64?: string, onEnded?: () => void) {
   try { currentAudio?.pause(); currentAudio = null; } catch { /* fine */ }
   try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
 
@@ -70,19 +67,17 @@ function speak(text: string, audioBase64?: string) {
     try {
       const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
       currentAudio = audio;
-      audio.play().catch(() => speakBrowserFallback(text));
+      if (onEnded) audio.onended = onEnded;
+      audio.play().catch(() => { speakBrowserFallback(text); if (onEnded) setTimeout(onEnded, 1500); });
       return;
-    } catch { /* fall through to browser */ }
+    } catch { /* fall through */ }
   }
   speakBrowserFallback(text);
+  if (onEnded) setTimeout(onEnded, 1500);
 }
 
 export default function Jarvis({ onDone }: { onDone?: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [heard, setHeard] = useState("");
-  const [reply, setReply] = useState("");
-  const [typed, setTyped] = useState("");
+  const [phase, setPhase] = useState<Phase>(“idle”);
   const [canListen, setCanListen] = useState(true);
   const rec = useRef<any>(null);
   const history = useRef<{ turns: Turn[]; at: number }>({ turns: [], at: 0 });
@@ -90,110 +85,87 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
   useEffect(() => {
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
     setCanListen(!!SR);
-    window.speechSynthesis?.getVoices(); // loads the voice list early
+    window.speechSynthesis?.getVoices();
   }, []);
 
-  const close = () => {
+  const stop = () => {
     try { rec.current?.abort(); } catch { /* already stopped */ }
     try { currentAudio?.pause(); currentAudio = null; } catch { /* fine */ }
     window.speechSynthesis?.cancel();
-    setOpen(false);
-    setPhase("idle");
+    setPhase(“idle”);
   };
 
   const ask = async (text: string) => {
     const said = text.trim();
-    if (!said) { setPhase("idle"); return; }
-    setHeard(said);
-    setPhase("thinking");
+    if (!said) { setPhase(“idle”); return; }
+    setPhase(“thinking”);
     const h = Date.now() - history.current.at < FOLLOW_UP_MS ? history.current.turns : [];
     try {
-      const r = await fetch("/api/jarvis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const r = await fetch(“/api/jarvis”, {
+        method: “POST”,
+        headers: { “Content-Type”: “application/json” },
         body: JSON.stringify({ text: said, history: h }),
       });
       const body = await r.json().catch(() => ({}));
-      const answer = String(body.reply ?? body.error ?? "Sorry, I didn't catch that.");
-      setReply(answer);
-      setPhase(r.ok ? "reply" : "error");
-      speak(answer, body.audio);
-      history.current = { turns: [...h, { role: "user" as const, content: said }, { role: "assistant" as const, content: answer }].slice(-6), at: Date.now() };
+      const answer = String(body.reply ?? body.error ?? “Sorry, I didn't catch that.”);
+      setPhase(r.ok ? “reply” : “error”);
+      speak(answer, body.audio, () => setPhase(“idle”));
+      history.current = { turns: [...h, { role: “user” as const, content: said }, { role: “assistant” as const, content: answer }].slice(-6), at: Date.now() };
       if (r.ok && Array.isArray(body.did) && body.did.length) setTimeout(() => onDone?.(), 2500);
-    } catch (e) {
-      setReply(`Couldn't reach Jarvis: ${(e as Error).message}`);
-      setPhase("error");
+    } catch {
+      setPhase(“error”);
+      speak(“Sorry, I couldn't reach the house.”, undefined, () => setPhase(“idle”));
     }
   };
 
-  // Fetch and play the time-based greeting, then start listening once the audio ends.
-  const greet = async (startListeningAfter: () => void) => {
+  const startRecognition = () => {
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    if (!SR) { setPhase(“idle”); return; }
+    window.speechSynthesis?.cancel();
+    const r = new SR();
+    r.lang = “en-US”;
+    r.interimResults = false;
+    r.continuous = false;
+    let final = “”;
+    r.onresult = (ev: any) => {
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
+      }
+    };
+    r.onerror = (ev: any) => {
+      if (ev.error === “no-speech” || ev.error === “aborted”) { setPhase(“idle”); return; }
+      setPhase(“error”);
+      speak(ev.error === “not-allowed” ? “Allow the microphone in Safari settings.” : “Couldn't listen.”, undefined, () => setPhase(“idle”));
+    };
+    r.onend = () => { rec.current = null; if (final.trim()) ask(final); else setPhase(“idle”); };
+    rec.current = r;
+    setPhase(“listening”);
+    try { r.start(); } catch { setPhase(“idle”); }
+  };
+
+  const greet = async (then: () => void) => {
     try {
-      const r = await fetch("/api/jarvis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const r = await fetch(“/api/jarvis”, {
+        method: “POST”,
+        headers: { “Content-Type”: “application/json” },
         body: JSON.stringify({ greet: true }),
       });
       const body = await r.json().catch(() => ({}));
-      const text = String(body.reply ?? "");
+      const text = String(body.reply ?? “”);
       if (text) {
-        setReply(text);
-        setPhase("reply");
-        if (body.audio) {
-          // Play greeting audio, then start listening when it finishes
-          try { currentAudio?.pause(); currentAudio = null; } catch { /* fine */ }
-          const audio = new Audio(`data:audio/mpeg;base64,${body.audio}`);
-          currentAudio = audio;
-          audio.onended = () => { setReply(""); startListeningAfter(); };
-          audio.onerror = () => { startListeningAfter(); };
-          audio.play().catch(() => { speakBrowserFallback(text); setTimeout(startListeningAfter, 1500); });
-          return;
-        }
-        speakBrowserFallback(text);
-        setTimeout(startListeningAfter, 1500);
+        setPhase(“reply”);
+        speak(text, body.audio, then);
         return;
       }
-    } catch { /* greeting failed, just start listening */ }
-    startListeningAfter();
+    } catch { /* greeting failed, just listen */ }
+    then();
   };
 
-  const listen = () => {
-    // iPad Safari only lets a page talk after a tap, so prime speech now with a silent utterance.
-    try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* fine */ }
-    setOpen(true);
-    setReply("");
-    setHeard("");
+  const activate = () => {
+    // iPad Safari: prime speech with a silent utterance so Cartesia audio can play.
+    try { const u = new SpeechSynthesisUtterance(“ “); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* fine */ }
 
-    const startRecognition = () => {
-      const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-      if (!SR) { setPhase("idle"); return; }
-      window.speechSynthesis?.cancel();
-      const r = new SR();
-      r.lang = "en-US";
-      r.interimResults = true;
-      r.continuous = false;
-      let final = "";
-      r.onresult = (ev: any) => {
-        let interim = "";
-        for (let i = ev.resultIndex; i < ev.results.length; i++) {
-          const t = ev.results[i][0].transcript;
-          if (ev.results[i].isFinal) final += t; else interim += t;
-        }
-        setHeard((final + interim).trim());
-      };
-      r.onerror = (ev: any) => {
-        if (ev.error === "no-speech" || ev.error === "aborted") { setPhase("idle"); return; }
-        setReply(ev.error === "not-allowed" ? "Allow the microphone for this site in Safari settings, or type below." : `Couldn't listen: ${ev.error}`);
-        setPhase("error");
-      };
-      r.onend = () => { rec.current = null; if (final.trim()) ask(final); else setPhase((p) => (p === "listening" ? "idle" : p)); };
-      rec.current = r;
-      setPhase("listening");
-      try { r.start(); } catch { setPhase("idle"); }
-    };
-
-    // Greet first, then start listening after the greeting finishes playing.
-    // On follow-ups (panel already open, re-tap), skip the greeting.
+    // Greet on first activation or after the follow-up window expires.
     if (!history.current.turns.length || Date.now() - history.current.at >= FOLLOW_UP_MS) {
       greet(startRecognition);
     } else {
@@ -201,37 +173,22 @@ export default function Jarvis({ onDone }: { onDone?: () => void }) {
     }
   };
 
-  const status = phase === "listening" ? "Listening…" : phase === "thinking" ? "On it…" : phase === "error" ? "Something went wrong" : phase === "reply" ? "Jarvis" : canListen ? "Tap the mic and speak" : "Type a request";
+  const handleClick = () => {
+    if (phase === “listening”) { rec.current?.stop(); return; }
+    if (phase === “thinking”) return; // wait for the answer
+    if (phase === “reply” || phase === “error”) { stop(); return; } // tap to dismiss
+    activate();
+  };
+
+  const isActive = phase === “listening” || phase === “reply”;
 
   return (
-    <>
-      <button onClick={() => (phase === "listening" ? rec.current?.stop() : listen())} aria-label="Talk to Jarvis"
-        className={`w-9 h-9 flex items-center justify-center rounded-full border active:scale-95 transition-colors ${phase === "listening" ? "bg-violet-500/30 border-violet-300/50 text-white jarvis-pulse" : "bg-white/5 border-white/10 text-violet-300"}`}>
-        <ArcReactor size={18} active={phase === "listening"} />
-      </button>
-      {open && (
-        <div className="fixed inset-x-0 top-[84px] z-[60] flex justify-center px-4 pointer-events-none">
-          <div role="dialog" aria-label="Jarvis" className="pointer-events-auto w-full max-w-[560px] rounded-3xl bg-[#17161d]/95 backdrop-blur border border-violet-300/20 shadow-2xl shadow-black/60 p-4 panel-in">
-            <div className="flex items-center gap-3">
-              <button onClick={() => (phase === "listening" ? rec.current?.stop() : listen())} disabled={!canListen || phase === "thinking"} aria-label={phase === "listening" ? "Stop listening" : "Speak again"}
-                className={`relative w-12 h-12 shrink-0 rounded-full flex items-center justify-center border disabled:opacity-50 ${phase === "listening" ? "bg-violet-500/20 border-violet-300 text-white jarvis-pulse" : "bg-violet-500/10 border-violet-400/30 text-violet-200"}`}>
-                {phase === "thinking" ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArcReactor size={28} active={phase === "listening"} />}
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-mono tracking-wider uppercase text-violet-300/80">{status}</div>
-                <div className="text-[15px] text-slate-400 truncate">{heard ? `“${heard}”` : phase === "listening" ? "…" : ""}</div>
-              </div>
-              <button onClick={close} aria-label="Close" className="w-9 h-9 shrink-0 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400"><X className="w-4 h-4" /></button>
-            </div>
-            {reply && <p className={`mt-3 text-[17px] leading-snug ${phase === "error" ? "text-amber-200" : "text-white"}`}>{reply}</p>}
-            <form onSubmit={(e) => { e.preventDefault(); const t = typed; setTyped(""); ask(t); }} className="mt-3 flex gap-2">
-              <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Or type: movie mode, lock the door…" enterKeyHint="send"
-                className="flex-1 min-w-0 h-10 px-3 rounded-xl bg-black/40 border border-white/10 text-[14px] text-white placeholder:text-slate-500 outline-none focus:border-violet-400/50" />
-              <button type="submit" disabled={!typed.trim() || phase === "thinking"} aria-label="Send" className="w-10 h-10 shrink-0 rounded-xl bg-violet-500/20 border border-violet-400/30 text-violet-200 flex items-center justify-center disabled:opacity-40"><SendIcon className="w-4 h-4" /></button>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+    <button onClick={handleClick} aria-label=”Talk to Jarvis” disabled={!canListen && phase === “idle”}
+      className={`relative w-9 h-9 flex items-center justify-center rounded-full border active:scale-95 transition-all disabled:opacity-40
+        ${isActive ? “bg-violet-500/30 border-violet-300/50 text-white jarvis-pulse” :
+          phase === “thinking” ? “bg-violet-500/20 border-violet-400/40 text-violet-200” :
+          “bg-white/5 border-white/10 text-violet-300”}`}>
+      <ArcReactor size={18} active={isActive} thinking={phase === “thinking”} />
+    </button>
   );
 }

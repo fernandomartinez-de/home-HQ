@@ -543,3 +543,6 @@ main > :nth-child(3).panel-in, main > :nth-child(3) .panel-in { animation-delay:
 /* Outer ring rotation when active */
 @keyframes jarvis-ring { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .jarvis-ring-outer { transform-origin: 16px 16px; animation: jarvis-ring 8s linear infinite; }
+
+/* Whole icon spins when Jarvis is thinking */
+.jarvis-spin { animation: jarvis-ring 1.5s linear infinite; }
